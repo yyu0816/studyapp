@@ -16,8 +16,39 @@ app_state = st.session_state["app_state"]
 st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
 # 3. 再來才是 import 你的頁面函式
-from studyapp.pages.monthlyplan import render_monthly_plan_page
+from pathlib import Path
+import importlib.util
+import sys
 
+
+def _import_monthly_plan_renderer():
+    try:
+        from studyapp.pages.monthlyplan import render_monthly_plan_page
+        return render_monthly_plan_page
+    except ModuleNotFoundError as err:
+        if err.name not in {"studyapp.pages.monthlyplan", "studyapp"}:
+            raise
+
+    try:
+        from pages.monthlyplan import render_monthly_plan_page
+        return render_monthly_plan_page
+    except ModuleNotFoundError as err:
+        if err.name != "pages.monthlyplan":
+            raise
+
+    module_path = Path(__file__).resolve().parent / "pages" / "monthlyplan.py"
+    if not module_path.exists():
+        raise FileNotFoundError(f"Cannot find monthlyplan module at {module_path}")
+    spec = importlib.util.spec_from_file_location("studyapp.pages.monthlyplan", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load monthlyplan module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.render_monthly_plan_page
+
+
+render_monthly_plan_page = _import_monthly_plan_renderer()
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
