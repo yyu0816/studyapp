@@ -392,6 +392,8 @@ def render_setup_page() -> None:
         index=count_options.index(str(st.session_state.get("preferred_subject_count", "無偏好"))) if str(st.session_state.get("preferred_subject_count", "無偏好")) in count_options else 0,
         key="preferred_subject_count",
     )
+    preferred_subject_count = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
+    st.session_state["preferred_subject_count"] = preferred_subject_count
 
     st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
@@ -416,7 +418,6 @@ def render_setup_page() -> None:
             custom_color_value = None
             if use_custom_color:
                 custom_color_value = st.color_picker("自訂顏色", value=event.get("display_color") or event.get("color") or "#4f84ff", key=f"event_custom_color_{idx}")
-                custom_color_value = st.text_input("或輸入色號", value=custom_color_value, key=f"event_custom_hex_{idx}")
             st.session_state["fixed_events"][idx] = {
                 "title": title_value,
                 "weekdays": weekdays_value,
