@@ -1,3 +1,16 @@
+import streamlit as st
+
+# 【關鍵修改】確保在任何程式碼執行前，session_state 已經準備好了
+if "app_state" not in st.session_state:
+    st.session_state["app_state"] = {
+        "plan": None,
+        "daily_log": None,
+        "monthly_plan": None,
+    }
+
+# 之後在程式碼中，統一使用下面這個別名，就不會再報錯了
+app_state = st.session_state["app_state"]
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
