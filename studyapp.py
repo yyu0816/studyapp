@@ -517,41 +517,87 @@ def render_setup_page() -> None:
 
 def render_monthly_plan_page() -> None:
     st.subheader("月曆與讀書計畫")
-    st.caption("月曆上會顯示固定行程，下面則列出每天要完成的事項。")
+    st.caption("月曆上會顯示固定行程與每日排程；點選日期可展開查看當天任務。")
 
-    if not app_state.get("monthly_plan"):
+    if not app_state.get("monthly_plan") or not app_state.get("plan"):
         st.info("請先完成初始設定。")
         return
 
-    monthly_plan = app_state["monthly_plan"] or []
-    week_groups = [monthly_plan[index:index + 7] for index in range(0, len(monthly_plan), 7)]
-    for week in week_groups:
-        cols = st.columns(7)
-        for col, item in zip(cols, week):
-            with col:
-                st.markdown(f"**{item['date']}**")
-                st.caption(item["day_name"])
-                if item.get("fixed_events"):
-                    for event in item["fixed_events"]:
-                        if event.get("show_on_calendar", True):
-                            st.markdown(f"- {event['title'] or '行程'}")
-                if item.get("subjects"):
-                    st.write("科目：" + ", ".join(item["subjects"]))
-                else:
-                    st.write("科目：尚未指定")
-        st.write("")
+    plan = app_state.get("plan") or {}
+    monthly_plan = app_state.get("monthly_plan") or []
 
-    st.markdown("### 每天須完成的事項")
-    for item in monthly_plan:
-        with st.expander(f"{item['date']} {item['day_name']}"):
+    # index monthly_plan by date string for fast lookup
+    plan_by_date: dict[str, dict] = {item["date"]: item for item in monthly_plan}
+
+    # parse start and end from plan
+    try:
+        start_date = datetime.strptime(plan.get("start_date", ""), "%Y-%m-%d").date()
+        end_date = datetime.strptime(plan.get("end_date", ""), "%Y-%m-%d").date()
+    except Exception:
+        st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
+        return
+
+    # align calendar to weeks starting on Monday
+    calendar_start = start_date - timedelta(days=(start_date.weekday()))
+    calendar_end = end_date + timedelta(days=(6 - end_date.weekday()))
+
+    # build rows of weeks
+    current = calendar_start
+    weeks: list[list[date]] = []
+    while current <= calendar_end:
+        week = [current + timedelta(days=i) for i in range(7)]
+        weeks.append(week)
+        current += timedelta(days=7)
+
+    # render calendar header
+    headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    st.markdown("### 月曆視圖")
+    for week in weeks:
+        cols = st.columns(7)
+        for col, day in zip(cols, week):
+            with col:
+                day_str = day.strftime("%Y-%m-%d")
+                is_in_range = start_date <= day <= end_date
+                day_label = day.strftime("%m/%d")
+                if not is_in_range:
+                    st.markdown(f"**{day_label}**", unsafe_allow_html=True)
+                    st.write("")
+                    continue
+
+                st.markdown(f"**{day_label}**")
+                item = plan_by_date.get(day_str)
+                if item:
+                    # fixed events
+                    if item.get("fixed_events"):
+                        for event in item.get("fixed_events", []):
+                            if event.get("show_on_calendar", True):
+                                st.caption(f"📌 {event.get('title') or '行程'} {event.get('start','')}~{event.get('end','')}")
+                    # subjects
+                    if item.get("subjects"):
+                        st.markdown("**科目：**")
+                        st.write(", ".join(item.get("subjects", [])))
+                    # tasks
+                    if item.get("tasks"):
+                        st.markdown("**今天任務**")
+                        for t in item.get("tasks", []):
+                            st.write(f"- {t}")
+                else:
+                    st.write("無排程")
+
+    st.markdown("---")
+    st.markdown("### 每日詳細清單（可展開）")
+    for day in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)):
+        day_str = day.strftime("%Y-%m-%d")
+        item = plan_by_date.get(day_str, {})
+        with st.expander(f"{day.strftime('%Y-%m-%d')} {item.get('day_name','')}"):
             if item.get("fixed_events"):
-                st.write("固定行程")
-                for event in item["fixed_events"]:
+                st.write("固定行程：")
+                for event in item.get("fixed_events", []):
                     if event.get("show_on_calendar", True):
-                        st.write(f"- {event['title'] or '行程'}：{event['start']} ～ {event['end']}")
-            st.write("今日須完成")
+                        st.write(f"- {event.get('title') or '行程'}：{event.get('start','')} ～ {event.get('end','')}")
+            st.write("今日須完成：")
             if item.get("tasks"):
-                for task in item["tasks"]:
+                for task in item.get("tasks", []):
                     st.write(f"- {task}")
             else:
                 st.write("- 尚未指定")
