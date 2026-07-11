@@ -393,7 +393,6 @@ def render_setup_page() -> None:
         key="preferred_subject_count",
     )
     preferred_subject_count = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
-    st.session_state["preferred_subject_count"] = preferred_subject_count
 
     st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
@@ -448,7 +447,7 @@ def render_setup_page() -> None:
             "plan_goal": st.session_state.get("plan_goal", ""),
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
-            "preferred_subject_count": int(st.session_state.get("preferred_subject_count", 0) or 0),
+            "preferred_subject_count": preferred_subject_count,
             "subjects": st.session_state["subjects"],
             "fixed_events": st.session_state["fixed_events"],
             "weekday_wake": weekday_wake,
