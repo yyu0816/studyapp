@@ -42,7 +42,11 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
                 if name or pages_value > 0:
                     materials.append({"name": name, "type": material_type, "pages": pages_value if pages_value > 0 else 0})
             if subject.get("name") or materials:
-                subjects.append({"name": str(subject.get("name", "") or "").strip(), "materials": materials})
+                subjects.append({
+                    "name": str(subject.get("name", "") or "").strip(),
+                    "materials": materials,
+                    "weekdays": list(subject.get("weekdays", []) or []),
+                })
         return subjects
 
     if hasattr(form_data, "getlist"):
@@ -125,15 +129,18 @@ def get_adjustment_message(pacing_feedback: str, time_loss: str, mood: str) -> s
 
 
 def build_plan_summary(plan_data: dict[str, Any], daily_data: dict[str, Any]) -> str:
-    subject_lines = "<ul>" + "".join(
-        f"<li>{item['name']}：{', '.join(f'{material['name'] or material['type']} {material['pages']} 頁' for material in item.get('materials', []))}</li>"
-        for item in plan_data.get("subjects", [])
-    ) + "</ul>"
+    subject_lines = "<ul>"
+    for item in plan_data.get("subjects", []):
+        material_texts = []
+        for material in item.get("materials", []):
+            material_texts.append(f"{material.get('name') or material.get('type')} {material.get('pages')} 頁")
+        subject_lines += f"<li>{item.get('name')}：{', '.join(material_texts)}</li>"
+    subject_lines += "</ul>"
 
-    schedule_lines = "<ul>" + "".join(
-        f"<li>{item['title']}：{', '.join(item.get('weekdays', []))} {item['start']} ～ {item['end']}（{item.get('display_color', item.get('color', ''))}）</li>"
-        for item in plan_data.get("fixed_events", [])
-    ) + "</ul>"
+    schedule_lines = "<ul>"
+    for item in plan_data.get("fixed_events", []):
+        schedule_lines += f"<li>{item.get('title')}：{', '.join(item.get('weekdays', []))} {item.get('start')} ～ {item.get('end')}（{item.get('display_color', item.get('color', ''))}）</li>"
+    schedule_lines += "</ul>"
 
     return f"""
     <section style="padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.08); margin-bottom: 12px;">
@@ -240,6 +247,8 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
         ]
 
     plan_data: dict[str, Any] = {
+        "plan_name": _get_field(form_data, "plan_name"),
+        "plan_goal": _get_field(form_data, "plan_goal"),
         "timeframe": _get_field(form_data, "timeframe") or _get_field(form_data, "timeframe_days") or "",
         "start_date": str(_get_field(form_data, "start_date") or ""),
         "end_date": str(_get_field(form_data, "end_date") or ""),
@@ -317,21 +326,30 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _initialize_session_state() -> None:
     if "subjects" not in st.session_state:
-        st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}]}]
+        st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}], "weekdays": []}]
     if "fixed_events" not in st.session_state:
-        st.session_state["fixed_events"] = [{"title": "", "weekdays": [], "start": "", "end": "", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True}]
+        st.session_state["fixed_events"] = [{"title": "", "weekdays": [], "start": "", "end": "", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}]
+    if "plan_name" not in st.session_state:
+        st.session_state["plan_name"] = ""
+    if "plan_goal" not in st.session_state:
+        st.session_state["plan_goal"] = ""
+    if "preferred_subject_count" not in st.session_state:
+        st.session_state["preferred_subject_count"] = 0
 
 
 def render_setup_page() -> None:
     st.subheader("1. 初始設定")
     _initialize_session_state()
 
+    plan_name = st.text_input("讀書計畫名稱", value=st.session_state.get("plan_name", ""), key="plan_name")
+    plan_goal = st.text_area("計畫目標", value=st.session_state.get("plan_goal", ""), placeholder="例如：每天至少看完 50 頁，並保持穩定複習節奏。", key="plan_goal")
+    st.session_state["plan_name"] = plan_name
+    st.session_state["plan_goal"] = plan_goal
+
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
     end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date")
     if end_date < start_date:
         st.error("結束日期不能早於開始日期。")
-
-    preferred_subject_count = st.number_input("每天偏好的科目數量", min_value=1, max_value=10, step=1, value=2, key="preferred_subject_count")
 
     st.subheader("科目與教材")
     st.caption("每個科目可新增多個教材／材料，輸入完一項後再按新增科目或新增教材。")
@@ -361,10 +379,19 @@ def render_setup_page() -> None:
                     st.session_state["subjects"][idx]["materials"][mid]["pages"] = int(pages_value)
             if st.button("新增教材／材料", key=f"add_material_{idx}"):
                 st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "教材", "pages": 1})
+            weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
+            st.session_state["subjects"][idx]["weekdays"] = weekdays_value
         st.divider()
 
     if st.button("新增科目"):
-        st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}]})
+        st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}], "weekdays": []})
+
+    st.subheader("學習偏好")
+    count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
+    preferred_subject_count_value = st.selectbox("每天偏好的總科目數量", count_options, index=count_options.index(str(st.session_state.get("preferred_subject_count", "無偏好"))) if str(st.session_state.get("preferred_subject_count", "無偏好")) in count_options else 0, key="preferred_subject_count")
+    st.session_state["preferred_subject_count"] = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
+
+    st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
     st.subheader("固定行程")
     st.caption("可像 Google Calendar 一樣新增固定行程，並選擇要不要顯示在月曆上。")
@@ -383,10 +410,11 @@ def render_setup_page() -> None:
                 key=f"event_color_{idx}",
             )
             show_on_calendar = st.checkbox("顯示在月曆", value=bool(event.get("show_on_calendar", True)), key=f"event_show_{idx}")
-            custom_color = st.checkbox("使用自訂顏色", value=bool(event.get("custom_color", False)), key=f"event_custom_{idx}")
+            use_custom_color = st.checkbox("使用自訂顏色或色號", value=bool(event.get("custom_color", False)), key=f"event_custom_{idx}")
             custom_color_value = None
-            if custom_color:
+            if use_custom_color:
                 custom_color_value = st.color_picker("自訂顏色", value=event.get("display_color") or event.get("color") or "#4f84ff", key=f"event_custom_color_{idx}")
+                custom_color_value = st.text_input("或輸入色號", value=custom_color_value, key=f"event_custom_hex_{idx}")
             st.session_state["fixed_events"][idx] = {
                 "title": title_value,
                 "weekdays": weekdays_value,
@@ -395,7 +423,7 @@ def render_setup_page() -> None:
                 "color": custom_color_value or (color_option["value"] if isinstance(color_option, dict) else color_option),
                 "display_color": custom_color_value or (color_option["value"] if isinstance(color_option, dict) else color_option),
                 "show_on_calendar": show_on_calendar,
-                "custom_color": custom_color,
+                "custom_color": use_custom_color,
             }
         st.divider()
 
@@ -413,9 +441,11 @@ def render_setup_page() -> None:
             st.error("結束日期不能早於開始日期。")
             return
         payload = {
+            "plan_name": st.session_state.get("plan_name", ""),
+            "plan_goal": st.session_state.get("plan_goal", ""),
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
-            "preferred_subject_count": int(preferred_subject_count),
+            "preferred_subject_count": int(st.session_state.get("preferred_subject_count", 0) or 0),
             "subjects": st.session_state["subjects"],
             "fixed_events": st.session_state["fixed_events"],
             "weekday_wake": weekday_wake,
@@ -519,19 +549,43 @@ def render_daily_checkin_page() -> None:
         st.write(app_state["daily_log"].get("recommendation", ""))
 
 
+def render_dashboard_page() -> None:
+    st.subheader("Dashboard")
+    if not app_state.get("plan"):
+        st.info("目前尚未建立讀書計畫，請先到計劃頁面完成初始設定。")
+        return
+    plan = app_state["plan"]
+    st.markdown(f"### {plan.get('plan_name', '未命名計畫')}")
+    st.write(plan.get("plan_goal", "尚未設定計畫目標。"))
+    st.markdown("---")
+    st.write(f"**開始日期**：{plan.get('start_date', '未填')}")
+    st.write(f"**結束日期**：{plan.get('end_date', '未填')}")
+    st.write(f"**每天偏好的科目數量**：{plan.get('preferred_subject_count', '無偏好')}")
+    st.write(f"**科目數量**：{len(plan.get('subjects', []))}")
+    st.write(f"**固定行程數量**：{len(plan.get('fixed_events', []))}")
+    if app_state.get("monthly_plan"):
+        st.write(f"**已產生天數**：{len(app_state['monthly_plan'])}")
+    if app_state.get("daily_log"):
+        st.markdown("### 最新每日打卡")
+        st.write(app_state["daily_log"].get("daily_progress", ""))
+        st.write(f"心情：{app_state['daily_log'].get('mood', '')}")
+        st.write(f"建議：{app_state['daily_log'].get('recommendation', '')}")
+
+
 def render_home_page() -> None:
     st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
     st.title("讀書計畫安排助手")
     st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
 
-    if not app_state.get("plan"):
-        page = "初始設定"
-    else:
-        page = st.sidebar.radio("頁面", ["初始設定", "月曆與計畫", "每日打卡"], index=1)
+    page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
+    default_index = 0 if not app_state.get("plan") else 1
+    page = st.sidebar.selectbox("主選單", page_options, index=default_index)
 
-    if page == "初始設定":
+    if page == "計劃頁面":
         render_setup_page()
-    elif page == "月曆與計畫":
+    elif page == "dashboard":
+        render_dashboard_page()
+    elif page == "月計畫":
         render_monthly_plan_page()
     else:
         render_daily_checkin_page()
