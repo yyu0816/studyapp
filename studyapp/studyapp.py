@@ -7,17 +7,17 @@ if "app_state" not in st.session_state:
         "daily_log": None,
         "monthly_plan": None,
     }
-
-# 之後在程式碼中，統一使用下面這個別名，就不會再報錯了
 app_state = st.session_state["app_state"]
+
+st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
+
+# import 你的頁面函式
+from studyapp.pages.monthlyplan import render_monthly_plan_page
 
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from typing import Any
-
-import streamlit as st
-from studyapp.pages.monthlyplan import render_monthly_plan_page
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
