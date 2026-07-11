@@ -4,21 +4,25 @@ from studyapp import build_monthly_plan, collect_plan_and_daily_data, get_adjust
 
 
 class StudyAppLogicTests(unittest.TestCase):
-    def test_parse_subject_entries_collects_subjects(self):
+    def test_parse_subject_entries_supports_materials(self):
         payload = {
-            "subject_name": ["數學", "英文"],
-            "pages_required": ["120", "80"],
-            "review_video": ["on", ""],
-            "mock_exam": ["", "on"],
+            "subjects": [
+                {
+                    "name": "數學",
+                    "materials": [
+                        {"name": "教材", "type": "教材", "pages": 120},
+                        {"name": "教學影片", "type": "教學影片", "pages": 3},
+                    ],
+                }
+            ]
         }
 
         subjects = parse_subject_entries(payload)
 
-        self.assertEqual(len(subjects), 2)
+        self.assertEqual(len(subjects), 1)
         self.assertEqual(subjects[0]["name"], "數學")
-        self.assertEqual(subjects[0]["pages"], 120)
-        self.assertTrue(subjects[0]["review_video"])
-        self.assertFalse(subjects[0]["mock_exam"])
+        self.assertEqual(subjects[0]["materials"][0]["type"], "教材")
+        self.assertEqual(subjects[0]["materials"][1]["pages"], 3)
 
     def test_get_adjustment_message_recommends_slower_pacing(self):
         message = get_adjustment_message("too_fast", "1.5", "good")
@@ -28,14 +32,24 @@ class StudyAppLogicTests(unittest.TestCase):
 
     def test_collect_plan_and_daily_data_builds_payload(self):
         form_data = {
-            "timeframe": "30 天",
-            "subject_name": ["數學"],
-            "pages_required": ["120"],
-            "review_video": ["on"],
-            "mock_exam": [""],
-            "schedule_day": ["週一"],
-            "schedule_start": ["20:00"],
-            "schedule_end": ["22:00"],
+            "start_date": "2026-07-11",
+            "end_date": "2026-07-20",
+            "subjects": [
+                {
+                    "name": "數學",
+                    "materials": [{"name": "教材", "type": "教材", "pages": 120}],
+                }
+            ],
+            "fixed_events": [
+                {
+                    "title": "上課",
+                    "weekdays": ["週一", "週三"],
+                    "start": "09:00",
+                    "end": "11:00",
+                    "color": "藍色",
+                    "show_on_calendar": True,
+                }
+            ],
             "weekday_wake": "07:00",
             "weekday_sleep": "23:30",
             "weekend_wake": "08:30",
@@ -50,19 +64,19 @@ class StudyAppLogicTests(unittest.TestCase):
 
         plan_data, daily_data = collect_plan_and_daily_data(form_data)
 
-        self.assertEqual(plan_data["timeframe"], "30 天")
+        self.assertEqual(plan_data["end_date"], "2026-07-20")
         self.assertEqual(plan_data["subjects"][0]["name"], "數學")
-        self.assertEqual(plan_data["fixed_events"][0]["day"], "週一")
+        self.assertEqual(plan_data["fixed_events"][0]["weekdays"], ["週一", "週三"])
         self.assertEqual(daily_data["daily_progress"], "完成 60 頁")
         self.assertIn("放慢", daily_data["recommendation"])
 
-    def test_build_monthly_plan_creates_daily_entries(self):
+    def test_build_monthly_plan_uses_end_date(self):
         plan_data = {
             "start_date": "2026-07-11",
-            "timeframe_days": 3,
+            "end_date": "2026-07-13",
             "subjects": [
-                {"name": "數學", "pages": 60, "review_video": 1, "mock_exam": 1},
-                {"name": "英文", "pages": 60, "review_video": 0, "mock_exam": 0},
+                {"name": "數學", "materials": [{"name": "教材", "type": "教材", "pages": 60}]},
+                {"name": "英文", "materials": [{"name": "練習題", "type": "練習題", "pages": 30}]},
             ],
             "preferred_subject_count": 2,
         }
@@ -70,6 +84,7 @@ class StudyAppLogicTests(unittest.TestCase):
         monthly_plan = build_monthly_plan(plan_data)
 
         self.assertEqual(len(monthly_plan), 3)
+        self.assertEqual(monthly_plan[-1]["date"], "2026-07-13")
         self.assertIn("數學", monthly_plan[0]["subjects"])
 
 
