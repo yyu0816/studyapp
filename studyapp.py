@@ -343,8 +343,6 @@ def render_setup_page() -> None:
 
     plan_name = st.text_input("讀書計畫名稱", value=st.session_state.get("plan_name", ""), key="plan_name")
     plan_goal = st.text_area("計畫目標", value=st.session_state.get("plan_goal", ""), placeholder="例如：每天至少看完 50 頁，並保持穩定複習節奏。", key="plan_goal")
-    st.session_state["plan_name"] = plan_name
-    st.session_state["plan_goal"] = plan_goal
 
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
     end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date")
@@ -388,8 +386,12 @@ def render_setup_page() -> None:
 
     st.subheader("學習偏好")
     count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
-    preferred_subject_count_value = st.selectbox("每天偏好的總科目數量", count_options, index=count_options.index(str(st.session_state.get("preferred_subject_count", "無偏好"))) if str(st.session_state.get("preferred_subject_count", "無偏好")) in count_options else 0, key="preferred_subject_count")
-    st.session_state["preferred_subject_count"] = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
+    preferred_subject_count_value = st.selectbox(
+        "每天偏好的總科目數量",
+        count_options,
+        index=count_options.index(str(st.session_state.get("preferred_subject_count", "無偏好"))) if str(st.session_state.get("preferred_subject_count", "無偏好")) in count_options else 0,
+        key="preferred_subject_count",
+    )
 
     st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
