@@ -22,12 +22,12 @@ import sys
 
 
 def _import_monthly_plan_renderer():
-    try:
-        from studyapp.pages.monthlyplan import render_monthly_plan_page
-        return render_monthly_plan_page
-    except ModuleNotFoundError as err:
-        if err.name not in {"studyapp.pages.monthlyplan", "studyapp"}:
-            raise
+    script_dir = Path(__file__).resolve().parent
+    parent_dir = script_dir.parent
+    for candidate in (script_dir, parent_dir):
+        candidate_str = str(candidate)
+        if candidate_str not in sys.path:
+            sys.path.insert(0, candidate_str)
 
     try:
         from pages.monthlyplan import render_monthly_plan_page
@@ -36,10 +36,17 @@ def _import_monthly_plan_renderer():
         if err.name != "pages.monthlyplan":
             raise
 
+    try:
+        from studyapp.pages.monthlyplan import render_monthly_plan_page
+        return render_monthly_plan_page
+    except ModuleNotFoundError as err:
+        if err.name != "studyapp.pages.monthlyplan":
+            raise
+
     module_path = Path(__file__).resolve().parent / "pages" / "monthlyplan.py"
     if not module_path.exists():
         raise FileNotFoundError(f"Cannot find monthlyplan module at {module_path}")
-    spec = importlib.util.spec_from_file_location("studyapp.pages.monthlyplan", module_path)
+    spec = importlib.util.spec_from_file_location("pages.monthlyplan", module_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Could not load monthlyplan module from {module_path}")
     module = importlib.util.module_from_spec(spec)
