@@ -662,4 +662,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    render_home_page()
+
+st.write("---")
+st.write("程式碼成功執行到最後一行了！")

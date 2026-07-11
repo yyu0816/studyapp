@@ -1,10 +1,11 @@
+st.write("Debug: session_state 的狀態:", st.session_state["app_state"])
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from typing import Any
 
 import streamlit as st
-
 
 def render_monthly_plan_page() -> None:
     st.subheader("月曆與讀書計畫")
