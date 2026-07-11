@@ -11,7 +11,15 @@ app_state: dict[str, Any] = {
     "monthly_plan": None,
 }
 
-MATERIAL_TYPES = ["教材", "練習題", "模擬考", "教學影片", "筆記"]
+MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
+MATERIAL_UNIT_MAP = {
+    "課本": "頁",
+    "教材": "頁",
+    "筆記": "頁",
+    "練習題": "回",
+    "模擬考": "回",
+    "教學影片": "小時",
+}
 WEEKDAY_OPTIONS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 COLOR_OPTIONS = [
     {"name": "藍色", "value": "#4f84ff"},
@@ -28,19 +36,25 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
         for subject in form_data["subjects"]:
             if not isinstance(subject, dict):
                 continue
-            materials = []
+            materials: list[dict[str, Any]] = []
             for material in subject.get("materials", []) or []:
                 if not isinstance(material, dict):
                     continue
                 name = str(material.get("name", "") or "").strip()
-                material_type = str(material.get("type", "教材") or "教材").strip() or "教材"
-                pages = material.get("pages", 0)
+                material_type = str(material.get("type", "課本") or "課本").strip() or "課本"
+                quantity = material.get("quantity", material.get("pages", 0))
                 try:
-                    pages_value = int(pages)
+                    quantity_value = int(quantity)
                 except (TypeError, ValueError):
-                    pages_value = 0
-                if name or pages_value > 0:
-                    materials.append({"name": name, "type": material_type, "pages": pages_value if pages_value > 0 else 0})
+                    quantity_value = 0
+                material_entry = {
+                    "name": name,
+                    "type": material_type,
+                    "quantity": quantity_value if quantity_value > 0 else 0,
+                }
+                if "pages" in material:
+                    material_entry["pages"] = material.get("pages")
+                materials.append(material_entry)
             if subject.get("name") or materials:
                 subjects.append({
                     "name": str(subject.get("name", "") or "").strip(),
@@ -96,7 +110,7 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
                     {
                         "name": "頁數",
                         "type": "教材",
-                        "pages": int(page_value) if page_value.isdigit() and int(page_value) > 0 else 0,
+                        "quantity": int(page_value) if page_value.isdigit() and int(page_value) > 0 else 0,
                     }
                 ],
                 "review_video": int(review_value) if review_value.isdigit() and int(review_value) > 0 else (1 if review_is_true else 0),
@@ -133,7 +147,8 @@ def build_plan_summary(plan_data: dict[str, Any], daily_data: dict[str, Any]) ->
     for item in plan_data.get("subjects", []):
         material_texts = []
         for material in item.get("materials", []):
-            material_texts.append(f"{material.get('name') or material.get('type')} {material.get('pages')} 頁")
+            unit = get_material_unit(material.get('type', ''))
+            material_texts.append(f"{material.get('name') or material.get('type')} {material.get('quantity', 0)} {unit}")
         subject_lines += f"<li>{item.get('name')}：{', '.join(material_texts)}</li>"
     subject_lines += "</ul>"
 
@@ -306,9 +321,11 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
         tasks = []
         for subject in subjects[: max(1, min(preferred_count or 1, len(subjects)))]:
             for material in subject.get("materials", []) or []:
-                if material.get("pages", 0):
+                quantity = material.get("quantity", material.get("pages", 0))
+                if quantity:
                     task_name = material.get("name") or material.get("type") or "教材"
-                    tasks.append(f"{subject['name']}：{task_name} {material['pages']} 頁")
+                    unit = get_material_unit(material.get("type", ""))
+                    tasks.append(f"{subject['name']}：{task_name} {quantity} {unit}")
         daily_events = [event for event in fixed_events if current_date.strftime("%a") in event.get("weekdays", []) or event.get("show_on_calendar", True)]
         monthly_plan.append(
             {
@@ -326,7 +343,7 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _initialize_session_state() -> None:
     if "subjects" not in st.session_state:
-        st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}], "weekdays": []}]
+        st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}]
     if "fixed_events" not in st.session_state:
         st.session_state["fixed_events"] = [{"title": "", "weekdays": [], "start": "", "end": "", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}]
     if "plan_name" not in st.session_state:
@@ -335,6 +352,12 @@ def _initialize_session_state() -> None:
         st.session_state["plan_goal"] = ""
     if "preferred_subject_count" not in st.session_state:
         st.session_state["preferred_subject_count"] = 0
+    if "main_page" not in st.session_state:
+        st.session_state["main_page"] = "計劃頁面"
+
+
+def get_material_unit(material_type: str) -> str:
+    return MATERIAL_UNIT_MAP.get(material_type, "項")
 
 
 def render_setup_page() -> None:
@@ -358,31 +381,61 @@ def render_setup_page() -> None:
             name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}")
             st.session_state["subjects"][idx]["name"] = name_value
 
-            materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "教材", "pages": 1}])
+            materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1}])
             for mid, material in enumerate(materials):
-                cols = st.columns([2, 1, 1])
+                effective_type = material.get("type", "課本")
+                selected_type = effective_type if effective_type in MATERIAL_TYPES else "其他"
+                cols = st.columns([2, 1.2, 1.2, 0.8])
                 with cols[0]:
-                    material_name = st.text_input("參考書名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}")
+                    material_name = st.text_input("教材名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}")
                     st.session_state["subjects"][idx]["materials"][mid]["name"] = material_name
                 with cols[1]:
                     material_type = st.selectbox(
                         "類型",
                         MATERIAL_TYPES,
-                        index=MATERIAL_TYPES.index(material.get("type", "教材")) if material.get("type", "教材") in MATERIAL_TYPES else 0,
+                        index=MATERIAL_TYPES.index(selected_type),
                         key=f"subject_{idx}_material_type_{mid}",
                     )
-                    st.session_state["subjects"][idx]["materials"][mid]["type"] = material_type
+                    custom_type_value = material.get("custom_type", "") if material_type == "其他" else ""
+                    if material_type == "其他":
+                        custom_type_value = st.text_input(
+                            "其他類型",
+                            value=custom_type_value,
+                            key=f"subject_{idx}_material_custom_{mid}",
+                        )
+                        effective_type = custom_type_value.strip() or "其他"
+                    else:
+                        effective_type = material_type
+                    st.session_state["subjects"][idx]["materials"][mid]["type"] = effective_type
+                    if effective_type == "其他":
+                        st.session_state["subjects"][idx]["materials"][mid]["custom_type"] = custom_type_value
+                    else:
+                        st.session_state["subjects"][idx]["materials"][mid].pop("custom_type", None)
                 with cols[2]:
-                    pages_value = st.number_input("頁數", min_value=1, step=1, value=int(material.get("pages", 1) or 1), key=f"subject_{idx}_material_pages_{mid}")
-                    st.session_state["subjects"][idx]["materials"][mid]["pages"] = int(pages_value)
+                    unit_text = get_material_unit(effective_type)
+                    quantity_value = st.number_input(
+                        f"數量 ({unit_text})",
+                        min_value=1,
+                        step=1,
+                        value=int(material.get("quantity", material.get("pages", 1)) or 1),
+                        key=f"subject_{idx}_material_quantity_{mid}",
+                    )
+                    st.session_state["subjects"][idx]["materials"][mid]["quantity"] = int(quantity_value)
+                with cols[3]:
+                    if st.button("刪除參考書", key=f"delete_material_{idx}_{mid}"):
+                        del st.session_state["subjects"][idx]["materials"][mid]
+                        st.experimental_rerun()
             if st.button("新增教材／材料", key=f"add_material_{idx}"):
-                st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "教材", "pages": 1})
+                st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "課本", "quantity": 1})
             weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
             st.session_state["subjects"][idx]["weekdays"] = weekdays_value
+            if st.button("刪除科目", key=f"delete_subject_{idx}") and len(st.session_state["subjects"]) > 1:
+                st.session_state["subjects"].pop(idx)
+                st.experimental_rerun()
         st.divider()
 
     if st.button("新增科目"):
-        st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "教材", "pages": 1}], "weekdays": []})
+        st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
 
     st.subheader("學習偏好")
     count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
@@ -457,9 +510,8 @@ def render_setup_page() -> None:
         }
         plan_data, daily_data = collect_plan_and_daily_data(payload)
         app_state["plan"] = plan_data
-        app_state["daily_log"] = daily_data
         app_state["monthly_plan"] = build_monthly_plan(plan_data)
-        st.session_state["current_page"] = "月曆與計畫"
+        st.session_state["main_page"] = "月計畫"
         st.success("初始設定已完成，月計畫已建立。")
 
 
@@ -580,8 +632,8 @@ def render_home_page() -> None:
     st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
 
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
-    default_index = 0 if not app_state.get("plan") else 1
-    page = st.sidebar.selectbox("主選單", page_options, index=default_index)
+    default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not app_state.get("plan") else 1)
+    page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="main_page")
 
     if page == "計劃頁面":
         render_setup_page()
