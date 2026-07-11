@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import streamlit as st
-from .pages.monthlyplan import render_monthly_plan_page
+from studyapp.pages.monthlyplan import render_monthly_plan_page
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
