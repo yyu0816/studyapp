@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+from typing import Any
 import streamlit as st
 
 # 【關鍵修改】確保在任何程式碼執行前，session_state 已經準備好了
@@ -11,13 +15,9 @@ app_state = st.session_state["app_state"]
 
 st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
-# import 你的頁面函式
+# 3. 再來才是 import 你的頁面函式
 from studyapp.pages.monthlyplan import render_monthly_plan_page
 
-from __future__ import annotations
-
-from datetime import date, datetime, timedelta
-from typing import Any
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
