@@ -16,46 +16,7 @@ app_state = st.session_state["app_state"]
 st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
 # 3. 再來才是 import 你的頁面函式
-from pathlib import Path
-import importlib.util
-import sys
-
-
-def _import_monthly_plan_renderer():
-    script_dir = Path(__file__).resolve().parent
-    parent_dir = script_dir.parent
-    for candidate in (script_dir, parent_dir):
-        candidate_str = str(candidate)
-        if candidate_str not in sys.path:
-            sys.path.insert(0, candidate_str)
-
-    try:
-        from pages.monthlyplan import render_monthly_plan_page
-        return render_monthly_plan_page
-    except ModuleNotFoundError as err:
-        if err.name != "pages.monthlyplan":
-            raise
-
-    try:
-        from studyapp.pages.monthlyplan import render_monthly_plan_page
-        return render_monthly_plan_page
-    except ModuleNotFoundError as err:
-        if err.name != "studyapp.pages.monthlyplan":
-            raise
-
-    module_path = Path(__file__).resolve().parent / "pages" / "monthlyplan.py"
-    if not module_path.exists():
-        raise FileNotFoundError(f"Cannot find monthlyplan module at {module_path}")
-    spec = importlib.util.spec_from_file_location("pages.monthlyplan", module_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load monthlyplan module from {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module.render_monthly_plan_page
-
-
-render_monthly_plan_page = _import_monthly_plan_renderer()
+from studyapp.monthlyplan import render_monthly_plan_page
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -289,6 +250,7 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
                     "weekdays": list(weekdays),
                     "start": str(event.get("start", "") or ""),
                     "end": str(event.get("end", "") or ""),
+                    "emoji": str(event.get("emoji", "📚") or "📚"),
                     "color": str(event.get("color", display_color) or display_color or "#4f84ff"),
                     "display_color": display_color or str(event.get("color", "") or "#4f84ff"),
                     "show_on_calendar": bool(event.get("show_on_calendar", True)),
