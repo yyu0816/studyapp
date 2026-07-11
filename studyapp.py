@@ -5,12 +5,6 @@ from typing import Any
 
 import streamlit as st
 
-app_state: dict[str, Any] = {
-    "plan": None,
-    "daily_log": None,
-    "monthly_plan": None,
-}
-
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
     "課本": "頁",
@@ -342,6 +336,14 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _initialize_session_state() -> None:
+    # core plan data
+    if "plan" not in st.session_state:
+        st.session_state["plan"] = None
+    if "monthly_plan" not in st.session_state:
+        st.session_state["monthly_plan"] = None
+    if "daily_log" not in st.session_state:
+        st.session_state["daily_log"] = None
+
     if "subjects" not in st.session_state:
         st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}]
     if "fixed_events" not in st.session_state:
@@ -509,8 +511,8 @@ def render_setup_page() -> None:
             "weekend_sleep": weekend_sleep,
         }
         plan_data, daily_data = collect_plan_and_daily_data(payload)
-        app_state["plan"] = plan_data
-        app_state["monthly_plan"] = build_monthly_plan(plan_data)
+        st.session_state["plan"] = plan_data
+        st.session_state["monthly_plan"] = build_monthly_plan(plan_data)
         st.session_state["main_page"] = "月計畫"
         st.success("初始設定已完成，月計畫已建立。")
 
@@ -519,12 +521,12 @@ def render_monthly_plan_page() -> None:
     st.subheader("月曆與讀書計畫")
     st.caption("月曆上會顯示固定行程與每日排程；點選日期可展開查看當天任務。")
 
-    if not app_state.get("monthly_plan") or not app_state.get("plan"):
+    if not st.session_state.get("monthly_plan") or not st.session_state.get("plan"):
         st.info("請先完成初始設定。")
         return
 
-    plan = app_state.get("plan") or {}
-    monthly_plan = app_state.get("monthly_plan") or []
+    plan = st.session_state.get("plan") or {}
+    monthly_plan = st.session_state.get("monthly_plan") or []
 
     # index monthly_plan by date string for fast lookup
     plan_by_date: dict[str, dict] = {item["date"]: item for item in monthly_plan}
@@ -605,11 +607,11 @@ def render_monthly_plan_page() -> None:
 
 def render_daily_checkin_page() -> None:
     st.subheader("2. 每日打卡或微調")
-    if not app_state.get("plan"):
+    if not st.session_state.get("plan"):
         st.info("請先完成初始設定。")
         return
 
-    daily_progress = st.text_area("今日讀書進度", value=app_state.get("daily_log", {}).get("daily_progress", ""), placeholder="例如：完成 60 頁數學與 20 頁英文")
+    daily_progress = st.text_area("今日讀書進度", value=st.session_state.get("daily_log", {}).get("daily_progress", ""), placeholder="例如：完成 60 頁數學與 20 頁英文")
     mood = st.selectbox(
         "心情與精力",
         ["good", "neutral", "low", "very_low"],
@@ -629,7 +631,7 @@ def render_daily_checkin_page() -> None:
         format_func=lambda value: {"balanced": "剛剛好", "too_fast": "進度太多", "too_slow": "進度太少"}.get(value, value),
         key="daily_pacing",
     )
-    notes = st.text_area("備註", value=app_state.get("daily_log", {}).get("notes", ""), placeholder="例如：今天需要延後 30 分鐘的複習")
+    notes = st.text_area("備註", value=st.session_state.get("daily_log", {}).get("notes", ""), placeholder="例如：今天需要延後 30 分鐘的複習")
 
     if st.button("儲存今日打卡"):
         daily_data = {
@@ -641,20 +643,20 @@ def render_daily_checkin_page() -> None:
             "notes": notes,
         }
         daily_data["recommendation"] = get_adjustment_message(daily_data["pacing_feedback"], daily_data["time_loss"], daily_data["mood"])
-        app_state["daily_log"] = daily_data
+        st.session_state["daily_log"] = daily_data
         st.success("今日打卡已更新")
 
-    if app_state.get("daily_log"):
+    if st.session_state.get("daily_log"):
         st.markdown("### 今日建議")
-        st.write(app_state["daily_log"].get("recommendation", ""))
+        st.write(st.session_state["daily_log"].get("recommendation", ""))
 
 
 def render_dashboard_page() -> None:
     st.subheader("Dashboard")
-    if not app_state.get("plan"):
+    if not st.session_state.get("plan"):
         st.info("目前尚未建立讀書計畫，請先到計劃頁面完成初始設定。")
         return
-    plan = app_state["plan"]
+    plan = st.session_state["plan"]
     st.markdown(f"### {plan.get('plan_name', '未命名計畫')}")
     st.write(plan.get("plan_goal", "尚未設定計畫目標。"))
     st.markdown("---")
@@ -663,13 +665,13 @@ def render_dashboard_page() -> None:
     st.write(f"**每天偏好的科目數量**：{plan.get('preferred_subject_count', '無偏好')}")
     st.write(f"**科目數量**：{len(plan.get('subjects', []))}")
     st.write(f"**固定行程數量**：{len(plan.get('fixed_events', []))}")
-    if app_state.get("monthly_plan"):
-        st.write(f"**已產生天數**：{len(app_state['monthly_plan'])}")
-    if app_state.get("daily_log"):
+    if st.session_state.get("monthly_plan"):
+        st.write(f"**已產生天數**：{len(st.session_state['monthly_plan'])}")
+    if st.session_state.get("daily_log"):
         st.markdown("### 最新每日打卡")
-        st.write(app_state["daily_log"].get("daily_progress", ""))
-        st.write(f"心情：{app_state['daily_log'].get('mood', '')}")
-        st.write(f"建議：{app_state['daily_log'].get('recommendation', '')}")
+        st.write(st.session_state["daily_log"].get("daily_progress", ""))
+        st.write(f"心情：{st.session_state['daily_log'].get('mood', '')}")
+        st.write(f"建議：{st.session_state['daily_log'].get('recommendation', '')}")
 
 
 def render_home_page() -> None:
@@ -678,7 +680,7 @@ def render_home_page() -> None:
     st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
 
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
-    default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not app_state.get("plan") else 1)
+    default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not st.session_state.get("plan") else 1)
     page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="page_selection")
     st.session_state["main_page"] = page
 
@@ -693,6 +695,7 @@ def render_home_page() -> None:
 
 
 def main() -> None:
+    _initialize_session_state()
     render_home_page()
 
 
