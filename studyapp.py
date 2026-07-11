@@ -633,7 +633,8 @@ def render_home_page() -> None:
 
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
     default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not app_state.get("plan") else 1)
-    page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="main_page")
+    page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="page_selection")
+    st.session_state["main_page"] = page
 
     if page == "計劃頁面":
         render_setup_page()
