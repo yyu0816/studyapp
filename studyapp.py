@@ -424,14 +424,14 @@ def render_setup_page() -> None:
                 with cols[3]:
                     if st.button("刪除參考書", key=f"delete_material_{idx}_{mid}"):
                         del st.session_state["subjects"][idx]["materials"][mid]
-                        st.experimental_rerun()
+                        return
             if st.button("新增教材／材料", key=f"add_material_{idx}"):
                 st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "課本", "quantity": 1})
             weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
             st.session_state["subjects"][idx]["weekdays"] = weekdays_value
             if st.button("刪除科目", key=f"delete_subject_{idx}") and len(st.session_state["subjects"]) > 1:
                 st.session_state["subjects"].pop(idx)
-                st.experimental_rerun()
+                return
         st.divider()
 
     if st.button("新增科目"):
