@@ -407,10 +407,6 @@ def render_setup_page() -> None:
     weekday_sleep = st.text_input("平日睡覺", value=st.session_state.get("weekday_sleep", "23:30"), key="weekday_sleep")
     weekend_wake = st.text_input("假日起床", value=st.session_state.get("weekend_wake", "08:30"), key="weekend_wake")
     weekend_sleep = st.text_input("假日睡覺", value=st.session_state.get("weekend_sleep", "00:30"), key="weekend_sleep")
-    st.session_state["weekday_wake"] = weekday_wake
-    st.session_state["weekday_sleep"] = weekday_sleep
-    st.session_state["weekend_wake"] = weekend_wake
-    st.session_state["weekend_sleep"] = weekend_sleep
 
     if st.button("生成完整讀書計畫"):
         if end_date < start_date:
