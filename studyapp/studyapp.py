@@ -408,6 +408,25 @@ def _parse_time_str(t_str: str, default="08:00"):
     except:
         return datetime.strptime(default, "%H:%M").time()
 
+def render_time_picker(label: str, default_time_str: str, key_prefix: str) -> str:
+    try:
+        if ":" in default_time_str:
+            h, m = default_time_str.split(":")[:2]
+        else:
+            h, m = "08", "00"
+        default_h = int(h)
+        default_m = int(m)
+    except:
+        default_h, default_m = 8, 0
+
+    st.markdown(f"<div style='font-size: 14px; margin-bottom: 4px;'>{label}</div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        hour = st.selectbox("時", [f"{i:02d}" for i in range(24)], index=default_h, key=f"{key_prefix}_h", label_visibility="collapsed")
+    with c2:
+        minute = st.selectbox("分", [f"{i:02d}" for i in range(60)], index=default_m, key=f"{key_prefix}_m", label_visibility="collapsed")
+    return f"{hour}:{minute}"
+
 
 def render_setup_page() -> None:
     st.subheader("1. 初始設定")
@@ -503,9 +522,9 @@ def render_setup_page() -> None:
             
             st_col, end_col = st.columns(2)
             with st_col:
-                start_value = st.time_input("開始時間", value=_parse_time_str(event.get("start", "08:00"), "08:00"), key=f"event_start_{idx}").strftime("%H:%M")
+                start_value = render_time_picker("開始時間", event.get("start", "08:00"), f"event_start_{idx}")
             with end_col:
-                end_value = st.time_input("結束時間", value=_parse_time_str(event.get("end", "09:00"), "09:00"), key=f"event_end_{idx}").strftime("%H:%M")
+                end_value = render_time_picker("結束時間", event.get("end", "09:00"), f"event_end_{idx}")
             color_option = st.selectbox(
                 "顏色",
                 options=COLOR_OPTIONS,
@@ -541,10 +560,13 @@ def render_setup_page() -> None:
     st.button("新增行程", on_click=_add_event)
 
     st.subheader("每日作息")
-    weekday_wake = st.text_input("平日起床", value=st.session_state.get("weekday_wake", "07:00"), key="weekday_wake")
-    weekday_sleep = st.text_input("平日睡覺", value=st.session_state.get("weekday_sleep", "23:30"), key="weekday_sleep")
-    weekend_wake = st.text_input("假日起床", value=st.session_state.get("weekend_wake", "08:30"), key="weekend_wake")
-    weekend_sleep = st.text_input("假日睡覺", value=st.session_state.get("weekend_sleep", "00:30"), key="weekend_sleep")
+    c1, c2 = st.columns(2)
+    with c1:
+        weekday_wake = render_time_picker("平日起床", st.session_state.get("weekday_wake", "07:00"), "weekday_wake")
+        weekend_wake = render_time_picker("假日起床", st.session_state.get("weekend_wake", "08:30"), "weekend_wake")
+    with c2:
+        weekday_sleep = render_time_picker("平日睡覺", st.session_state.get("weekday_sleep", "23:30"), "weekday_sleep")
+        weekend_sleep = render_time_picker("假日睡覺", st.session_state.get("weekend_sleep", "00:30"), "weekend_sleep")
 
     if st.button("生成完整讀書計畫"):
         if end_date < start_date:

@@ -39,11 +39,16 @@ def render_daily_checkin_page() -> None:
     plan = st.session_state.get("plan", {})
     fixed_events = plan.get("fixed_events", [])
     
+    if "daily_override_events" not in st.session_state:
+        st.session_state["daily_override_events"] = {}
+    overrides = st.session_state["daily_override_events"].get(today_str, [])
+
     # Filter today's events
     today_events = [
         e for e in fixed_events 
         if today_weekday in e.get("weekdays", []) and e.get("show_on_calendar", True)
     ]
+    today_events.extend(overrides)
     # Sort events by start time
     today_events.sort(key=lambda x: x.get("start", ""))
 
@@ -52,7 +57,7 @@ def render_daily_checkin_page() -> None:
     with col_timeline:
         st.markdown("### 🕒 時間軸 (今日行程)")
         if today_events:
-            timeline_html = "<div style='border-left: 3px solid #4f84ff; padding-left: 15px; margin-left: 10px;'>"
+            timeline_html = "<div style='margin-left: 55px; border-left: 3px solid #4f84ff; padding-left: 20px;'>"
             for event in today_events:
                 emoji = event.get("emoji", "📌")
                 color = event.get("display_color", event.get("color", "#4f84ff"))
@@ -60,11 +65,12 @@ def render_daily_checkin_page() -> None:
                 start = event.get("start", "")
                 end = event.get("end", "")
                 timeline_html += f"""
-                <div style='position: relative; margin-bottom: 20px;'>
-                    <div style='position: absolute; left: -24px; top: 0; width: 14px; height: 14px; border-radius: 50%; background-color: {color}; border: 3px solid white;'></div>
-                    <div style='font-size: 12px; color: #666;'>{start} - {end}</div>
-                    <div style='background-color: #f4f7fb; padding: 10px; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+                <div style='position: relative; margin-bottom: 25px;'>
+                    <div style='position: absolute; left: -85px; top: -2px; width: 50px; text-align: right; font-weight: bold; color: #666;'>{start}</div>
+                    <div style='position: absolute; left: -29px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background-color: {color}; border: 3px solid white;'></div>
+                    <div style='background-color: #f4f7fb; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
                         <strong>{emoji} {title}</strong>
+                        <div style='font-size: 12px; color: #888; margin-top: 4px;'>{start} - {end}</div>
                     </div>
                 </div>
                 """
@@ -78,8 +84,56 @@ def render_daily_checkin_page() -> None:
         
         with row1_col1:
             st.markdown("#### 📝 今日行程")
-            st.markdown("<div style='background-color: #fafafa; padding: 10px; border-radius: 8px; min-height: 150px;'>", unsafe_allow_html=True)
-            # Find tasks for today if possible from monthly_plan
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 150px;'>", unsafe_allow_html=True)
+            if today_events:
+                for event in today_events:
+                    emoji = event.get("emoji", "📌")
+                    title = event.get("title", "未命名行程")
+                    start = event.get("start", "")
+                    end = event.get("end", "")
+                    st.markdown(f"**{emoji} {title}** ({start} - {end})")
+            else:
+                st.write("今日無行程")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("➕ 新增當日行程"):
+                new_title = st.text_input("行程標題", key="new_daily_title")
+                
+                # We use side-by-side selectboxes for time inside the expander
+                c_start, c_end = st.columns(2)
+                with c_start:
+                    st.markdown("<div style='font-size: 14px;'>開始時間</div>", unsafe_allow_html=True)
+                    s_c1, s_c2 = st.columns(2)
+                    with s_c1:
+                        new_start_h = st.selectbox("時", [f"{i:02d}" for i in range(24)], index=12, key="new_start_h", label_visibility="collapsed")
+                    with s_c2:
+                        new_start_m = st.selectbox("分", [f"{i:02d}" for i in range(60)], index=0, key="new_start_m", label_visibility="collapsed")
+                with c_end:
+                    st.markdown("<div style='font-size: 14px;'>結束時間</div>", unsafe_allow_html=True)
+                    e_c1, e_c2 = st.columns(2)
+                    with e_c1:
+                        new_end_h = st.selectbox("時", [f"{i:02d}" for i in range(24)], index=13, key="new_end_h", label_visibility="collapsed")
+                    with e_c2:
+                        new_end_m = st.selectbox("分", [f"{i:02d}" for i in range(60)], index=0, key="new_end_m", label_visibility="collapsed")
+                        
+                new_emoji = st.selectbox("表符", ["📌", "📚", "📝", "🏃", "☕", "💻", "🧠"], key="new_emoji")
+                if st.button("確認新增"):
+                    if new_title.strip():
+                        st.session_state["daily_override_events"].setdefault(today_str, []).append({
+                            "title": new_title.strip(),
+                            "start": f"{new_start_h}:{new_start_m}",
+                            "end": f"{new_end_h}:{new_end_m}",
+                            "emoji": new_emoji,
+                            "color": "#ff9f43",
+                            "display_color": "#ff9f43",
+                            "show_on_calendar": True
+                        })
+                        st.rerun()
+
+        with row1_col2:
+            st.markdown("#### 📖 今日讀書進度")
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px;'>", unsafe_allow_html=True)
             monthly_plan = st.session_state.get("monthly_plan", [])
             today_plan = next((item for item in monthly_plan if item.get("date") == today_str), None)
             
@@ -90,14 +144,12 @@ def render_daily_checkin_page() -> None:
                 st.write("今日無指定讀書內容")
             st.markdown("</div>", unsafe_allow_html=True)
 
-        with row1_col2:
-            st.markdown("#### 📖 今日讀書進度")
             daily_progress = st.text_area(
                 " ", 
                 value=st.session_state.get("daily_log", {}).get("daily_progress", ""), 
                 placeholder="例如：完成 60 頁數學與 20 頁英文", 
                 label_visibility="collapsed",
-                height=150
+                height=100
             )
 
         st.markdown("<br>", unsafe_allow_html=True)
