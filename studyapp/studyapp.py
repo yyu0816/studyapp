@@ -641,10 +641,41 @@ def render_dashboard_page() -> None:
 
 def render_home_page() -> None:
     st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
+    
+    st.markdown("""
+    <style>
+    .menu-btn > button {
+        width: 100%;
+        border-radius: 8px;
+        transition: all 0.3s;
+        border: 1px solid #ddd;
+        background: transparent;
+    }
+    .menu-btn > button:hover {
+        background-color: #4f84ff;
+        color: white;
+        border-color: #4f84ff;
+    }
+    /* Hide Streamlit default sidebar completely to prevent confusion */
+    [data-testid="collapsedControl"] { display: none; }
+    </style>
+    """, unsafe_allow_html=True)
+
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
-    default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not st.session_state.get("plan") else 1)
-    page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="page_selection")
-    st.session_state["main_page"] = page
+    
+    if "main_page" not in st.session_state:
+        st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
+
+    cols = st.columns(len(page_options))
+    for i, opt in enumerate(page_options):
+        with cols[i]:
+            # wrapper to target our button CSS
+            st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
+            if st.button(opt, use_container_width=True, key=f"menu_btn_{i}"):
+                st.session_state["main_page"] = opt
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    page = st.session_state["main_page"]
 
     if page != "每日打卡與微調":
         st.title("讀書計畫安排助手")

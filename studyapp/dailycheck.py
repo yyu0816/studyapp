@@ -82,7 +82,7 @@ def render_daily_checkin_page() -> None:
         try:
             from datetime import datetime
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-            days_left = (end_date - date.today()).days
+            days_left = (end_date - today).days
             if days_left > 0:
                 countdown_text = f"⏳ 距離目標還有 <b>{days_left}</b> 天"
             elif days_left == 0:

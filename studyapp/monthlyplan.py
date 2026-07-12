@@ -63,7 +63,7 @@ def render_monthly_plan_page() -> None:
                 day_str = day.strftime("%Y-%m-%d")
                 item = plan_by_date.get(day_str)
                 is_current_month = day.month == month and start_date <= day <= end_date
-                day_label = day.strftime("%m/%d")
+                day_label = str(day.day)
                 
                 bg_color = "#fff" if is_current_month else "#fcfcfc"
                 text_color = "#555" if is_current_month else "#bbb"
