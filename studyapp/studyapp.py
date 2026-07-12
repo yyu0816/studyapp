@@ -30,18 +30,24 @@ MATERIAL_UNIT_MAP = {
 }
 WEEKDAY_OPTIONS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 COLOR_OPTIONS = [
-    {"name": "藍色", "value": "#4f84ff"},
-    {"name": "紫色", "value": "#7b5cff"},
-    {"name": "紅色", "value": "#ff6b6b"},
-    {"name": "綠色", "value": "#2ecc71"},
-    {"name": "橙色", "value": "#ff9f43"},
+    {"name": "🔵 藍色",  "value": "#4f84ff"},
+    {"name": "🟣 紫色",  "value": "#7b5cff"},
+    {"name": "🔴 紅色",  "value": "#ff6b6b"},
+    {"name": "🟢 綠色",  "value": "#2ecc71"},
+    {"name": "🟠 橙色",  "value": "#ff9f43"},
+    {"name": "🟡 黃色",  "value": "#f9ca24"},
+    {"name": "⚪ 灰色",  "value": "#636e72"},
+    {"name": "🤍 深紅",  "value": "#b71540"},
 ]
 EMOJI_OPTIONS = [
     "📚", "📝", "🕒", "🏫", "🎯", "💡", "☕", "🛌", "🏃", "🎒",
     "😀", "😎", "🤔", "😴", "💪", "🙌", "✨", "🔥", "💯", "🎉",
     "📖", "✏️", "📐", "🔬", "💻", "🧠", "🗓️", "✅", "❌", "📌",
     "🍎", "🍔", "🥤", "🎵", "🎧", "🎨", "⚽", "🏀", "🎮", "🎬",
-    "🚗", "🚌", "🚆", "✈️", "🏠", "🏢", "🏥", "🏦", "🛒", "🌲"
+    "🚗", "🚌", "🚆", "✈️", "🏠", "🏢", "🏥", "🏦", "🛒", "🌲",
+    "🏐", "🚿", "🏊", "🤸", "⚾", "🎾", "🧘", "🍜", "🧃", "📺",
+    "🧖", "🏄", "😜", "🥳", "👍", "🧹", "🛕", "📦", "🔓", "⏰",
+    "🌿", "🐶", "🐱", "⛰️", "🌊", "🔭", "🧪", "📱", "😉", "🥱",
 ]
 
 
@@ -537,9 +543,11 @@ def render_setup_page() -> None:
                 "顏色",
                 options=COLOR_OPTIONS,
                 format_func=lambda option: option["name"] if isinstance(option, dict) else option,
-                index=next((index for index, option in enumerate(COLOR_OPTIONS) if option["value"] == event.get("display_color") or option["value"] == event.get("color")), 0),
+                index=next((index for index, option in enumerate(COLOR_OPTIONS) if isinstance(option, dict) and (option["value"] == event.get("display_color") or option["value"] == event.get("color"))), 0),
                 key=f"event_color_{idx}",
             )
+            if isinstance(color_option, dict):
+                st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{color_option['value']};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
             emoji_option = st.selectbox(
                 "表情符號",
                 options=EMOJI_OPTIONS,
@@ -547,6 +555,7 @@ def render_setup_page() -> None:
                 key=f"event_emoji_{idx}",
             )
             show_on_calendar = st.checkbox("顯示在月曆", value=bool(event.get("show_on_calendar", True)), key=f"event_show_{idx}")
+            concurrent_with_study = st.checkbox("是否能和讀書計畫並行？", value=bool(event.get("concurrent_with_study", False)), key=f"event_concurrent_{idx}")
             use_custom_color = st.checkbox("使用自訂顏色或色號", value=bool(event.get("custom_color", False)), key=f"event_custom_{idx}")
             custom_color_value = None
             if use_custom_color:
@@ -561,6 +570,7 @@ def render_setup_page() -> None:
                 "color": custom_color_value or (color_option["value"] if isinstance(color_option, dict) else color_option),
                 "display_color": custom_color_value or (color_option["value"] if isinstance(color_option, dict) else color_option),
                 "show_on_calendar": show_on_calendar,
+                "concurrent_with_study": concurrent_with_study,
                 "custom_color": use_custom_color,
             }
         st.divider()

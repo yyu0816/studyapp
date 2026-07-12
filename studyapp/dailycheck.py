@@ -4,7 +4,7 @@ from typing import Any
 from datetime import date
 import streamlit as st
 
-# Full shared emoji library (must match studyapp.py EMOJI_OPTIONS)
+# Full shared emoji library — kept in sync with studyapp.py EMOJI_OPTIONS
 EMOJI_OPTIONS = [
     "📚", "📝", "🕒", "🏫", "🎯", "💡", "☕", "🛌", "🏃", "🎒",
     "😀", "😎", "🤔", "😴", "💪", "🙌", "✨", "🔥", "💯", "🎉",
@@ -12,17 +12,19 @@ EMOJI_OPTIONS = [
     "🍎", "🍔", "🥤", "🎵", "🎧", "🎨", "⚽", "🏀", "🎮", "🎬",
     "🚗", "🚌", "🚆", "✈️", "🏠", "🏢", "🏥", "🏦", "🛒", "🌲",
     "🏐", "🚿", "🏊", "🤸", "⚾", "🎾", "🧘", "🍜", "🧃", "📺",
+    "🧖", "🏄", "😜", "🥳", "👍", "🧹", "🛕", "📦", "🔓", "⏰",
+    "🌿", "🐶", "🐱", "⛰️", "🌊", "🔭", "🧪", "📱", "😉", "🥱",
 ]
 
 COLOR_OPTIONS = [
-    {"name": "藍色",  "value": "#4f84ff"},
-    {"name": "紫色",  "value": "#7b5cff"},
-    {"name": "紅色",  "value": "#ff6b6b"},
-    {"name": "綠色",  "value": "#2ecc71"},
-    {"name": "橙色",  "value": "#ff9f43"},
-    {"name": "粉色",  "value": "#fd79a8"},
-    {"name": "深藍",  "value": "#0652DD"},
-    {"name": "深綠",  "value": "#009432"},
+    {"name": "🔵 藍色", "value": "#4f84ff"},
+    {"name": "🟣 紫色", "value": "#7b5cff"},
+    {"name": "🔴 紅色", "value": "#ff6b6b"},
+    {"name": "🟢 綠色", "value": "#2ecc71"},
+    {"name": "🟠 橙色", "value": "#ff9f43"},
+    {"name": "🟡 黃色", "value": "#f9ca24"},
+    {"name": "⚪ 灰色", "value": "#636e72"},
+    {"name": "🤍 深紅", "value": "#b71540"},
 ]
 
 
@@ -47,6 +49,11 @@ def _time_to_minutes(h: str, m: str) -> int:
     return int(h) * 60 + int(m)
 
 
+def _minutes_to_px(total_minutes: int, px_per_hour: int = 60) -> float:
+    """Convert absolute minutes-of-day to pixel offset."""
+    return total_minutes * px_per_hour / 60
+
+
 def render_daily_checkin_page() -> None:
     st.subheader("每日打卡與微調")
     if not st.session_state.get("plan"):
@@ -68,10 +75,15 @@ def render_daily_checkin_page() -> None:
         st.session_state["daily_override_tasks"] = {}
     daily_tasks_overrides = st.session_state["daily_override_tasks"].get(today_str, [])
 
-    # time_loss records: list of {"start": "HH:MM", "end": "HH:MM", "minutes": N, "reason": "..."}
     if "time_loss_records" not in st.session_state:
         st.session_state["time_loss_records"] = {}
     time_loss_records = st.session_state["time_loss_records"].get(today_str, [])
+
+    # Persist mood & motivation so they survive Streamlit reruns
+    if "saved_motivation" not in st.session_state:
+        st.session_state["saved_motivation"] = 3
+    if "saved_mood" not in st.session_state:
+        st.session_state["saved_mood"] = 3
 
     # Filter today's fixed events
     today_events = [
@@ -82,67 +94,116 @@ def render_daily_checkin_page() -> None:
     today_events.sort(key=lambda x: x.get("start", ""))
 
     # ── Timeline ──────────────────────────────────────────────────────────────
+    HOUR_PX = 60          # pixels per hour on the timeline
+    TIMELINE_START = 0    # start at 00:00
+    TIMELINE_END   = 24   # end at 24:00
+    TOTAL_PX = HOUR_PX * (TIMELINE_END - TIMELINE_START)
+
+    def event_to_px(start_str: str, end_str: str):
+        try:
+            sh, sm = start_str.split(":")
+            eh, em = end_str.split(":")
+            top    = int(sh) * HOUR_PX + int(sm) * HOUR_PX / 60
+            bottom = int(eh) * HOUR_PX + int(em) * HOUR_PX / 60
+            if bottom <= top:
+                bottom = top + HOUR_PX   # at least 1 hour if end <= start
+            return top, bottom
+        except Exception:
+            return 0, HOUR_PX
+
+    # Assign column index for overlapping events (simple greedy)
+    def assign_columns(events):
+        slots: list[list] = []     # each slot is a list of (top, bottom, event_idx)
+        result = {}                # event_idx -> (col, n_cols_in_group)
+        for i, ev in enumerate(events):
+            top, bottom = event_to_px(ev.get("start", "00:00"), ev.get("end", "01:00"))
+            placed = False
+            for col_idx, slot in enumerate(slots):
+                last_top, last_bottom, _ = slot[-1]
+                if top >= last_bottom:
+                    slot.append((top, bottom, i))
+                    result[i] = col_idx
+                    placed = True
+                    break
+            if not placed:
+                slots.append([(top, bottom, i)])
+                result[i] = len(slots) - 1
+
+        # Determine how many columns each event needs to share
+        n_cols = len(slots)
+        # For each event find maximum columns in its time range
+        final = {}
+        for i, ev in enumerate(events):
+            top, bottom = event_to_px(ev.get("start", "00:00"), ev.get("end", "01:00"))
+            concurrent = sum(
+                1 for j, ev2 in enumerate(events)
+                if j != i and event_to_px(ev2.get("start", "00:00"), ev2.get("end", "01:00"))[0] < bottom
+                and event_to_px(ev2.get("start", "00:00"), ev2.get("end", "01:00"))[1] > top
+            )
+            final[i] = (result[i], concurrent + 1)
+        return final
+
+    event_layout = assign_columns(today_events)
+
     col_timeline, col_main = st.columns([1, 2], gap="large")
 
     with col_timeline:
         st.markdown("### 🕒 時間軸")
 
-        # Build a map: hour (int) -> list of events starting in that hour
-        hour_event_map: dict[int, list] = {h: [] for h in range(24)}
-        for event in today_events:
-            start_str = event.get("start", "")
-            try:
-                h = int(start_str.split(":")[0])
-                if 0 <= h < 24:
-                    hour_event_map[h].append(event)
-            except (ValueError, IndexError):
-                pass
-
+        # Build HTML timeline with absolute positioning
+        # Outer wrapper: fixed height with relative positioning
         timeline_html = (
-            "<div style='margin-left: 60px; border-left: 3px solid #4f84ff; "
-            "padding-left: 16px; margin-top: 20px; padding-bottom: 20px;'>"
+            f"<div style='position:relative; height:{TOTAL_PX}px; "
+            f"margin-left:60px; border-left:3px solid #4f84ff; "
+            f"margin-top:10px; margin-bottom:20px;'>"
         )
-        for hour in range(24):
-            hour_str = f"{hour:02d}"
-            hour_events = hour_event_map[hour]
 
-            # Hour tick mark — always shown, sits to the left of the line
+        # Hour tick marks
+        for hour in range(TIMELINE_START, TIMELINE_END + 1):
+            top_px = (hour - TIMELINE_START) * HOUR_PX
+            hour_label = f"{hour:02d}:00" if hour < 24 else ""
             timeline_html += (
-                f"<div style='position: relative; min-height: 44px;'>"
-                f"<div style='position: absolute; left: -88px; top: 0; width: 56px; "
-                f"text-align: right; color: #bbb; font-size: 13px; line-height: 1;'>"
-                f"{hour_str}:00</div>"
-                f"<div style='position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; "
-                f"border-radius: 50%; background-color: #dde; border: 2px solid white;'></div>"
+                f"<div style='position:absolute; top:{top_px}px; left:0; right:0; "
+                f"border-top:1px solid #e8e8e8;'>"
+                f"<span style='position:absolute; left:-72px; top:-10px; "
+                f"width:60px; text-align:right; color:#aaa; font-size:12px; "
+                f"line-height:1;'>{hour_label}</span>"
+                f"<div style='position:absolute; left:-8px; top:-5px; width:10px; height:10px; "
+                f"border-radius:50%; background:#dde; border:2px solid white;'></div>"
+                f"</div>"
             )
 
-            # Events starting this hour are rendered inside their own block
-            for event in hour_events:
-                emoji = event.get("emoji", "📌")
-                color = event.get("display_color", event.get("color", "#4f84ff"))
-                title = event.get("title", "未命名行程")
-                start = event.get("start", "")
-                end = event.get("end", "")
+        # Event cards — absolutely positioned, split into columns if overlapping
+        CARD_LEFT_OFFSET = 10   # px from the timeline line
+        CARD_WIDTH_BASE  = 160  # px total card area for one column
 
-                timeline_html += (
-                    f"<div style='position: relative; margin-bottom: 12px; margin-top: 8px;'>"
-                    # event time label — shifted further left so it doesn't overlap the line tick
-                    f"<div style='position: absolute; left: -88px; top: 0; width: 56px; "
-                    f"text-align: right; font-weight: bold; color: #555; font-size: 12px; line-height: 1.2;'>"
-                    f"{start}</div>"
-                    # coloured dot on the line
-                    f"<div style='position: absolute; left: -26px; top: 4px; width: 14px; height: 14px; "
-                    f"border-radius: 50%; background-color: {color}; border: 2px solid white; "
-                    f"box-shadow: 0 0 0 2px {color}33;'></div>"
-                    # card
-                    f"<div style='background-color: {color}22; border-left: 4px solid {color}; "
-                    f"padding: 8px 10px; border-radius: 6px;'>"
-                    f"<strong>{emoji} {title}</strong>"
-                    f"<div style='font-size: 11px; color: #777; margin-top: 2px;'>{start} – {end}</div>"
-                    f"</div></div>"
-                )
+        for i, event in enumerate(today_events):
+            col_idx, n_cols = event_layout.get(i, (0, 1))
+            top_px, bottom_px = event_to_px(
+                event.get("start", "00:00"), event.get("end", "01:00")
+            )
+            height_px = max(bottom_px - top_px, 24)
 
-            timeline_html += "</div>"
+            emoji = event.get("emoji", "📌")
+            color = event.get("display_color", event.get("color", "#4f84ff"))
+            title = event.get("title", "未命名行程")
+            start = event.get("start", "")
+            end   = event.get("end", "")
+
+            card_width  = CARD_WIDTH_BASE // n_cols
+            card_left   = CARD_LEFT_OFFSET + col_idx * card_width
+
+            timeline_html += (
+                f"<div style='position:absolute; top:{top_px}px; height:{height_px}px; "
+                f"left:{card_left}px; width:{card_width - 4}px; "
+                f"background:{color}33; border-left:4px solid {color}; "
+                f"border-radius:4px; padding:4px 6px; overflow:hidden; box-sizing:border-box; "
+                f"font-size:12px; line-height:1.3;'>"
+                f"<strong style='color:{color};'>{emoji}</strong> "
+                f"<span style='color:#333;'>{title}</span><br>"
+                f"<span style='color:#888;font-size:11px;'>{start}–{end}</span>"
+                f"</div>"
+            )
 
         timeline_html += "</div>"
 
@@ -160,12 +221,66 @@ def render_daily_checkin_page() -> None:
             st.markdown("#### 📝 今日行程")
             with st.container(border=True):
                 if today_events:
-                    for event in today_events:
+                    for i, event in enumerate(today_events):
                         emoji = event.get("emoji", "📌")
                         title = event.get("title", "未命名行程")
                         start = event.get("start", "")
-                        end = event.get("end", "")
-                        st.markdown(f"**{emoji} {title}** ({start} – {end})")
+                        end   = event.get("end", "")
+                        color = event.get("display_color", event.get("color", "#4f84ff"))
+                        is_override = i >= len([
+                            e for e in fixed_events
+                            if today_weekday in e.get("weekdays", []) and e.get("show_on_calendar", True)
+                        ])
+
+                        with st.expander(f"{emoji} **{title}** ({start}–{end})", expanded=False):
+                            # Editable only for overrides (daily added events)
+                            if is_override:
+                                override_idx = i - len([
+                                    e for e in fixed_events
+                                    if today_weekday in e.get("weekdays", []) and e.get("show_on_calendar", True)
+                                ])
+                                new_t = st.text_input("行程標題", value=title, key=f"edit_title_{i}")
+                                ec1, ec2 = st.columns(2)
+                                with ec1:
+                                    st.markdown("開始時間")
+                                    eh1, em1 = st.columns(2)
+                                    with eh1:
+                                        e_sh = st.selectbox("時", [f"{h:02d}" for h in range(24)],
+                                            index=int(start.split(":")[0]) if start else 8,
+                                            key=f"edit_sh_{i}")
+                                    with em1:
+                                        e_sm = st.selectbox("分", [f"{m:02d}" for m in range(60)],
+                                            index=int(start.split(":")[1]) if start and ":" in start else 0,
+                                            key=f"edit_sm_{i}")
+                                with ec2:
+                                    st.markdown("結束時間")
+                                    eh2, em2 = st.columns(2)
+                                    with eh2:
+                                        e_eh = st.selectbox("時", [f"{h:02d}" for h in range(24)],
+                                            index=int(end.split(":")[0]) if end else 9,
+                                            key=f"edit_eh_{i}")
+                                    with em2:
+                                        e_em = st.selectbox("分", [f"{m:02d}" for m in range(60)],
+                                            index=int(end.split(":")[1]) if end and ":" in end else 0,
+                                            key=f"edit_em_{i}")
+                                new_emoji_e = st.selectbox("表符", EMOJI_OPTIONS,
+                                    index=EMOJI_OPTIONS.index(emoji) if emoji in EMOJI_OPTIONS else 0,
+                                    key=f"edit_emoji_{i}")
+                                if st.button("儲存修改", key=f"save_edit_{i}"):
+                                    st.session_state["daily_override_events"][today_str][override_idx].update({
+                                        "title": new_t.strip(),
+                                        "start": f"{e_sh}:{e_sm}",
+                                        "end":   f"{e_eh}:{e_em}",
+                                        "emoji": new_emoji_e,
+                                    })
+                                    st.rerun()
+                                if st.button("🗑️ 刪除", key=f"del_override_{i}"):
+                                    st.session_state["daily_override_events"][today_str].pop(override_idx)
+                                    st.rerun()
+                            else:
+                                st.markdown(f"**{emoji} {title}**")
+                                st.markdown(f"時間：{start} – {end}")
+                                st.markdown(f"_（固定行程，如需修改請至計劃頁面）_")
                 else:
                     st.markdown("今日無行程")
 
@@ -173,63 +288,67 @@ def render_daily_checkin_page() -> None:
                 with st.expander("➕ 新增當日行程"):
                     new_title = st.text_input("行程標題", key="new_daily_title")
 
-                    # Start / End time pickers
                     c_start, c_end = st.columns(2)
                     with c_start:
                         st.markdown("**開始時間**")
                         s_h_col, s_m_col = st.columns(2)
                         with s_h_col:
                             new_start_h = st.selectbox(
-                                "開始時", [f"{i:02d}" for i in range(24)],
+                                "開始-時", [f"{i:02d}" for i in range(24)],
                                 index=8, key="new_start_h")
                         with s_m_col:
                             new_start_m = st.selectbox(
-                                "開始分", [f"{i:02d}" for i in range(60)],
+                                "開始-分", [f"{i:02d}" for i in range(60)],
                                 index=0, key="new_start_m")
                     with c_end:
                         st.markdown("**結束時間**")
                         e_h_col, e_m_col = st.columns(2)
                         with e_h_col:
                             new_end_h = st.selectbox(
-                                "結束時", [f"{i:02d}" for i in range(24)],
+                                "結束-時", [f"{i:02d}" for i in range(24)],
                                 index=9, key="new_end_h")
                         with e_m_col:
                             new_end_m = st.selectbox(
-                                "結束分", [f"{i:02d}" for i in range(60)],
+                                "結束-分", [f"{i:02d}" for i in range(60)],
                                 index=0, key="new_end_m")
 
-                    st.markdown(
-                        f"⏱ 預覽：**{new_start_h}:{new_start_m}** → **{new_end_h}:{new_end_m}**"
-                    )
+                    st.info(f"⏱ 預覽：{new_start_h}:{new_start_m} → {new_end_h}:{new_end_m}")
 
-                    # Emoji picker (full library)
                     new_emoji = st.selectbox("表符", EMOJI_OPTIONS, index=0, key="new_emoji")
 
-                    # Background colour picker
+                    # Color picker with preview
                     new_color_option = st.selectbox(
-                        "背景色",
-                        options=COLOR_OPTIONS,
+                        "背景色", options=COLOR_OPTIONS,
                         format_func=lambda o: o["name"],
-                        index=0,
-                        key="new_event_color",
+                        index=0, key="new_event_color",
                     )
-                    use_custom_new_color = st.checkbox("使用自訂顏色", key="new_event_use_custom_color")
                     new_color_value = new_color_option["value"]
-                    if use_custom_new_color:
+                    st.markdown(
+                        f"<div style='display:inline-block;width:22px;height:14px;"
+                        f"border-radius:3px;background:{new_color_value};"
+                        f"vertical-align:middle;margin-right:6px;'></div>"
+                        f"<span style='font-size:13px;color:#555;'>{new_color_option['name']}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    use_custom_new = st.checkbox("使用自訂顏色", key="new_event_use_custom_color")
+                    if use_custom_new:
                         new_color_value = st.color_picker(
                             "自訂顏色", value=new_color_value, key="new_event_custom_color"
                         )
 
+                    concurrent_new = st.checkbox("是否能和讀書計畫並行？", key="new_event_concurrent")
+
                     if st.button("確認新增", key="btn_add_event"):
                         if new_title.strip():
                             st.session_state["daily_override_events"].setdefault(today_str, []).append({
-                                "title": new_title.strip(),
-                                "start": f"{new_start_h}:{new_start_m}",
-                                "end":   f"{new_end_h}:{new_end_m}",
-                                "emoji": new_emoji,
-                                "color": new_color_value,
+                                "title":   new_title.strip(),
+                                "start":   f"{new_start_h}:{new_start_m}",
+                                "end":     f"{new_end_h}:{new_end_m}",
+                                "emoji":   new_emoji,
+                                "color":   new_color_value,
                                 "display_color": new_color_value,
                                 "show_on_calendar": True,
+                                "concurrent_with_study": concurrent_new,
                             })
                             st.rerun()
 
@@ -237,18 +356,21 @@ def render_daily_checkin_page() -> None:
             st.markdown("#### 🎭 心情反饋")
             with st.container(border=True):
                 is_mood_submitted = st.session_state.get("mood_submitted", False)
-                motivation = st.radio(
-                    "動力 (1: 低下 - 5: 充滿動力)", [1, 2, 3, 4, 5],
-                    index=2, horizontal=True, key="daily_motivation",
-                    disabled=is_mood_submitted)
-                mood = st.radio(
-                    "心情 (1: 低落 - 5: 心情極佳)", [1, 2, 3, 4, 5],
-                    index=2, horizontal=True, key="daily_mood_score",
-                    disabled=is_mood_submitted)
 
                 if not is_mood_submitted:
+                    motivation = st.radio(
+                        "動力 (1: 低下 - 5: 充滿動力)", [1, 2, 3, 4, 5],
+                        index=st.session_state["saved_motivation"] - 1,
+                        horizontal=True, key="daily_motivation")
+                    mood = st.radio(
+                        "心情 (1: 低落 - 5: 心情極佳)", [1, 2, 3, 4, 5],
+                        index=st.session_state["saved_mood"] - 1,
+                        horizontal=True, key="daily_mood_score")
+                    # Save immediately as user changes
+                    st.session_state["saved_motivation"] = motivation
+                    st.session_state["saved_mood"] = mood
+
                     if st.button("確認送出", key="btn_submit_mood"):
-                        # ── 確認提醒 ──────────────────────────────────
                         st.session_state["mood_pending_confirm"] = True
                         st.rerun()
 
@@ -269,6 +391,13 @@ def render_daily_checkin_page() -> None:
                                 st.session_state["mood_pending_confirm"] = False
                                 st.rerun()
                 else:
+                    # Show locked values from saved state
+                    st.radio("動力", [1, 2, 3, 4, 5],
+                        index=st.session_state["saved_motivation"] - 1,
+                        horizontal=True, key="daily_motivation_locked", disabled=True)
+                    st.radio("心情", [1, 2, 3, 4, 5],
+                        index=st.session_state["saved_mood"] - 1,
+                        horizontal=True, key="daily_mood_score_locked", disabled=True)
                     st.success("已送出心情與動力紀錄！")
 
         # ── 今日讀書進度 ──────────────────────────────────────────────────────
@@ -293,7 +422,7 @@ def render_daily_checkin_page() -> None:
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 with st.expander("➕ 新增當日進度"):
-                    new_subject = st.text_input("科目", key="new_task_subject")
+                    new_subject    = st.text_input("科目", key="new_task_subject")
                     new_task_title = st.text_input(
                         "內容標題 (例: 小組作業、心得報告...)", key="new_task_title"
                     )
@@ -319,7 +448,6 @@ def render_daily_checkin_page() -> None:
                     [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_pacing_score"
                 )
 
-                # ── 意外損失時間（多筆） ───────────────────────────────────────
                 if "show_time_loss" not in st.session_state:
                     st.session_state["show_time_loss"] = False
 
@@ -335,23 +463,22 @@ def render_daily_checkin_page() -> None:
                             lsh_col, lsm_col = st.columns(2)
                             with lsh_col:
                                 loss_start_h = st.selectbox(
-                                    "開始時", [f"{i:02d}" for i in range(24)], key="loss_s_h")
+                                    "開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
                             with lsm_col:
                                 loss_start_m = st.selectbox(
-                                    "開始分", [f"{i:02d}" for i in range(60)], key="loss_s_m")
+                                    "開始分", [f"{m:02d}" for m in range(60)], key="loss_s_m")
                         with fl_c2:
                             st.markdown("結束時間")
                             leh_col, lem_col = st.columns(2)
                             with leh_col:
                                 loss_end_h = st.selectbox(
-                                    "結束時", [f"{i:02d}" for i in range(24)], key="loss_e_h")
+                                    "結束時", [f"{h:02d}" for h in range(24)], key="loss_e_h")
                             with lem_col:
                                 loss_end_m = st.selectbox(
-                                    "結束分", [f"{i:02d}" for i in range(60)], key="loss_e_m")
+                                    "結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
                         loss_reason = st.text_input("原因（選填）", key="loss_reason")
 
-                        submitted = st.form_submit_button("新增這筆")
-                        if submitted:
+                        if st.form_submit_button("新增這筆"):
                             start_mins = _time_to_minutes(loss_start_h, loss_start_m)
                             end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
                             diff_mins  = end_mins - start_mins
@@ -365,21 +492,18 @@ def render_daily_checkin_page() -> None:
                             })
                             st.rerun()
 
-                # Show existing records
                 time_loss_records = st.session_state["time_loss_records"].get(today_str, [])
                 if time_loss_records:
                     st.markdown("**已記錄的意外損失：**")
                     total_mins = 0
-                    for i, rec in enumerate(time_loss_records):
+                    for rec in time_loss_records:
                         mins = rec.get("minutes", 0)
                         total_mins += mins
                         reason_str = f"　原因：{rec['reason']}" if rec.get("reason") else ""
-                        st.markdown(
-                            f"- {rec['start']} → {rec['end']}　**{mins} 分鐘**{reason_str}"
-                        )
+                        st.markdown(f"- {rec['start']} → {rec['end']}　**{mins} 分鐘**{reason_str}")
                     total_h = total_mins // 60
                     total_m = total_mins % 60
-                    st.info(f"⏱ 今日合計損失：**{total_h} 小時 {total_m} 分鐘**（{total_mins} 分鐘）")
+                    st.info(f"⏱ 今日合計損失：**{total_h} 小時 {total_m} 分鐘**")
                 else:
                     total_mins = 0
 
@@ -393,30 +517,27 @@ def render_daily_checkin_page() -> None:
                 "詳細進度說明",
                 value=(st.session_state.get("daily_log") or {}).get("daily_progress", ""),
                 placeholder="例如：完成 60 頁數學與 20 頁英文",
-                height=100,
-                disabled=is_daily_saved,
+                height=100, disabled=is_daily_saved,
             )
             notes = st.text_area(
                 "備註",
                 value=(st.session_state.get("daily_log") or {}).get("notes", ""),
                 placeholder="例如：今天需要延後 30 分鐘的複習",
-                height=80,
-                disabled=is_daily_saved,
+                height=80, disabled=is_daily_saved,
             )
 
         if not is_daily_saved:
             if st.button("💾 儲存今日打卡", use_container_width=True):
-                # Read current radio values safely
-                motivation_val = st.session_state.get("daily_motivation", 3)
-                mood_val = st.session_state.get("daily_mood_score", 3)
+                motivation_val = st.session_state.get("saved_motivation", 3)
+                mood_val       = st.session_state.get("saved_mood", 3)
                 daily_data = {
-                    "daily_progress":  daily_progress,
-                    "mood_score":      mood_val,
+                    "daily_progress":   daily_progress,
+                    "mood_score":       mood_val,
                     "motivation_score": motivation_val,
-                    "amount_score":    amount_feedback,
-                    "pacing_score":    pacing_feedback,
-                    "time_loss":       time_loss,
-                    "notes":           notes,
+                    "amount_score":     amount_feedback,
+                    "pacing_score":     pacing_feedback,
+                    "time_loss":        time_loss,
+                    "notes":            notes,
                 }
                 daily_data["recommendation"] = get_adjustment_message(
                     daily_data["pacing_score"],
@@ -428,7 +549,10 @@ def render_daily_checkin_page() -> None:
                 st.rerun()
         else:
             st.success("今日打卡已儲存且鎖定！")
-            st.info(f"💡 **今日建議**：\n{(st.session_state.get('daily_log') or {}).get('recommendation', '')}")
+            st.info(
+                f"💡 **今日建議**：\n"
+                f"{(st.session_state.get('daily_log') or {}).get('recommendation', '')}"
+            )
             if st.button("✏️ 編輯今日打卡", use_container_width=True):
                 st.session_state["daily_saved"] = False
                 st.rerun()
