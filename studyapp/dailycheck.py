@@ -493,44 +493,45 @@ def render_daily_checkin_page() -> None:
                     st.session_state["show_time_loss"] = True
 
                 if st.session_state["show_time_loss"]:
-                    with st.form("form_time_loss", clear_on_submit=True):
-                        st.markdown("**新增一筆意外損失**")
-                        fl_c1, fl_c2 = st.columns(2)
-                        with fl_c1:
-                            st.markdown("開始時間")
-                            lsh_col, lsm_col = st.columns(2)
-                            with lsh_col:
-                                loss_start_h = st.selectbox(
-                                    "開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
-                            with lsm_col:
-                                loss_start_m = st.selectbox(
-                                    "開始分", [f"{m:02d}" for m in range(60)], key="loss_s_m")
-                        with fl_c2:
-                            st.markdown("結束時間")
-                            leh_col, lem_col = st.columns(2)
-                            with leh_col:
-                                loss_end_h = st.selectbox(
-                                    "結束時", [f"{h:02d}" for h in range(24)], key="loss_e_h")
-                            with lem_col:
-                                loss_end_m = st.selectbox(
-                                    "結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
-                        
-                        st.info(f"⏱ 預覽：{loss_start_h}:{loss_start_m} → {loss_end_h}:{loss_end_m}")
-                        loss_reason = st.text_input("原因（選填）", key="loss_reason")
+                    st.markdown("**新增一筆意外損失**")
+                    fl_c1, fl_c2 = st.columns(2)
+                    with fl_c1:
+                        st.markdown("開始時間")
+                        lsh_col, lsm_col = st.columns(2)
+                        with lsh_col:
+                            loss_start_h = st.selectbox(
+                                "開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
+                        with lsm_col:
+                            loss_start_m = st.selectbox(
+                                "開始分", [f"{m:02d}" for m in range(60)], key="loss_s_m")
+                    with fl_c2:
+                        st.markdown("結束時間")
+                        leh_col, lem_col = st.columns(2)
+                        with leh_col:
+                            loss_end_h = st.selectbox(
+                                "結束時", [f"{h:02d}" for h in range(24)], key="loss_e_h")
+                        with lem_col:
+                            loss_end_m = st.selectbox(
+                                "結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
+                    
+                    st.info(f"⏱ 預覽：{loss_start_h}:{loss_start_m} → {loss_end_h}:{loss_end_m}")
+                    loss_reason = st.text_input("原因（選填）", key="loss_reason")
 
-                        if st.form_submit_button("新增這筆"):
-                            start_mins = _time_to_minutes(loss_start_h, loss_start_m)
-                            end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
-                            diff_mins  = end_mins - start_mins
-                            if diff_mins <= 0:
-                                diff_mins += 24 * 60
-                            st.session_state["time_loss_records"].setdefault(today_str, []).append({
-                                "start":   f"{loss_start_h}:{loss_start_m}",
-                                "end":     f"{loss_end_h}:{loss_end_m}",
-                                "minutes": diff_mins,
-                                "reason":  loss_reason.strip(),
-                            })
-                            st.rerun()
+                    if st.button("新增這筆"):
+                        start_mins = _time_to_minutes(loss_start_h, loss_start_m)
+                        end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
+                        diff_mins  = end_mins - start_mins
+                        if diff_mins <= 0:
+                            diff_mins += 24 * 60
+                        st.session_state["time_loss_records"].setdefault(today_str, []).append({
+                            "start":   f"{loss_start_h}:{loss_start_m}",
+                            "end":     f"{loss_end_h}:{loss_end_m}",
+                            "minutes": diff_mins,
+                            "reason":  loss_reason.strip(),
+                        })
+                        if "loss_reason" in st.session_state:
+                            del st.session_state["loss_reason"]
+                        st.rerun()
 
                 time_loss_records = st.session_state["time_loss_records"].get(today_str, [])
                 if time_loss_records:
@@ -549,22 +550,18 @@ def render_daily_checkin_page() -> None:
 
                 time_loss = round(total_mins / 60, 2)
 
-        # ── 記錄區 ───────────────────────────────────────────────────────────
-        st.markdown("#### 🗒️ 記錄區與今日成果")
+        # ── 紀錄區 ───────────────────────────────────────────────────────────
+        st.markdown("#### 🗒️ 紀錄區")
         with st.container(border=True):
             is_daily_saved = st.session_state.get("daily_saved", False)
             daily_progress = st.text_area(
-                "詳細進度說明",
+                "今日紀錄",
                 value=(st.session_state.get("daily_log") or {}).get("daily_progress", ""),
-                placeholder="例如：完成 60 頁數學與 20 頁英文",
-                height=100, disabled=is_daily_saved,
+                placeholder="寫點東西吧!",
+                height=200, disabled=is_daily_saved,
+                label_visibility="collapsed"
             )
-            notes = st.text_area(
-                "備註",
-                value=(st.session_state.get("daily_log") or {}).get("notes", ""),
-                placeholder="例如：今天需要延後 30 分鐘的複習",
-                height=80, disabled=is_daily_saved,
-            )
+            notes = ""  # Kept for compatibility
 
         if not is_daily_saved:
             if st.button("💾 儲存今日打卡", use_container_width=True):
