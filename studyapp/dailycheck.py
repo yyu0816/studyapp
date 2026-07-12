@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-from datetime import date
+from datetime import date, timedelta
 import streamlit as st
 
 # Full shared emoji library — kept in sync with studyapp.py EMOJI_OPTIONS
@@ -67,7 +67,10 @@ def render_daily_checkin_page() -> None:
         st.info("請先完成初始設定。")
         return
 
-    today = date.today()
+    if "view_date" not in st.session_state:
+        st.session_state["view_date"] = date.today()
+
+    today = st.session_state["view_date"]
     today_str = today.strftime("%Y-%m-%d")
     weekday_map = {0: "週一", 1: "週二", 2: "週三", 3: "週四", 4: "週五", 5: "週六", 6: "週日"}
     today_weekday = weekday_map[today.weekday()]
@@ -79,7 +82,7 @@ def render_daily_checkin_page() -> None:
         try:
             from datetime import datetime
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-            days_left = (end_date - today).days
+            days_left = (end_date - date.today()).days
             if days_left > 0:
                 countdown_text = f"⏳ 距離目標還有 <b>{days_left}</b> 天"
             elif days_left == 0:
@@ -89,10 +92,22 @@ def render_daily_checkin_page() -> None:
         except:
             pass
 
-    with st.container(border=True):
-        st.markdown(f"<h3 style='text-align: center; margin-bottom: 0;'>📅 {today_str} ({today_weekday})</h3>", unsafe_allow_html=True)
-        if countdown_text:
-            st.markdown(f"<p style='text-align: center; font-size: 1.2rem; color: #ff4b4b; margin-top: 5px; margin-bottom: 0;'>{countdown_text}</p>", unsafe_allow_html=True)
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
+        with st.container(border=True):
+            hc1, hc2, hc3 = st.columns([1, 6, 1])
+            with hc1:
+                if st.button("◀", key="prev_day", use_container_width=True):
+                    st.session_state["view_date"] -= timedelta(days=1)
+                    st.rerun()
+            with hc2:
+                st.markdown(f"<h3 style='text-align: center; margin-bottom: 0; margin-top: 0;'>📅 {today_str} ({today_weekday})</h3>", unsafe_allow_html=True)
+                if countdown_text:
+                    st.markdown(f"<p style='text-align: center; font-size: 1.1rem; color: #ff4b4b; margin-top: 5px; margin-bottom: 0;'>{countdown_text}</p>", unsafe_allow_html=True)
+            with hc3:
+                if st.button("▶", key="next_day", use_container_width=True):
+                    st.session_state["view_date"] += timedelta(days=1)
+                    st.rerun()
 
     fixed_events = plan.get("fixed_events", [])
 

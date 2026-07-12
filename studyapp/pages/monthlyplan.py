@@ -40,86 +40,84 @@ def render_monthly_plan_page() -> None:
         weeks.append(week)
         current += timedelta(days=7)
 
-    # render calendar header with weekday labels
-    headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     st.markdown("### 月曆視圖")
-    header_cols = st.columns(7)
-    for col, label in zip(header_cols, headers):
-        with col:
-            st.markdown(f"**{label}**")
+    
+    html_calendar = """
+    <style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        border-top: 1px solid #ddd;
+        border-left: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .calendar-header {
+        background: #f4f6f8;
+        text-align: center;
+        font-weight: bold;
+        padding: 8px;
+        border-bottom: 1px solid #ddd;
+        border-right: 1px solid #ddd;
+        color: #333;
+    }
+    .calendar-cell {
+        min-height: 120px;
+        padding: 6px;
+        border-bottom: 1px solid #ddd;
+        border-right: 1px solid #ddd;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .calendar-cell.out-of-range {
+        background: #fcfcfc;
+        color: #bbb;
+    }
+    .calendar-date {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 4px;
+        color: #555;
+    }
+    .calendar-event {
+        font-size: 12px;
+        color: #333;
+        padding: 3px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    </style>
+    <div class="calendar-grid">
+    """
+    
+    headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    for h in headers:
+        html_calendar += f'<div class="calendar-header">{h}</div>'
 
-    st.markdown("<div style='border: 2px solid #ddd; padding: 8px; border-radius: 12px;'>", unsafe_allow_html=True)
     for week in weeks:
-        cols = st.columns(7)
-        for col, day in zip(cols, week):
-            with col:
-                day_str = day.strftime("%Y-%m-%d")
-                is_in_range = start_date <= day <= end_date
-                day_label = day.strftime("%m/%d")
-                if not is_in_range:
-                    st.markdown(f"<div style='min-height: 100px; border: 1px solid transparent; padding: 8px;'> <strong>{day_label}</strong> </div>", unsafe_allow_html=True)
-                    continue
-
+        for day in week:
+            day_str = day.strftime("%Y-%m-%d")
+            is_in_range = start_date <= day <= end_date
+            day_label = day.strftime("%m/%d")
+            css_class = "calendar-cell" if is_in_range else "calendar-cell out-of-range"
+            html_calendar += f'<div class="{css_class}"><div class="calendar-date">{day_label}</div>'
+            
+            if is_in_range:
                 item = plan_by_date.get(day_str)
-                event_lines = []
                 if item and item.get("fixed_events"):
                     for event in item.get("fixed_events", []):
                         if event.get("show_on_calendar", True):
                             emoji = event.get("emoji", "📌")
-                            event_lines.append(f"{emoji} {event.get('title', '')}")
-                if st.button(day_label, key=f"select_day_{day_str}"):
-                    st.session_state["selected_day"] = day_str
-                for line in event_lines:
-                    st.markdown(f"<div style='font-size:12px; line-height:1.2'>{line}</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+                            title = event.get("title", "")
+                            color = event.get("display_color", event.get("color", "#4f84ff"))
+                            html_calendar += f'<div class="calendar-event" style="background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>'
+            html_calendar += '</div>'
 
-    selected_day = st.session_state.get("selected_day")
-    if selected_day and selected_day in plan_by_date:
-        selected_item = plan_by_date[selected_day]
-        st.markdown("---")
-        st.markdown(f"### {selected_day} 詳細時間軸")
-        if selected_item.get("fixed_events"):
-            st.write("時間軸：")
-            for event in selected_item.get("fixed_events", []):
-                if event.get("show_on_calendar", True):
-                    color = event.get("display_color", event.get("color", "#4f84ff"))
-                    st.markdown(
-                        f"<div style='background:{color}; color:#fff; border-radius:6px; padding:6px; margin-bottom:4px;'>"
-                        f"<strong>{event.get('emoji', '📌')} {event.get('title', '')}</strong><br>"
-                        f"{event.get('start','')} ～ {event.get('end','')}"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-        else:
-            st.write("無固定行程")
-        st.write("今日須完成：")
-        if selected_item.get("tasks"):
-            for task in selected_item.get("tasks", []):
-                st.write(f"- {task}")
-        else:
-            st.write("- 尚未指定")
+    html_calendar += "</div>"
 
-    st.markdown("---")
-    st.markdown("### 每日詳細行程")
-    for day in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)):
-        day_str = day.strftime("%Y-%m-%d")
-        item = plan_by_date.get(day_str, {})
-        with st.expander(f"{day.strftime('%Y-%m-%d')} {item.get('day_name','')}"):
-            if item.get("fixed_events"):
-                st.write("時間軸：")
-                for event in item.get("fixed_events", []):
-                    if event.get("show_on_calendar", True):
-                        color = event.get("display_color", event.get("color", "#4f84ff"))
-                        st.markdown(
-                            f"<div style='background:{color}; color:#fff; border-radius:6px; padding:6px; margin-bottom:4px;'>"
-                            f"<strong>{event.get('emoji', '📌')} {event.get('title', '')}</strong><br>"
-                            f"{event.get('start','')} ～ {event.get('end','')}"
-                            f"</div>",
-                            unsafe_allow_html=True,
-                        )
-            st.write("今日須完成：")
-            if item.get("tasks"):
-                for task in item.get("tasks", []):
-                    st.write(f"- {task}")
-            else:
-                st.write("- 尚未指定")
+    st.markdown(html_calendar, unsafe_allow_html=True)
