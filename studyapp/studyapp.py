@@ -641,16 +641,16 @@ def render_dashboard_page() -> None:
 
 def render_home_page() -> None:
     st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
-    st.title("讀書計畫安排助手")
-    st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
-
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
     default_index = page_options.index(st.session_state.get("main_page", "計劃頁面")) if st.session_state.get("main_page") in page_options else (0 if not st.session_state.get("plan") else 1)
     page = st.sidebar.selectbox("主選單", page_options, index=default_index, key="page_selection")
     st.session_state["main_page"] = page
 
-    if st.session_state.get("plan_name"):
-        st.markdown(f"### {st.session_state['plan_name']}")
+    if page != "每日打卡與微調":
+        st.title("讀書計畫安排助手")
+        st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
+        if st.session_state.get("plan_name"):
+            st.markdown(f"### {st.session_state['plan_name']}")
 
     if page == "計劃頁面":
         render_setup_page()

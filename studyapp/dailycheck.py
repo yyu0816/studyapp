@@ -63,16 +63,37 @@ def _time_to_minutes(h: str, m: str) -> int:
 
 
 def render_daily_checkin_page() -> None:
-    st.subheader("每日打卡與微調")
     if not st.session_state.get("plan"):
         st.info("請先完成初始設定。")
         return
 
-    today_str = date.today().strftime("%Y-%m-%d")
+    today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
     weekday_map = {0: "週一", 1: "週二", 2: "週三", 3: "週四", 4: "週五", 5: "週六", 6: "週日"}
-    today_weekday = weekday_map[date.today().weekday()]
+    today_weekday = weekday_map[today.weekday()]
 
     plan = st.session_state.get("plan", {})
+    end_date_str = plan.get("end_date")
+    countdown_text = ""
+    if end_date_str:
+        try:
+            from datetime import datetime
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            days_left = (end_date - today).days
+            if days_left > 0:
+                countdown_text = f"⏳ 距離目標還有 <b>{days_left}</b> 天"
+            elif days_left == 0:
+                countdown_text = "🎉 就是今天！"
+            else:
+                countdown_text = "計畫已結束"
+        except:
+            pass
+
+    with st.container(border=True):
+        st.markdown(f"<h3 style='text-align: center; margin-bottom: 0;'>📅 {today_str} ({today_weekday})</h3>", unsafe_allow_html=True)
+        if countdown_text:
+            st.markdown(f"<p style='text-align: center; font-size: 1.2rem; color: #ff4b4b; margin-top: 5px; margin-bottom: 0;'>{countdown_text}</p>", unsafe_allow_html=True)
+
     fixed_events = plan.get("fixed_events", [])
 
     if "daily_override_events" not in st.session_state:
@@ -101,7 +122,7 @@ def render_daily_checkin_page() -> None:
     
     # 1. Fixed events
     for f_idx, e in enumerate(fixed_events):
-        if today_weekday in e.get("weekdays", []) and e.get("show_on_calendar", True):
+        if today_weekday in e.get("weekdays", []):
             if f_idx in modified_fixed:
                 if not modified_fixed[f_idx].get("deleted"):
                     m_event = modified_fixed[f_idx].copy()
