@@ -83,6 +83,12 @@ def render_monthly_plan_page() -> None:
         st.info("請先完成初始設定。")
         return
 
+    # Check for query params for event clicking
+    add_event_target = st.query_params.get("add_event_date")
+    if add_event_target:
+        st.query_params.clear()
+        add_event_dialog(add_event_target)
+
     plan = st.session_state.get("plan") or {}
     monthly_plan = st.session_state.get("monthly_plan") or []
     plan_by_date: dict[str, dict[str, Any]] = {item["date"]: item for item in monthly_plan}
@@ -94,22 +100,6 @@ def render_monthly_plan_page() -> None:
         st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
         return
 
-    st.markdown("""
-    <style>
-    .cal-btn > button {
-        padding: 2px !important;
-        min-height: 20px !important;
-        font-weight: bold;
-        color: #555;
-        border: none !important;
-        background: transparent !important;
-    }
-    .cal-btn > button:hover {
-        color: #4f84ff;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     grouped = _group_monthly_plan_by_month(monthly_plan)
     headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     
@@ -120,52 +110,75 @@ def render_monthly_plan_page() -> None:
         col_cal, col_overview = st.columns([2, 1])
         
         with col_cal:
-            # Render headers
-            hc = st.columns(7)
-            for i, h in enumerate(headers):
-                with hc[i]:
-                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:8px;'>{h}</div>", unsafe_allow_html=True)
-            
+            html_calendar = """
+            <style>
+            .grid-cell {
+                min-height: 120px; 
+                padding: 6px; 
+                border-bottom: 1px solid #ddd; 
+                border-right: 1px solid #ddd; 
+                display: flex; 
+                flex-direction: column; 
+                gap: 4px;
+                text-decoration: none;
+                color: inherit;
+                transition: background-color 0.2s;
+                cursor: pointer;
+            }
+            .grid-cell:hover {
+                background-color: #f0f7ff !important;
+            }
+            </style>
+            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid #ddd; border-left: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; margin-bottom: 30px;">
+            """
+            for h in headers:
+                html_calendar += f'<div style="background: #f4f6f8; text-align: center; font-weight: bold; padding: 8px; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; color: #333; font-size:14px;">{h}</div>'
+
             weeks = _month_calendar_dates(year, month)
             for week in weeks:
-                cols = st.columns(7)
-                for i, day in enumerate(week):
-                    with cols[i]:
-                        day_str = day.strftime("%Y-%m-%d")
-                        item = plan_by_date.get(day_str)
-                        is_current_month = day.month == month and start_date <= day <= end_date
+                for day in week:
+                    day_str = day.strftime("%Y-%m-%d")
+                    item = plan_by_date.get(day_str)
+                    is_current_month = day.month == month and start_date <= day <= end_date
+                    day_label = str(day.day)
+                    
+                    bg_color = "#fff" if is_current_month else "#fcfcfc"
+                    text_color = "#333" if is_current_month else "#bbb"
+                    
+                    # We wrap the entire cell in an <a> tag that triggers the query param reload if it's within the valid range
+                    if is_current_month:
+                        html_calendar += f'<a href="?add_event_date={day_str}" target="_self" class="grid-cell" style="background: {bg_color};">'
+                    else:
+                        html_calendar += f'<div class="grid-cell" style="background: {bg_color}; cursor: default;">'
                         
-                        bg_color = "#fff" if is_current_month else "#fcfcfc"
+                    html_calendar += f'<div style="font-weight: bold; font-size: 14px; margin-bottom: 4px; color: {text_color};">{day_label}</div>'
+                    
+                    if is_current_month:
+                        events = []
+                        if item and item.get("fixed_events"):
+                            events.extend(item.get("fixed_events", []))
+                        if "daily_override_events" in st.session_state and day_str in st.session_state["daily_override_events"]:
+                            events.extend(st.session_state["daily_override_events"][day_str])
                         
-                        with st.container(border=True):
-                            # Wrapper for button to reduce size
-                            st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
-                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
-                                if is_current_month:
-                                    add_event_dialog(day_str)
-                                else:
-                                    st.warning("請選擇計畫範圍內的日期")
-                            st.markdown('</div>', unsafe_allow_html=True)
-                            
-                            # Render events in this cell
-                            if is_current_month:
-                                events = []
-                                if item and item.get("fixed_events"):
-                                    events.extend(item.get("fixed_events", []))
-                                if "daily_override_events" in st.session_state and day_str in st.session_state["daily_override_events"]:
-                                    events.extend(st.session_state["daily_override_events"][day_str])
-                                
-                                for event in events:
-                                    if event.get("show_on_calendar", True):
-                                        emoji = event.get("emoji", "📌")
-                                        title = event.get("title", "")
-                                        color = event.get("display_color", event.get("color", "#4f84ff"))
-                                        st.markdown(f'<div style="font-size: 11px; color: #333; padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>', unsafe_allow_html=True)
-                                
-                                if item and item.get("tasks"):
-                                    for task in item.get("tasks", []):
-                                        st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
-                                        
+                        for event in events:
+                            if event.get("show_on_calendar", True):
+                                emoji = event.get("emoji", "📌")
+                                title = event.get("title", "")
+                                color = event.get("display_color", event.get("color", "#4f84ff"))
+                                html_calendar += f'<div style="font-size: 11px; color: #333; padding: 3px 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>'
+                        
+                        if item and item.get("tasks"):
+                            for task in item.get("tasks", []):
+                                html_calendar += f'<div style="font-size: 10px; color: #555; padding: 2px 4px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>'
+                    
+                    if is_current_month:
+                        html_calendar += '</a>'
+                    else:
+                        html_calendar += '</div>'
+                        
+            html_calendar += "</div>"
+            st.markdown(html_calendar, unsafe_allow_html=True)
+            
         with col_overview:
             st.markdown("#### 📅 行程總覽")
             with st.container(border=True):
