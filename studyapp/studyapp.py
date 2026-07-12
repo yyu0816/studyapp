@@ -290,11 +290,19 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
         "pacing_feedback": _get_field(form_data, "pacing_feedback"),
         "notes": _get_field(form_data, "notes"),
     }
-    daily_data["recommendation"] = get_adjustment_message(
-        daily_data["pacing_feedback"],
-        daily_data["time_loss"],
-        daily_data["mood"],
-    )
+    try:
+        pacing_val = int(daily_data.get("pacing_feedback") or 3)
+    except (TypeError, ValueError):
+        pacing_val = 3
+    try:
+        loss_val = float(daily_data.get("time_loss") or 0)
+    except (TypeError, ValueError):
+        loss_val = 0.0
+    try:
+        mood_val = int(daily_data.get("mood") or 3)
+    except (TypeError, ValueError):
+        mood_val = 3
+    daily_data["recommendation"] = get_adjustment_message(pacing_val, loss_val, mood_val)
     return plan_data, daily_data
 
 
