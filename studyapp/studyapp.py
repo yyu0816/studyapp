@@ -650,14 +650,13 @@ def render_home_page() -> None:
         transition: all 0.3s;
         border: 1px solid #ddd;
         background: transparent;
+        margin-bottom: 8px;
     }
     .menu-btn > button:hover {
         background-color: #4f84ff;
         color: white;
         border-color: #4f84ff;
     }
-    /* Hide Streamlit default sidebar completely to prevent confusion */
-    [data-testid="collapsedControl"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -666,10 +665,9 @@ def render_home_page() -> None:
     if "main_page" not in st.session_state:
         st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
 
-    cols = st.columns(len(page_options))
+    st.sidebar.markdown("### 主選單")
     for i, opt in enumerate(page_options):
-        with cols[i]:
-            # wrapper to target our button CSS
+        with st.sidebar:
             st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
             if st.button(opt, use_container_width=True, key=f"menu_btn_{i}"):
                 st.session_state["main_page"] = opt
