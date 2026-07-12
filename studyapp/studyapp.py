@@ -17,6 +17,7 @@ st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layo
 
 # 3. 再來才是 import 你的頁面函式
 from monthlyplan import render_monthly_plan_page
+from dailycheck import render_daily_checkin_page, get_adjustment_message
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -35,7 +36,13 @@ COLOR_OPTIONS = [
     {"name": "綠色", "value": "#2ecc71"},
     {"name": "橙色", "value": "#ff9f43"},
 ]
-EMOJI_OPTIONS = ["📚", "📝", "🕒", "🏫", "🎯", "💡", "☕", "🛌", "🏃", "🎒"]
+EMOJI_OPTIONS = [
+    "📚", "📝", "🕒", "🏫", "🎯", "💡", "☕", "🛌", "🏃", "🎒",
+    "😀", "😎", "🤔", "😴", "💪", "🙌", "✨", "🔥", "💯", "🎉",
+    "📖", "✏️", "📐", "🔬", "💻", "🧠", "🗓️", "✅", "❌", "📌",
+    "🍎", "🍔", "🥤", "🎵", "🎧", "🎨", "⚽", "🏀", "🎮", "🎬",
+    "🚗", "🚌", "🚆", "✈️", "🏠", "🏢", "🏥", "🏦", "🛒", "🌲"
+]
 
 
 def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
@@ -130,24 +137,7 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
     return subjects
 
 
-def get_adjustment_message(pacing_feedback: str, time_loss: str, mood: str) -> str:
-    feedback = pacing_feedback or "balanced"
-    loss = float(time_loss) if str(time_loss).replace(".", "", 1).isdigit() else 0
 
-    if feedback == "too_fast":
-        if loss >= 1.5:
-            return "你的節奏偏快，建議放慢一點並減少當天的學習量，保留更多休息時間。"
-        return "你的節奏偏快，建議放慢節奏並把重點任務縮減到 1~2 項。"
-
-    if feedback == "too_slow":
-        if mood in {"low", "very_low"}:
-            return "你目前狀態偏低，建議先做高收益的複習，再逐步增加今日的進度。"
-        return "你的節奏偏慢，建議把今日的目標拆成更小的步驟，提升完成感。"
-
-    if loss >= 2:
-        return "今天意外損失了不少時間，建議把明天的安排再留出緩衝時段。"
-
-    return "目前節奏還算穩定，保持每日小步進展即可。"
 
 
 def build_plan_summary(plan_data: dict[str, Any], daily_data: dict[str, Any]) -> str:
@@ -394,6 +384,31 @@ def get_material_unit(material_type: str) -> str:
     return MATERIAL_UNIT_MAP.get(material_type, "項")
 
 
+def _add_subject():
+    st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
+
+def _del_subject(idx):
+    st.session_state["subjects"].pop(idx)
+
+def _add_material(idx):
+    st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "課本", "quantity": 1})
+
+def _del_material(idx, mid):
+    del st.session_state["subjects"][idx]["materials"][mid]
+
+def _add_event():
+    st.session_state["fixed_events"].append({"title": "", "weekdays": [], "start": "08:00", "end": "09:00", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False})
+
+def _del_event(idx):
+    st.session_state["fixed_events"].pop(idx)
+
+def _parse_time_str(t_str: str, default="08:00"):
+    try:
+        return datetime.strptime(t_str, "%H:%M").time()
+    except:
+        return datetime.strptime(default, "%H:%M").time()
+
+
 def render_setup_page() -> None:
     st.subheader("1. 初始設定")
     _initialize_session_state()
@@ -456,20 +471,15 @@ def render_setup_page() -> None:
                     )
                     st.session_state["subjects"][idx]["materials"][mid]["quantity"] = int(quantity_value)
                 with cols[3]:
-                    if st.button("刪除參考書", key=f"delete_material_{idx}_{mid}"):
-                        del st.session_state["subjects"][idx]["materials"][mid]
-                        return
-            if st.button("新增教材／材料", key=f"add_material_{idx}"):
-                st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "課本", "quantity": 1})
+                    st.button("刪除教材", key=f"delete_material_{idx}_{mid}", on_click=_del_material, args=(idx, mid))
+            st.button("新增教材／材料", key=f"add_material_{idx}", on_click=_add_material, args=(idx,))
             weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
             st.session_state["subjects"][idx]["weekdays"] = weekdays_value
-            if st.button("刪除科目", key=f"delete_subject_{idx}") and len(st.session_state["subjects"]) > 1:
-                st.session_state["subjects"].pop(idx)
-                return
+            if len(st.session_state["subjects"]) > 1:
+                st.button("刪除科目", key=f"delete_subject_{idx}", on_click=_del_subject, args=(idx,))
         st.divider()
 
-    if st.button("新增科目"):
-        st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
+    st.button("新增科目", on_click=_add_subject)
 
     st.subheader("學習偏好")
     count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
@@ -490,8 +500,12 @@ def render_setup_page() -> None:
         with st.container():
             title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"event_title_{idx}")
             weekdays_value = st.multiselect("星期", WEEKDAY_OPTIONS, default=event.get("weekdays", []), key=f"event_weekdays_{idx}")
-            start_value = st.text_input("開始時間", value=event.get("start", ""), key=f"event_start_{idx}")
-            end_value = st.text_input("結束時間", value=event.get("end", ""), key=f"event_end_{idx}")
+            
+            st_col, end_col = st.columns(2)
+            with st_col:
+                start_value = st.time_input("開始時間", value=_parse_time_str(event.get("start", "08:00"), "08:00"), key=f"event_start_{idx}").strftime("%H:%M")
+            with end_col:
+                end_value = st.time_input("結束時間", value=_parse_time_str(event.get("end", "09:00"), "09:00"), key=f"event_end_{idx}").strftime("%H:%M")
             color_option = st.selectbox(
                 "顏色",
                 options=COLOR_OPTIONS,
@@ -510,9 +524,7 @@ def render_setup_page() -> None:
             custom_color_value = None
             if use_custom_color:
                 custom_color_value = st.color_picker("自訂顏色", value=event.get("display_color") or event.get("color") or "#4f84ff", key=f"event_custom_color_{idx}")
-            if st.button("刪除行程", key=f"delete_event_{idx}"):
-                st.session_state["fixed_events"].pop(idx)
-                return
+            st.button("刪除行程", key=f"delete_event_{idx}", on_click=_del_event, args=(idx,))
             st.session_state["fixed_events"][idx] = {
                 "title": title_value,
                 "weekdays": weekdays_value,
@@ -526,8 +538,7 @@ def render_setup_page() -> None:
             }
         st.divider()
 
-    if st.button("新增行程"):
-        st.session_state["fixed_events"].append({"title": "", "weekdays": [], "start": "", "end": "", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False})
+    st.button("新增行程", on_click=_add_event)
 
     st.subheader("每日作息")
     weekday_wake = st.text_input("平日起床", value=st.session_state.get("weekday_wake", "07:00"), key="weekday_wake")
@@ -562,52 +573,7 @@ def render_setup_page() -> None:
 # The monthly plan page rendering is implemented in pages/monthlyplan.py
 
 
-def render_daily_checkin_page() -> None:
-    st.subheader("2. 每日打卡或微調")
-    if not st.session_state.get("plan"):
-        st.info("請先完成初始設定。")
-        return
 
-    daily_progress = st.text_area("今日讀書進度", value=st.session_state.get("daily_log", {}).get("daily_progress", ""), placeholder="例如：完成 60 頁數學與 20 頁英文")
-    mood = st.selectbox(
-        "心情與精力",
-        ["good", "neutral", "low", "very_low"],
-        format_func=lambda value: {"good": "好", "neutral": "普通", "low": "低", "very_low": "很低"}.get(value, value),
-        key="daily_mood",
-    )
-    energy = st.selectbox(
-        "能量等級",
-        ["high", "medium", "low"],
-        format_func=lambda value: {"high": "高", "medium": "中", "low": "低"}.get(value, value),
-        key="daily_energy",
-    )
-    time_loss = st.number_input("意外時間損失（小時）", min_value=0.0, step=0.5, key="daily_time_loss")
-    pacing_feedback = st.selectbox(
-        "節奏回饋",
-        ["balanced", "too_fast", "too_slow"],
-        format_func=lambda value: {"balanced": "剛剛好", "too_fast": "進度太多", "too_slow": "進度太少"}.get(value, value),
-        key="daily_pacing",
-    )
-    notes = st.text_area("備註", value=st.session_state.get("daily_log", {}).get("notes", ""), placeholder="例如：今天需要延後 30 分鐘的複習")
-
-    if st.button("儲存今日打卡"):
-        daily_data = {
-            "daily_progress": daily_progress,
-            "mood": mood,
-            "energy": energy,
-            "time_loss": str(time_loss),
-            "pacing_feedback": pacing_feedback,
-            "notes": notes,
-        }
-        daily_data["recommendation"] = get_adjustment_message(daily_data["pacing_feedback"], daily_data["time_loss"], daily_data["mood"])
-        st.session_state["daily_log"] = daily_data
-        st.success("今日打卡已更新")
-
-    if st.session_state.get("plan_name"):
-        st.markdown(f"### {st.session_state['plan_name']}")
-    if st.session_state.get("daily_log"):
-        st.markdown("### 今日建議")
-        st.write(st.session_state["daily_log"].get("recommendation", ""))
 
 
 def render_dashboard_page() -> None:

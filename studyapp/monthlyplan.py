@@ -20,12 +20,10 @@ def _group_monthly_plan_by_month(monthly_plan: list[dict[str, Any]]) -> dict[tup
 
 def _month_calendar_dates(year: int, month: int) -> list[list[date]]:
     first_day = date(year, month, 1)
-    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
     start = first_day - timedelta(days=first_day.weekday())
-    end = last_day + timedelta(days=(6 - last_day.weekday()))
     weeks: list[list[date]] = []
     current = start
-    while current <= end:
+    for _ in range(6):
         weeks.append([current + timedelta(days=i) for i in range(7)])
         current += timedelta(days=7)
     return weeks
