@@ -96,35 +96,47 @@ def render_monthly_plan_page() -> None:
 
     st.markdown("""
     <style>
-    /* Force 7-column rows to never wrap, preventing the layout from breaking on smaller screens */
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) {
+    /* Robust sibling selector to target ONLY the calendar grid rows */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
         gap: 2px !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) > div[data-testid="column"] {
-        padding: 0 2px !important;
-        min-width: 0 !important;
-    }
-    
-    /* Make calendar cell containers look like a grid and remove huge default padding */
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 4px !important;
-        min-height: 120px !important;
+        align-items: stretch !important; /* Ensure equal height across the row */
+        margin-bottom: 2px !important;
     }
 
+    /* Prevent columns from wrapping and remove outer padding */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        min-width: 0 !important;
+        padding: 0 !important; 
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Stretch the border container and remove its huge internal padding */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 4px !important;
+        min-height: 120px !important;
+        height: 100% !important;
+        flex-grow: 1 !important;
+        border-radius: 4px !important;
+    }
+
+    /* Specific styling for the native Streamlit button to make it look like a date label */
     .cal-btn > button {
-        padding: 2px !important;
-        min-height: 20px !important;
+        padding: 2px 4px !important;
+        min-height: 24px !important;
         font-weight: bold;
         color: #555;
         border: none !important;
         background: transparent !important;
         width: 100% !important;
-        display: flex;
-        justify-content: flex-start;
+        display: flex !important;
+        justify-content: flex-start !important;
+        border-radius: 4px !important;
     }
     .cal-btn > button:hover {
-        color: #4f84ff;
+        color: #4f84ff !important;
+        background-color: #f0f7ff !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -136,14 +148,17 @@ def render_monthly_plan_page() -> None:
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
         
-        col_cal, col_overview = st.columns([2, 1])
+        col_cal, col_overview = st.columns([2, 1], gap="medium")
         
         with col_cal:
+            # THIS IS THE ANCHOR: The sibling selector targets all horizontal blocks after this div!
+            st.markdown('<div class="calendar-root" style="display:none;"></div>', unsafe_allow_html=True)
+            
             # Render headers
             hc = st.columns(7)
             for i, h in enumerate(headers):
                 with hc[i]:
-                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:8px; background:#f4f6f8; padding:4px; border-radius:4px;'>{h}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555; background:#f4f6f8; padding:6px; border-radius:4px; margin-bottom: 2px; border: 1px solid #eee;'>{h}</div>", unsafe_allow_html=True)
             
             weeks = _month_calendar_dates(year, month)
             for week in weeks:
@@ -154,11 +169,8 @@ def render_monthly_plan_page() -> None:
                         item = plan_by_date.get(day_str)
                         is_current_month = day.month == month and start_date <= day <= end_date
                         
-                        bg_color = "#fff" if is_current_month else "#fcfcfc"
-                        text_color = "#555" if is_current_month else "#bbb"
+                        text_color = "#555" if is_current_month else "#ccc"
                         
-                        # Set cell background using markdown before the container? 
-                        # Streamlit containers are transparent by default, but border=True gives them a white/gray background.
                         with st.container(border=True):
                             st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
                             if is_current_month:
