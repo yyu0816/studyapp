@@ -190,13 +190,13 @@ def render_daily_checkin_page() -> None:
         with st.container(border=True):
             daily_progress = st.text_area(
                 "詳細進度說明", 
-                value=st.session_state.get("daily_log", {}).get("daily_progress", ""), 
+                value=(st.session_state.get("daily_log") or {}).get("daily_progress", ""), 
                 placeholder="例如：完成 60 頁數學與 20 頁英文", 
                 height=100
             )
             notes = st.text_area(
                 "備註", 
-                value=st.session_state.get("daily_log", {}).get("notes", ""), 
+                value=(st.session_state.get("daily_log") or {}).get("notes", ""), 
                 placeholder="例如：今天需要延後 30 分鐘的複習", 
                 height=80
             )
