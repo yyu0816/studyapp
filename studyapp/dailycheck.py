@@ -43,6 +43,10 @@ def render_daily_checkin_page() -> None:
         st.session_state["daily_override_events"] = {}
     overrides = st.session_state["daily_override_events"].get(today_str, [])
 
+    if "daily_override_tasks" not in st.session_state:
+        st.session_state["daily_override_tasks"] = {}
+    daily_tasks_overrides = st.session_state["daily_override_tasks"].get(today_str, [])
+
     # Filter today's events
     today_events = [
         e for e in fixed_events 
@@ -56,35 +60,44 @@ def render_daily_checkin_page() -> None:
 
     with col_timeline:
         st.markdown("### 🕒 時間軸 (今日行程)")
-        if today_events:
-            timeline_html = "<div style='margin-left: 55px; border-left: 3px solid #4f84ff; padding-left: 20px;'>"
-            for event in today_events:
+        timeline_html = "<div style='margin-left: 55px; border-left: 3px solid #4f84ff; padding-left: 20px; margin-top: 20px; padding-bottom: 20px;'>"
+        for hour in range(24):
+            hour_str = f"{hour:02d}"
+            hour_events = [e for e in today_events if e.get("start", "").startswith(hour_str + ":")]
+            
+            timeline_html += f"""
+            <div style='position: relative; min-height: 35px;'>
+                <div style='position: absolute; left: -85px; top: -2px; width: 50px; text-align: right; color: #aaa; font-size: 14px;'>{hour_str}:00</div>
+                <div style='position: absolute; left: -24px; top: 3px; width: 8px; height: 8px; border-radius: 50%; background-color: #eee; border: 2px solid white;'></div>
+            """
+            
+            for event in hour_events:
                 emoji = event.get("emoji", "📌")
                 color = event.get("display_color", event.get("color", "#4f84ff"))
                 title = event.get("title", "未命名行程")
                 start = event.get("start", "")
                 end = event.get("end", "")
+                
                 timeline_html += f"""
-                <div style='position: relative; margin-bottom: 25px;'>
-                    <div style='position: absolute; left: -85px; top: -2px; width: 50px; text-align: right; font-weight: bold; color: #666;'>{start}</div>
+                <div style='position: relative; margin-bottom: 15px; margin-top: 10px;'>
+                    <div style='position: absolute; left: -85px; top: -2px; width: 50px; text-align: right; font-weight: bold; color: #666; font-size: 14px;'>{start}</div>
                     <div style='position: absolute; left: -29px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background-color: {color}; border: 3px solid white;'></div>
-                    <div style='background-color: #f4f7fb; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+                    <div style='background-color: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e3e3e3;'>
                         <strong>{emoji} {title}</strong>
                         <div style='font-size: 12px; color: #888; margin-top: 4px;'>{start} - {end}</div>
                     </div>
                 </div>
                 """
             timeline_html += "</div>"
-            st.markdown(timeline_html, unsafe_allow_html=True)
-        else:
-            st.info("今日無固定行程")
+        timeline_html += "</div>"
+        st.markdown(timeline_html, unsafe_allow_html=True)
 
     with col_main:
         row1_col1, row1_col2 = st.columns(2)
         
         with row1_col1:
             st.markdown("#### 📝 今日行程")
-            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 150px;'>", unsafe_allow_html=True)
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 150px; margin-bottom: 10px;'>", unsafe_allow_html=True)
             if today_events:
                 for event in today_events:
                     emoji = event.get("emoji", "📌")
@@ -93,14 +106,12 @@ def render_daily_checkin_page() -> None:
                     end = event.get("end", "")
                     st.markdown(f"**{emoji} {title}** ({start} - {end})")
             else:
-                st.write("今日無行程")
+                st.markdown("今日無行程")
             st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
             with st.expander("➕ 新增當日行程"):
                 new_title = st.text_input("行程標題", key="new_daily_title")
                 
-                # We use side-by-side selectboxes for time inside the expander
                 c_start, c_end = st.columns(2)
                 with c_start:
                     st.markdown("<div style='font-size: 14px;'>開始時間</div>", unsafe_allow_html=True)
@@ -118,7 +129,7 @@ def render_daily_checkin_page() -> None:
                         new_end_m = st.selectbox("分", [f"{i:02d}" for i in range(60)], index=0, key="new_end_m", label_visibility="collapsed")
                         
                 new_emoji = st.selectbox("表符", ["📌", "📚", "📝", "🏃", "☕", "💻", "🧠"], key="new_emoji")
-                if st.button("確認新增"):
+                if st.button("確認新增", key="btn_add_event"):
                     if new_title.strip():
                         st.session_state["daily_override_events"].setdefault(today_str, []).append({
                             "title": new_title.strip(),
@@ -131,32 +142,9 @@ def render_daily_checkin_page() -> None:
                         })
                         st.rerun()
 
-        with row1_col2:
-            st.markdown("#### 📖 今日讀書進度")
-            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px;'>", unsafe_allow_html=True)
-            monthly_plan = st.session_state.get("monthly_plan", [])
-            today_plan = next((item for item in monthly_plan if item.get("date") == today_str), None)
-            
-            if today_plan and today_plan.get("tasks"):
-                for task in today_plan.get("tasks", []):
-                    st.checkbox(task, key=f"task_check_{task}")
-            else:
-                st.write("今日無指定讀書內容")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            daily_progress = st.text_area(
-                " ", 
-                value=st.session_state.get("daily_log", {}).get("daily_progress", ""), 
-                placeholder="例如：完成 60 頁數學與 20 頁英文", 
-                label_visibility="collapsed",
-                height=100
-            )
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        row2_col1, row2_col2 = st.columns(2)
-
-        with row2_col1:
+            st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("#### 🎭 心情反饋")
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px;'>", unsafe_allow_html=True)
             mood = st.selectbox(
                 " ",
                 ["good", "neutral", "low", "very_low"],
@@ -164,34 +152,68 @@ def render_daily_checkin_page() -> None:
                 key="daily_mood",
                 label_visibility="collapsed"
             )
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        with row2_col2:
-            st.markdown("#### ⚖️ 安排反饋")
+        with row1_col2:
+            st.markdown("#### 📖 今日讀書進度")
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; min-height: 150px;'>", unsafe_allow_html=True)
+            monthly_plan = st.session_state.get("monthly_plan", [])
+            today_plan = next((item for item in monthly_plan if item.get("date") == today_str), None)
+            
+            tasks = []
+            if today_plan and today_plan.get("tasks"):
+                tasks.extend(today_plan.get("tasks"))
+            tasks.extend(daily_tasks_overrides)
+
+            if tasks:
+                for task in tasks:
+                    st.checkbox(task, key=f"task_check_{task}")
+            else:
+                st.markdown("今日無指定讀書內容")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            with st.expander("➕ 新增當日進度"):
+                new_subject = st.text_input("科目", key="new_task_subject")
+                new_task_title = st.text_input("內容標題 (例: 小組作業、心得報告...)", key="new_task_title")
+                if st.button("確認新增", key="btn_add_task"):
+                    if new_task_title.strip():
+                        task_text = f"{new_subject.strip()}：{new_task_title.strip()}" if new_subject.strip() else new_task_title.strip()
+                        st.session_state["daily_override_tasks"].setdefault(today_str, []).append(task_text)
+                        st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("#### ⚖️ 進度安排反饋")
+            st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px;'>", unsafe_allow_html=True)
             pacing_feedback = st.selectbox(
-                " ",
+                "節奏回饋",
                 ["balanced", "too_fast", "too_slow"],
                 format_func=lambda value: {"balanced": "剛剛好", "too_fast": "進度太多", "too_slow": "進度太少"}.get(value, value),
                 key="daily_pacing",
-                label_visibility="collapsed"
             )
             time_loss = st.number_input("意外時間損失（小時）", min_value=0.0, step=0.5, key="daily_time_loss")
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 🗒️ 記錄區")
-        notes = st.text_area(
-            " ", 
-            value=st.session_state.get("daily_log", {}).get("notes", ""), 
-            placeholder="例如：今天需要延後 30 分鐘的複習", 
-            label_visibility="collapsed",
+        st.markdown("#### 🗒️ 記錄區與今日成果")
+        st.markdown("<div style='border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        daily_progress = st.text_area(
+            "詳細進度說明", 
+            value=st.session_state.get("daily_log", {}).get("daily_progress", ""), 
+            placeholder="例如：完成 60 頁數學與 20 頁英文", 
             height=100
         )
+        notes = st.text_area(
+            "備註", 
+            value=st.session_state.get("daily_log", {}).get("notes", ""), 
+            placeholder="例如：今天需要延後 30 分鐘的複習", 
+            height=80
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("💾 儲存今日打卡", use_container_width=True):
             daily_data = {
                 "daily_progress": daily_progress,
                 "mood": mood,
-                "energy": "medium", # Default energy as we simplified the form
+                "energy": "medium",
                 "time_loss": str(time_loss),
                 "pacing_feedback": pacing_feedback,
                 "notes": notes,
@@ -200,7 +222,6 @@ def render_daily_checkin_page() -> None:
             st.session_state["daily_log"] = daily_data
             st.success("今日打卡已更新！")
             
-            # Show recommendation instantly
             st.info(f"💡 **今日建議**：\n{daily_data['recommendation']}")
 
     if st.session_state.get("plan_name"):
