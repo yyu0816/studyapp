@@ -63,7 +63,7 @@ def render_daily_checkin_page() -> None:
             hour_events = [e for e in today_events if e.get("start", "").startswith(hour_str + ":")]
             
             timeline_html += f"""
-            <div style='position: relative; min-height: 35px;'>
+            <div style='position: relative; min-height: 40px;'>
                 <div style='position: absolute; left: -85px; top: -2px; width: 50px; text-align: right; color: #aaa; font-size: 14px;'>{hour_str}:00</div>
                 <div style='position: absolute; left: -24px; top: 3px; width: 8px; height: 8px; border-radius: 50%; background-color: #eee; border: 2px solid white;'></div>
             """
@@ -87,7 +87,12 @@ def render_daily_checkin_page() -> None:
                 """
             timeline_html += "</div>"
         timeline_html += "</div>"
-        st.markdown(timeline_html, unsafe_allow_html=True)
+        
+        # Use st.html if available to prevent markdown truncation limit bug, else fallback to markdown
+        if hasattr(st, "html"):
+            st.html(timeline_html)
+        else:
+            st.markdown(timeline_html, unsafe_allow_html=True)
 
     with col_main:
         row1_col1, row1_col2 = st.columns(2)
@@ -124,7 +129,7 @@ def render_daily_checkin_page() -> None:
                         with e_c2:
                             new_end_m = st.selectbox("分", [f"{i:02d}" for i in range(60)], index=0, key="new_end_m", label_visibility="collapsed")
                             
-                    new_emoji = st.selectbox("表符", ["📌", "📚", "📝", "🏃", "☕", "💻", "🧠"], key="new_emoji")
+                    new_emoji = st.selectbox("表符", ["📌", "📚", "📝", "🏃", "☕", "💻", "🧠", "🏐", "🚿", "⚽", "🏀", "🎮", "🍔", "📺", "🎧", "💪"], key="new_emoji")
                     if st.button("確認新增", key="btn_add_event"):
                         if new_title.strip():
                             st.session_state["daily_override_events"].setdefault(today_str, []).append({
@@ -140,8 +145,16 @@ def render_daily_checkin_page() -> None:
 
             st.markdown("#### 🎭 心情反饋")
             with st.container(border=True):
-                motivation = st.radio("動力 (1: 低下 - 5: 充滿動力)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_motivation")
-                mood = st.radio("心情 (1: 低落 - 5: 心情極佳)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_mood_score")
+                is_mood_submitted = st.session_state.get("mood_submitted", False)
+                motivation = st.radio("動力 (1: 低下 - 5: 充滿動力)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_motivation", disabled=is_mood_submitted)
+                mood = st.radio("心情 (1: 低落 - 5: 心情極佳)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_mood_score", disabled=is_mood_submitted)
+                
+                if not is_mood_submitted:
+                    if st.button("確認送出", key="btn_submit_mood"):
+                        st.session_state["mood_submitted"] = True
+                        st.rerun()
+                else:
+                    st.success("已送出心情與動力紀錄！")
 
         with row1_col2:
             st.markdown("#### 📖 今日讀書進度")
@@ -172,8 +185,8 @@ def render_daily_checkin_page() -> None:
 
             st.markdown("#### ⚖️ 進度安排反饋")
             with st.container(border=True):
-                amount_feedback = st.radio("分量回饋 (1: 太少/休息太多 - 5: 太多/休息太少)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_amount")
-                pacing_feedback = st.radio("節奏回饋 (1: 太慢 - 5: 太快)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_pacing_score")
+                amount_feedback = st.radio("分量回饋 (1: 分量太少；5:分量太多)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_amount")
+                pacing_feedback = st.radio("節奏回饋 (1: 節奏太慢、休息太多；5:節奏太快、休息太少)", [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_pacing_score")
                 
                 if "show_time_loss" not in st.session_state:
                     st.session_state["show_time_loss"] = False
@@ -184,38 +197,64 @@ def render_daily_checkin_page() -> None:
 
                 time_loss = 0.0
                 if st.session_state["show_time_loss"]:
-                    time_loss = st.number_input("意外損失時間（小時）", min_value=0.0, step=0.5, key="daily_time_loss")
+                    c_loss_s, c_loss_e = st.columns(2)
+                    with c_loss_s:
+                        loss_start_h = st.selectbox("開始時", [f"{i:02d}" for i in range(24)], key="loss_s_h")
+                        loss_start_m = st.selectbox("開始分", [f"{i:02d}" for i in range(60)], key="loss_s_m")
+                    with c_loss_e:
+                        loss_end_h = st.selectbox("結束時", [f"{i:02d}" for i in range(24)], key="loss_e_h")
+                        loss_end_m = st.selectbox("結束分", [f"{i:02d}" for i in range(60)], key="loss_e_m")
+                    
+                    try:
+                        sh, sm = int(loss_start_h), int(loss_start_m)
+                        eh, em = int(loss_end_h), int(loss_end_m)
+                        loss_hours = (eh - sh) + (em - sm) / 60.0
+                        if loss_hours < 0:
+                            loss_hours += 24.0
+                        time_loss = round(loss_hours, 1)
+                        st.markdown(f"**計算結果：** 損失 {time_loss} 小時")
+                    except:
+                        time_loss = 0.0
 
         st.markdown("#### 🗒️ 記錄區與今日成果")
         with st.container(border=True):
+            is_daily_saved = st.session_state.get("daily_saved", False)
             daily_progress = st.text_area(
                 "詳細進度說明", 
                 value=(st.session_state.get("daily_log") or {}).get("daily_progress", ""), 
                 placeholder="例如：完成 60 頁數學與 20 頁英文", 
-                height=100
+                height=100,
+                disabled=is_daily_saved
             )
             notes = st.text_area(
                 "備註", 
                 value=(st.session_state.get("daily_log") or {}).get("notes", ""), 
                 placeholder="例如：今天需要延後 30 分鐘的複習", 
-                height=80
+                height=80,
+                disabled=is_daily_saved
             )
 
-        if st.button("💾 儲存今日打卡", use_container_width=True):
-            daily_data = {
-                "daily_progress": daily_progress,
-                "mood_score": mood,
-                "motivation_score": motivation,
-                "amount_score": amount_feedback,
-                "pacing_score": pacing_feedback,
-                "time_loss": time_loss,
-                "notes": notes,
-            }
-            daily_data["recommendation"] = get_adjustment_message(daily_data["pacing_score"], daily_data["time_loss"], daily_data["mood_score"])
-            st.session_state["daily_log"] = daily_data
-            st.success("今日打卡已更新！")
-            
-            st.info(f"💡 **今日建議**：\n{daily_data['recommendation']}")
+        if not is_daily_saved:
+            if st.button("💾 儲存今日打卡", use_container_width=True):
+                daily_data = {
+                    "daily_progress": daily_progress,
+                    "mood_score": mood,
+                    "motivation_score": motivation,
+                    "amount_score": amount_feedback,
+                    "pacing_score": pacing_feedback,
+                    "time_loss": time_loss,
+                    "notes": notes,
+                }
+                daily_data["recommendation"] = get_adjustment_message(daily_data["pacing_score"], daily_data["time_loss"], daily_data["mood_score"])
+                st.session_state["daily_log"] = daily_data
+                st.session_state["daily_saved"] = True
+                st.rerun()
+        else:
+            st.success("今日打卡已儲存且鎖定！")
+            st.info(f"💡 **今日建議**：\n{st.session_state.get('daily_log', {}).get('recommendation', '')}")
+            if st.button("✏️ 編輯今日打卡", use_container_width=True):
+                st.session_state["daily_saved"] = False
+                st.rerun()
 
     if st.session_state.get("plan_name"):
         st.markdown(f"---")
