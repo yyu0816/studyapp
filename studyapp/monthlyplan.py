@@ -140,7 +140,7 @@ def render_monthly_plan_page() -> None:
                         with st.container(border=True):
                             # Wrapper for button to reduce size
                             st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
-                            if st.button(str(day.day), key=f"btn_add_{day_str}", use_container_width=True):
+                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
                                 if is_current_month:
                                     add_event_dialog(day_str)
                                 else:
