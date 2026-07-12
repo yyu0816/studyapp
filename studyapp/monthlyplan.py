@@ -96,35 +96,38 @@ def render_monthly_plan_page() -> None:
 
     st.markdown("""
     <style>
-    /* Robust sibling selector to target ONLY the calendar grid rows */
+    /* Remove all gaps between columns to create a continuous table */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
-        gap: 2px !important;
-        align-items: stretch !important; /* Ensure equal height across the row */
-        margin-bottom: 2px !important;
+        gap: 0 !important; 
+        align-items: stretch !important;
     }
 
-    /* Prevent columns from wrapping and remove outer padding */
+    /* Transform columns into table cells */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         min-width: 0 !important;
-        padding: 0 !important; 
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Stretch the border container and remove its huge internal padding */
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 4px !important;
+        padding: 4px !important; 
+        border-bottom: 1px solid #ddd;
+        border-right: 1px solid #ddd;
         min-height: 120px !important;
-        height: 100% !important;
-        flex-grow: 1 !important;
-        border-radius: 4px !important;
     }
 
-    /* Specific styling for the native Streamlit button to make it look like a date label */
+    /* Top border for the very first row (which is right after calendar-root) */
+    .calendar-root + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        border-top: 1px solid #ddd;
+        min-height: auto !important; /* Headers don't need 120px height */
+        background-color: #f4f6f8;
+    }
+
+    /* Left border for the first column of every row */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
+        border-left: 1px solid #ddd;
+    }
+
+    /* Button styling to look like plain text dates */
     .cal-btn > button {
-        padding: 2px 4px !important;
-        min-height: 24px !important;
+        padding: 0 !important;
+        min-height: 20px !important;
         font-weight: bold;
         color: #555;
         border: none !important;
@@ -132,11 +135,10 @@ def render_monthly_plan_page() -> None:
         width: 100% !important;
         display: flex !important;
         justify-content: flex-start !important;
-        border-radius: 4px !important;
     }
     .cal-btn > button:hover {
         color: #4f84ff !important;
-        background-color: #f0f7ff !important;
+        background-color: transparent !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -158,7 +160,7 @@ def render_monthly_plan_page() -> None:
             hc = st.columns(7)
             for i, h in enumerate(headers):
                 with hc[i]:
-                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555; background:#f4f6f8; padding:6px; border-radius:4px; margin-bottom: 2px; border: 1px solid #eee;'>{h}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#333;'>{h}</div>", unsafe_allow_html=True)
             
             weeks = _month_calendar_dates(year, month)
             for week in weeks:
@@ -169,35 +171,40 @@ def render_monthly_plan_page() -> None:
                         item = plan_by_date.get(day_str)
                         is_current_month = day.month == month and start_date <= day <= end_date
                         
+                        bg_color = "#fff" if is_current_month else "#fcfcfc"
                         text_color = "#555" if is_current_month else "#ccc"
                         
-                        with st.container(border=True):
-                            st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
-                            if is_current_month:
-                                if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
-                                    add_event_dialog(day_str)
-                            else:
-                                st.markdown(f"<div style='color:{text_color}; font-weight:bold; padding:4px;'>{day.day}</div>", unsafe_allow_html=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
+                        # We apply background color by wrapping the content in a div that fills the cell
+                        st.markdown(f'<div style="background-color: {bg_color}; margin: -4px; padding: 4px; height: calc(100% + 8px);">', unsafe_allow_html=True)
+                        
+                        st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
+                        if is_current_month:
+                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
+                                add_event_dialog(day_str)
+                        else:
+                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; padding-bottom:4px;'>{day.day}</div>", unsafe_allow_html=True)
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # Render events in this cell
+                        if is_current_month:
+                            events = []
+                            if item and item.get("fixed_events"):
+                                events.extend(item.get("fixed_events", []))
+                            if "daily_override_events" in st.session_state and day_str in st.session_state["daily_override_events"]:
+                                events.extend(st.session_state["daily_override_events"][day_str])
                             
-                            # Render events in this cell
-                            if is_current_month:
-                                events = []
-                                if item and item.get("fixed_events"):
-                                    events.extend(item.get("fixed_events", []))
-                                if "daily_override_events" in st.session_state and day_str in st.session_state["daily_override_events"]:
-                                    events.extend(st.session_state["daily_override_events"][day_str])
-                                
-                                for event in events:
-                                    if event.get("show_on_calendar", True):
-                                        emoji = event.get("emoji", "📌")
-                                        title = event.get("title", "")
-                                        color = event.get("display_color", event.get("color", "#4f84ff"))
-                                        st.markdown(f'<div style="font-size: 11px; color: #333; padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>', unsafe_allow_html=True)
-                                
-                                if item and item.get("tasks"):
-                                    for task in item.get("tasks", []):
-                                        st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
+                            for event in events:
+                                if event.get("show_on_calendar", True):
+                                    emoji = event.get("emoji", "📌")
+                                    title = event.get("title", "")
+                                    color = event.get("display_color", event.get("color", "#4f84ff"))
+                                    st.markdown(f'<div style="font-size: 11px; color: #333; padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>', unsafe_allow_html=True)
+                            
+                            if item and item.get("tasks"):
+                                for task in item.get("tasks", []):
+                                    st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
                                         
         with col_overview:
             st.markdown("#### 📅 行程總覽")
