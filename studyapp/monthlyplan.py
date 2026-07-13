@@ -143,21 +143,21 @@ def render_monthly_plan_page() -> None:
         align-items: stretch !important;
     }
 
-    /* Transform columns into table cells */
+    /* Transform columns into table cells and apply WHITE background */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         min-width: 0 !important;
         padding: 4px !important; 
         border-bottom: 1px solid #ddd;
         border-right: 1px solid #ddd;
         min-height: 120px !important;
-        background-color: #fff;
+        background-color: #ffffff !important;
     }
 
     /* Top border for the very first row (which is right after calendar-root) */
     .calendar-root + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         border-top: 1px solid #ddd;
         min-height: auto !important; /* Headers don't need 120px height */
-        background-color: #f4f6f8;
+        background-color: #f4f6f8 !important;
     }
 
     /* Left border for the first column of every row */
@@ -165,28 +165,40 @@ def render_monthly_plan_page() -> None:
         border-left: 1px solid #ddd;
     }
 
-    /* Button styling to look like plain text dates at top-left */
-    .cal-btn > button {
-        padding: 0 !important;
-        min-height: 20px !important;
-        font-weight: bold;
-        color: #555;
+    /* Target the Streamlit button container precisely to strip all borders/shadows */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
         border: none !important;
         background: transparent !important;
-        width: 100% !important;
-        display: flex !important;
-        justify-content: flex-start !important;
         box-shadow: none !important;
         outline: none !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        display: block !important;
+        text-align: left !important;
+        margin: 0 !important;
+        width: auto !important;
     }
-    .cal-btn > button:hover {
+    
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover,
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:focus,
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:active {
+        background: transparent !important;
         color: #4f84ff !important;
-        background-color: transparent !important;
-    }
-    .cal-btn > button:focus {
         box-shadow: none !important;
         outline: none !important;
-        background-color: transparent !important;
+    }
+
+    /* Target the paragraph inside the button to match non-clickable text exactly */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button p {
+        font-weight: bold !important;
+        color: #555 !important;
+        margin: 0 !important;
+        font-size: 16px !important;
+        line-height: 1 !important;
+    }
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover p {
+        color: #4f84ff !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -221,15 +233,11 @@ def render_monthly_plan_page() -> None:
                         
                         text_color = "#555" if is_current_month else "#ccc"
                         
-                        st.markdown(f'<div style="background-color: #fff; margin: -4px; padding: 4px; height: calc(100% + 8px);">', unsafe_allow_html=True)
-                        
-                        st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
                         if is_current_month:
-                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
+                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}"):
                                 add_event_dialog(day_str)
                         else:
-                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; padding-bottom:4px; text-align: left;'>{day.day}</div>", unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
+                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; font-size:16px; line-height:1;'>{day.day}</div>", unsafe_allow_html=True)
                         
                         # Render events in this cell
                         if is_current_month:
