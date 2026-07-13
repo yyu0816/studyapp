@@ -64,28 +64,24 @@ def add_event_dialog(day_str: str):
         
     is_all_day = st.checkbox("整天", value=True)
     
-    col1, col2 = st.columns(2)
     start_time = "00:00"
     end_time = "23:59"
-    with col1:
-        if not is_all_day:
+    if not is_all_day:
+        col1, col2 = st.columns(2)
+        with col1:
             start_val = st.time_input("開始時間")
             if start_val: start_time = start_val.strftime("%H:%M")
-    with col2:
-        if not is_all_day:
+        with col2:
             end_val = st.time_input("結束時間")
             if end_val: end_time = end_val.strftime("%H:%M")
             
-    c1, c2 = st.columns(2)
-    with c1:
-        emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
-    with c2:
-        color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True, label_visibility="collapsed")
-        if color_mode == "預設色板":
-            color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], label_visibility="collapsed")
-            color = color_option["value"] if isinstance(color_option, dict) else color_option
-        else:
-            color = st.color_picker("顏色", "#4f84ff", label_visibility="collapsed")
+    emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
+    color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True)
+    if color_mode == "預設色板":
+        color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
+        color = color_option["value"] if isinstance(color_option, dict) else color_option
+    else:
+        color = st.color_picker("選擇顏色", "#4f84ff")
         
     if st.button("儲存", use_container_width=True):
         if not title:
@@ -140,11 +136,8 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
             num_weight = "bold" if is_current else "normal"
             bg = "#ffffff" if is_current else "#fafafa"
 
-            # Clickable date number
-            if is_current:
-                num_html = f'<span class="cal-date" data-date="{day_str}" onclick="window.parent.postMessage({{type:\'streamlit:setComponentValue\', value: \'{day_str}\'}}, \'*\')"></span><div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px; cursor:pointer;" onclick="document.getElementById(\'calclick_{day_str}\').click()">{day.day}</div>'
-            else:
-                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
+            # Date number (no onclick needed — entire cell is clickable via form submit below)
+            num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
 
             # Events
             events_html = ""
@@ -164,7 +157,12 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                     for task in item["tasks"]:
                         events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
 
-            row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; min-height:110px; width:14.2857%;">{num_html}{events_html}</td>'
+            if is_current:
+                # Wrap the whole cell in a form that submits the date on click
+                cell_inner = f'{num_html}{events_html}'
+                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:0; width:14.2857%; cursor:pointer;" onclick="document.getElementById(\'calclick_{day_str}\').click()"><div style="padding:6px; min-height:110px;">{cell_inner}</div></td>'
+            else:
+                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; min-height:110px; width:14.2857%;">{num_html}</td>'
         row += "</tr>"
         rows_html += row
 
@@ -209,54 +207,51 @@ def render_monthly_plan_page() -> None:
             calendar_html = _build_calendar_html(year, month, plan_by_date, start_date, end_date)
             st.markdown(calendar_html, unsafe_allow_html=True)
 
-            # Hidden buttons for each day in the current month so clicks work
+            # Invisible buttons — styled to 0 size so they truly take no space
+            st.markdown('<div style="height:0;overflow:hidden;position:absolute;visibility:hidden;">', unsafe_allow_html=True)
             weeks = _month_calendar_dates(year, month)
-            st.markdown('<div style="display:none">', unsafe_allow_html=True)
             for week in weeks:
                 for day in week:
                     if day.month == month and start_date <= day <= end_date:
                         day_str = day.strftime("%Y-%m-%d")
-                        if st.button("x", key=f"calclick_{year}_{month}_{day_str}"):
+                        if st.button(".", key=f"calclick_{year}_{month}_{day_str}", help=""):
                             st.session_state["_cal_clicked_date"] = day_str
                             st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
                                         
         with col_overview:
             st.markdown("#### 📅 行程總覽")
-            with st.container(border=True):
-                month_events = []
-                for _item in _items:
-                    d_str = _item["date"]
-                    
-                    if _item.get("fixed_events"):
-                        for e in _item["fixed_events"]:
-                            if e.get("show_on_calendar", True):
-                                month_events.append({"date": d_str, "event": e})
-                    
-                    if "daily_override_events" in st.session_state and d_str in st.session_state["daily_override_events"]:
-                        for e in st.session_state["daily_override_events"][d_str]:
-                            if e.get("show_on_calendar", True):
-                                month_events.append({"date": d_str, "event": e})
-                
-                if month_events:
-                    # Group by title and emoji
-                    grouped_ev = {}
-                    for me in month_events:
-                        title = me["event"].get("title", "")
-                        emoji = me["event"].get("emoji", "📌")
-                        color = me["event"].get("display_color", me["event"].get("color", "#4f84ff"))
-                        key = (title, emoji, color)
-                        grouped_ev.setdefault(key, []).append(me["date"])
-                        
-                    for (title, emoji, color), dates in grouped_ev.items():
-                        date_str_formatted = _format_date_list(dates)
-                        st.markdown(f"""
-                        <div style="font-size:13px; margin-bottom:6px; padding:6px; border-left: 4px solid {color}; background:#f9f9f9; border-radius:4px;">
-                            <strong>[{date_str_formatted}]</strong> {emoji} {title}
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.write("本月無任何行程")
+            # Only show user-added events (daily_override_events), not fixed events
+            user_events: list[dict] = []
+            override = st.session_state.get("daily_override_events", {})
+            for _item in _items:
+                d_str = _item["date"]
+                if d_str in override:
+                    for e in override[d_str]:
+                        if e.get("show_on_calendar", True):
+                            user_events.append({"date": d_str, "event": e})
+
+            if user_events:
+                # Sort by date
+                user_events.sort(key=lambda x: x["date"])
+                # Group same title+emoji+color across consecutive dates
+                grouped_ev: dict = {}
+                for me in user_events:
+                    ev_title = me["event"].get("title", "")
+                    ev_emoji = me["event"].get("emoji", "📌")
+                    ev_color = me["event"].get("display_color", me["event"].get("color", "#4f84ff"))
+                    key = (ev_title, ev_emoji, ev_color)
+                    grouped_ev.setdefault(key, []).append(me["date"])
+
+                for (ev_title, ev_emoji, ev_color), dates in grouped_ev.items():
+                    date_str_formatted = _format_date_list(dates)
+                    st.markdown(
+                        f'<div style="font-size:13px; margin-bottom:6px; padding:4px 0; border-left:4px solid {ev_color}; padding-left:8px;">'
+                        f'<strong>{date_str_formatted}</strong> {ev_emoji} {ev_title}</div>',
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.write("本月無新增行程")
                     
             st.markdown("#### 📖 月進度")
             with st.container(border=True):
