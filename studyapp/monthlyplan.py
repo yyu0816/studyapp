@@ -136,33 +136,55 @@ def render_monthly_plan_page() -> None:
 
     st.markdown("""
     <style>
-    /* Remove all gaps between columns to create a continuous table */
+    /* Reset gaps for the calendar rows to create a perfect contiguous table */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] {
+        gap: 0 !important;
         flex-wrap: nowrap !important;
-        gap: 0 !important; 
         align-items: stretch !important;
+        width: 100% !important;
+        margin-bottom: 0 !important;
     }
 
-    /* Transform columns into table cells and apply WHITE background */
+    /* Make columns identical width and perfectly touching */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         min-width: 0 !important;
-        padding: 4px !important; 
-        border-bottom: 1px solid #ddd;
-        border-right: 1px solid #ddd;
-        min-height: 120px !important;
+        flex: 1 1 0% !important;
+        width: 14.2857% !important; /* Force exact 1/7 width */
+        padding: 6px !important;
         background-color: #ffffff !important;
+        border-right: 1px solid #e0e0e0 !important;
+        border-bottom: 1px solid #e0e0e0 !important;
+        min-height: 120px !important;
     }
 
-    /* Top border for the very first row (which is right after calendar-root) */
-    .calendar-root + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-        border-top: 1px solid #ddd;
-        min-height: auto !important; /* Headers don't need 120px height */
-        background-color: #f4f6f8 !important;
-    }
-
-    /* Left border for the first column of every row */
+    /* Leftmost border for the first column of EVERY row */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
-        border-left: 1px solid #ddd;
+        border-left: 1px solid #e0e0e0 !important;
+    }
+
+    /* Topmost border for the first row (headers) */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"] {
+        border-top: 1px solid #e0e0e0 !important;
+        min-height: 40px !important; /* Headers don't need to be 120px tall */
+        background-color: #f9f9f9 !important;
+    }
+
+    /* Outer rounded corners */
+    /* Top-Left */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:first-child {
+        border-top-left-radius: 8px !important;
+    }
+    /* Top-Right */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:last-child {
+        border-top-right-radius: 8px !important;
+    }
+    /* Bottom-Left (7th row = 1 header + 6 weeks) */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(7) > div[data-testid="column"]:first-child {
+        border-bottom-left-radius: 8px !important;
+    }
+    /* Bottom-Right */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(7) > div[data-testid="column"]:last-child {
+        border-bottom-right-radius: 8px !important;
     }
 
     /* Target the Streamlit button container precisely to strip all borders/shadows */
@@ -194,7 +216,7 @@ def render_monthly_plan_page() -> None:
         font-weight: bold !important;
         color: #555 !important;
         margin: 0 !important;
-        font-size: 16px !important;
+        font-size: 14px !important;
         line-height: 1 !important;
     }
     .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover p {
@@ -216,11 +238,11 @@ def render_monthly_plan_page() -> None:
             # THIS IS THE ANCHOR: The sibling selector targets all horizontal blocks after this div!
             st.markdown('<div class="calendar-root" style="display:none;"></div>', unsafe_allow_html=True)
             
-            # Render headers
+            # Row 1: Render headers
             hc = st.columns(7)
             for i, h in enumerate(headers):
                 with hc[i]:
-                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#333;'>{h}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555;'>{h}</div>", unsafe_allow_html=True)
             
             weeks = _month_calendar_dates(year, month)
             for week in weeks:
@@ -249,14 +271,13 @@ def render_monthly_plan_page() -> None:
                             
                             for event in events:
                                 if event.get("show_on_calendar", True):
-                                    emoji = event.get("emoji", "📌")
                                     title = event.get("title", "")
                                     color = event.get("display_color", event.get("color", "#4f84ff"))
-                                    st.markdown(f'<div style="font-size: 11px; color: #333; padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:{color}33; border-left:3px solid {color};">{emoji} {title}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div style="font-size: 11px; font-weight: bold; color: #fff; padding: 3px 6px; border-radius: 6px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background-color: {color};">{title}</div>', unsafe_allow_html=True)
                             
                             if item and item.get("tasks"):
                                 for task in item.get("tasks", []):
-                                    st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-top: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                                         
