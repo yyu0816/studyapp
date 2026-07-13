@@ -29,11 +29,40 @@ def _month_calendar_dates(year: int, month: int) -> list[list[date]]:
         current += timedelta(days=7)
     return weeks
 
+def _format_date_list(date_strs: list[str]) -> str:
+    if not date_strs: return ""
+    dates = sorted([datetime.strptime(d, "%Y-%m-%d").date() for d in set(date_strs)])
+    ranges = []
+    current_range = [dates[0]]
+    for i in range(1, len(dates)):
+        if (dates[i] - dates[i-1]).days == 1:
+            current_range.append(dates[i])
+        else:
+            ranges.append(current_range)
+            current_range = [dates[i]]
+    ranges.append(current_range)
+    
+    formatted_ranges = []
+    for r in ranges:
+        if len(r) == 1:
+            formatted_ranges.append(r[0].strftime("%m/%d"))
+        else:
+            formatted_ranges.append(f"{r[0].strftime('%m/%d')}~{r[-1].strftime('%m/%d')}")
+    
+    return ", ".join(formatted_ranges)
+
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
-    st.write(f"**日期**：{day_str}")
+    st.write(f"**新增行程**")
     title = st.text_input("行程名稱")
-    is_all_day = st.checkbox("整天")
+    
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        start_date = st.date_input("開始日期", value=_parse_date(day_str))
+    with col_d2:
+        end_date = st.date_input("結束日期", value=_parse_date(day_str))
+        
+    is_all_day = st.checkbox("整天", value=True)
     
     col1, col2 = st.columns(2)
     start_time = "00:00"
@@ -51,31 +80,42 @@ def add_event_dialog(day_str: str):
     with c1:
         emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
     with c2:
-        color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
-        if isinstance(color_option, dict):
-            color = color_option["value"]
+        color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True, label_visibility="collapsed")
+        if color_mode == "預設色板":
+            color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], label_visibility="collapsed")
+            color = color_option["value"] if isinstance(color_option, dict) else color_option
         else:
-            color = color_option
+            color = st.color_picker("顏色", "#4f84ff", label_visibility="collapsed")
         
     if st.button("儲存", use_container_width=True):
         if not title:
             st.error("請輸入行程名稱")
             return
+        if start_date > end_date:
+            st.error("開始日期不能晚於結束日期")
+            return
+            
         if "daily_override_events" not in st.session_state:
             st.session_state["daily_override_events"] = {}
-        if day_str not in st.session_state["daily_override_events"]:
-            st.session_state["daily_override_events"][day_str] = []
             
-        st.session_state["daily_override_events"][day_str].append({
-            "title": title,
-            "start": start_time,
-            "end": end_time,
-            "emoji": emoji,
-            "color": color,
-            "display_color": color,
-            "is_all_day": is_all_day,
-            "show_on_calendar": True
-        })
+        current = start_date
+        while current <= end_date:
+            curr_str = current.strftime("%Y-%m-%d")
+            if curr_str not in st.session_state["daily_override_events"]:
+                st.session_state["daily_override_events"][curr_str] = []
+                
+            st.session_state["daily_override_events"][curr_str].append({
+                "title": title,
+                "start": start_time,
+                "end": end_time,
+                "emoji": emoji,
+                "color": color,
+                "display_color": color,
+                "is_all_day": is_all_day,
+                "show_on_calendar": True
+            })
+            current += timedelta(days=1)
+            
         st.rerun()
 
 def render_monthly_plan_page() -> None:
@@ -110,6 +150,7 @@ def render_monthly_plan_page() -> None:
         border-bottom: 1px solid #ddd;
         border-right: 1px solid #ddd;
         min-height: 120px !important;
+        background-color: #fff;
     }
 
     /* Top border for the very first row (which is right after calendar-root) */
@@ -124,7 +165,7 @@ def render_monthly_plan_page() -> None:
         border-left: 1px solid #ddd;
     }
 
-    /* Button styling to look like plain text dates */
+    /* Button styling to look like plain text dates at top-left */
     .cal-btn > button {
         padding: 0 !important;
         min-height: 20px !important;
@@ -135,9 +176,16 @@ def render_monthly_plan_page() -> None:
         width: 100% !important;
         display: flex !important;
         justify-content: flex-start !important;
+        box-shadow: none !important;
+        outline: none !important;
     }
     .cal-btn > button:hover {
         color: #4f84ff !important;
+        background-color: transparent !important;
+    }
+    .cal-btn > button:focus {
+        box-shadow: none !important;
+        outline: none !important;
         background-color: transparent !important;
     }
     </style>
@@ -171,18 +219,16 @@ def render_monthly_plan_page() -> None:
                         item = plan_by_date.get(day_str)
                         is_current_month = day.month == month and start_date <= day <= end_date
                         
-                        bg_color = "#fff" if is_current_month else "#fcfcfc"
                         text_color = "#555" if is_current_month else "#ccc"
                         
-                        # We apply background color by wrapping the content in a div that fills the cell
-                        st.markdown(f'<div style="background-color: {bg_color}; margin: -4px; padding: 4px; height: calc(100% + 8px);">', unsafe_allow_html=True)
+                        st.markdown(f'<div style="background-color: #fff; margin: -4px; padding: 4px; height: calc(100% + 8px);">', unsafe_allow_html=True)
                         
                         st.markdown('<div class="cal-btn">', unsafe_allow_html=True)
                         if is_current_month:
                             if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}", use_container_width=True):
                                 add_event_dialog(day_str)
                         else:
-                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; padding-bottom:4px;'>{day.day}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; padding-bottom:4px; text-align: left;'>{day.day}</div>", unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                         
                         # Render events in this cell
@@ -212,27 +258,32 @@ def render_monthly_plan_page() -> None:
                 month_events = []
                 for _item in _items:
                     d_str = _item["date"]
-                    d_obj = _parse_date(d_str)
-                    weekday_str = headers[d_obj.weekday()]
                     
                     if _item.get("fixed_events"):
                         for e in _item["fixed_events"]:
                             if e.get("show_on_calendar", True):
-                                month_events.append({"date": d_str, "weekday": weekday_str, "event": e, "type": "fixed"})
+                                month_events.append({"date": d_str, "event": e})
                     
                     if "daily_override_events" in st.session_state and d_str in st.session_state["daily_override_events"]:
                         for e in st.session_state["daily_override_events"][d_str]:
                             if e.get("show_on_calendar", True):
-                                month_events.append({"date": d_str, "weekday": weekday_str, "event": e, "type": "temp"})
+                                month_events.append({"date": d_str, "event": e})
                 
                 if month_events:
+                    # Group by title and emoji
+                    grouped_ev = {}
                     for me in month_events:
-                        e = me["event"]
-                        color = e.get("display_color", e.get("color", "#4f84ff"))
-                        label = "固" if me["type"] == "fixed" else "臨"
+                        title = me["event"].get("title", "")
+                        emoji = me["event"].get("emoji", "📌")
+                        color = me["event"].get("display_color", me["event"].get("color", "#4f84ff"))
+                        key = (title, emoji, color)
+                        grouped_ev.setdefault(key, []).append(me["date"])
+                        
+                    for (title, emoji, color), dates in grouped_ev.items():
+                        date_str_formatted = _format_date_list(dates)
                         st.markdown(f"""
                         <div style="font-size:13px; margin-bottom:6px; padding:6px; border-left: 4px solid {color}; background:#f9f9f9; border-radius:4px;">
-                            <strong>{me['date'][5:]} ({me['weekday']})</strong> - {e.get('emoji', '📌')} {e.get('title', '')} <span style="font-size:10px; color:#888;">[{label}]</span>
+                            <strong>[{date_str_formatted}]</strong> {emoji} {title}
                         </div>
                         """, unsafe_allow_html=True)
                 else:
@@ -248,9 +299,11 @@ def render_monthly_plan_page() -> None:
                             if len(parts) == 2:
                                 subj = parts[0].strip()
                                 detail = parts[1].strip()
-                                progress.setdefault(subj, []).append(detail)
+                                if detail not in progress.setdefault(subj, []):
+                                    progress[subj].append(detail)
                             else:
-                                progress.setdefault("其他", []).append(task)
+                                if task not in progress.setdefault("其他", []):
+                                    progress["其他"].append(task)
                                 
                 if progress:
                     for subj, details in progress.items():
