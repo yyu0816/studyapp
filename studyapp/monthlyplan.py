@@ -137,7 +137,7 @@ def render_monthly_plan_page() -> None:
     st.markdown("""
     <style>
     /* Reset gaps for the calendar rows to create a perfect contiguous table */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] {
         gap: 0 !important;
         flex-wrap: nowrap !important;
         align-items: stretch !important;
@@ -146,7 +146,7 @@ def render_monthly_plan_page() -> None:
     }
 
     /* Make columns identical width and perfectly touching */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         min-width: 0 !important;
         flex: 1 1 0% !important;
         width: 14.2857% !important; /* Force exact 1/7 width */
@@ -158,12 +158,12 @@ def render_monthly_plan_page() -> None:
     }
 
     /* Leftmost border for the first column of EVERY row */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
         border-left: 1px solid #cccccc !important;
     }
 
     /* Topmost border for the first row (headers) */
-    div[data-testid="element-container"]:has(.calendar-root) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"] {
         border-top: 1px solid #cccccc !important;
         min-height: 40px !important; /* Headers don't need to be 120px tall */
         background-color: #f9f9f9 !important;
@@ -171,24 +171,24 @@ def render_monthly_plan_page() -> None:
 
     /* Outer rounded corners */
     /* Top-Left */
-    div[data-testid="element-container"]:has(.calendar-root) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"]:first-child {
         border-top-left-radius: 8px !important;
     }
     /* Top-Right */
-    div[data-testid="element-container"]:has(.calendar-root) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"]:last-child {
         border-top-right-radius: 8px !important;
     }
-    /* Bottom-Left (nth-child(8) because 1 anchor + 1 header + 6 weeks) */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"]:nth-child(8) > div[data-testid="column"]:first-child {
+    /* Bottom-Left (nth-child(7) because 1 header + 6 weeks = 7 rows) */
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(7) > div[data-testid="column"]:first-child {
         border-bottom-left-radius: 8px !important;
     }
     /* Bottom-Right */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"]:nth-child(8) > div[data-testid="column"]:last-child {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(7) > div[data-testid="column"]:last-child {
         border-bottom-right-radius: 8px !important;
     }
 
     /* AGGRESSIVELY strip all borders, shadows, and backgrounds from the native st.button */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
         border: 0px solid transparent !important; /* Explicitly 0px */
         background-color: transparent !important;
         box-shadow: none !important;
@@ -204,9 +204,9 @@ def render_monthly_plan_page() -> None:
         -webkit-appearance: none !important;
     }
     
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
         border: 0px solid transparent !important;
         background-color: transparent !important;
         color: #4f84ff !important;
@@ -215,7 +215,7 @@ def render_monthly_plan_page() -> None:
     }
 
     /* Target the paragraph inside the button to match non-clickable text exactly */
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] p {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] p {
         font-weight: bold !important;
         color: #555 !important;
         margin: 0 !important;
@@ -224,7 +224,7 @@ def render_monthly_plan_page() -> None:
         line-height: 1 !important;
         text-align: left !important;
     }
-    div[data-testid="element-container"]:has(.calendar-root) ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p {
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p {
         color: #4f84ff !important;
     }
     </style>
@@ -240,9 +240,6 @@ def render_monthly_plan_page() -> None:
         col_cal, col_overview = st.columns([2, 1], gap="medium")
         
         with col_cal:
-            # THIS IS THE ANCHOR: The sibling selector targets all horizontal blocks after this div!
-            st.markdown('<div class="calendar-root" style="display:none;"></div>', unsafe_allow_html=True)
-            
             # Row 1: Render headers
             hc = st.columns(7)
             for i, h in enumerate(headers):
