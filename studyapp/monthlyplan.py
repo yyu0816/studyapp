@@ -177,15 +177,42 @@ def add_event_dialog(day_str: str):
 @st.dialog("編輯行程")
 def edit_event_dialog(date_str: str, ev_idx: int):
     override = st.session_state.get("daily_override_events", {})
-    ev = override.get(date_str, [])[ev_idx]
+    ev_list_for_date = override.get(date_str, [])
+    if ev_idx >= len(ev_list_for_date):
+        st.error("找不到行程")
+        return
+        
+    ev = ev_list_for_date[ev_idx]
 
-    title = st.text_input("行程名稱", value=ev.get("title", ""))
+    title_orig = ev.get("title", "")
+    emoji_orig = ev.get("emoji", "📌")
+    color_orig = ev.get("display_color", ev.get("color", "#4f84ff"))
+    start_orig = ev.get("start", "00:00")
+    end_orig   = ev.get("end", "23:59")
+    
+    # Find all dates that have this exact event (for grouped editing)
+    matching_dates = []
+    for d_str, ev_list in override.items():
+        for e in ev_list:
+            if (e.get("title", "") == title_orig and 
+                e.get("emoji", "📌") == emoji_orig and 
+                e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
+                e.get("start", "00:00") == start_orig and
+                e.get("end", "23:59") == end_orig):
+                matching_dates.append(d_str)
+                break # only count the date once
+
+    title = st.text_input("行程名稱", value=title_orig)
 
     _sd_key = "_edit_dlg_start"
     _ed_key = "_edit_dlg_end"
     if _sd_key not in st.session_state:
-        st.session_state[_sd_key] = _parse_date(date_str)
-        st.session_state[_ed_key] = _parse_date(date_str)
+        if matching_dates:
+            st.session_state[_sd_key] = _parse_date(min(matching_dates))
+            st.session_state[_ed_key] = _parse_date(max(matching_dates))
+        else:
+            st.session_state[_sd_key] = _parse_date(date_str)
+            st.session_state[_ed_key] = _parse_date(date_str)
 
     def _on_start_change():
         if st.session_state[_ed_key] < st.session_state[_sd_key]:
@@ -223,8 +250,17 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             if not title:
                 st.error("請輸入行程名稱")
                 return
-            # Remove old event from this date
-            override[date_str].pop(ev_idx)
+            
+            # Remove all old matching events across all dates
+            for d_str in matching_dates:
+                override[d_str] = [e for e in override[d_str] if not (
+                    e.get("title", "") == title_orig and 
+                    e.get("emoji", "📌") == emoji_orig and 
+                    e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
+                    e.get("start", "00:00") == start_orig and
+                    e.get("end", "23:59") == end_orig
+                )]
+                
             # Re-insert across new date range
             cur = start_date
             while cur <= end_date:
@@ -240,7 +276,14 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.rerun()
     with col_del:
         if st.button("🗑️ 刪除", use_container_width=True):
-            override[date_str].pop(ev_idx)
+            for d_str in matching_dates:
+                override[d_str] = [e for e in override[d_str] if not (
+                    e.get("title", "") == title_orig and 
+                    e.get("emoji", "📌") == emoji_orig and 
+                    e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
+                    e.get("start", "00:00") == start_orig and
+                    e.get("end", "23:59") == end_orig
+                )]
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
             st.rerun()
@@ -327,6 +370,14 @@ def render_monthly_plan_page() -> None:
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
+    qp = st.query_params
+    edit_val = qp.get("edit_event", None)
+    if edit_val:
+        st.query_params.clear()
+        parts = edit_val.split("|")
+        if len(parts) == 2:
+            edit_event_dialog(parts[0], int(parts[1]))
+
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
 
@@ -356,26 +407,44 @@ def render_monthly_plan_page() -> None:
                         user_events.append({"date": d_str, "event": e, "ev_idx": ev_idx})
 
             if user_events:
-                # Sort by date, then show each event individually with an edit button
+                # Sort by date
                 user_events.sort(key=lambda x: x["date"])
-                for ui, me in enumerate(user_events):
-                    ev_date = me["date"]
-                    ev_title = me["event"].get("title", "")
-                    ev_emoji = me["event"].get("emoji", "📌")
-                    ev_color = me["event"].get("display_color", me["event"].get("color", "#4f84ff"))
-                    ev_idx   = me["ev_idx"]
-                    date_label = datetime.strptime(ev_date, "%Y-%m-%d").strftime("%m/%d")
+                
+                # Group same title+emoji+color+start+end across consecutive dates
+                grouped_ev: dict = {}
+                for me in user_events:
+                    ev = me["event"]
+                    key = (
+                        ev.get("title", ""), 
+                        ev.get("emoji", "📌"), 
+                        ev.get("display_color", ev.get("color", "#4f84ff")),
+                        ev.get("start", "00:00"),
+                        ev.get("end", "23:59")
+                    )
+                    grouped_ev.setdefault(key, []).append((me["date"], me["ev_idx"]))
 
-                    col_txt, col_btn = st.columns([4, 1])
-                    with col_txt:
-                        st.markdown(
-                            f'<div style="font-size:13px;padding:4px 0;border-left:4px solid {ev_color};padding-left:8px;">'
-                            f'<strong>{date_label}</strong> {ev_emoji} {ev_title}</div>',
-                            unsafe_allow_html=True,
-                        )
-                    with col_btn:
-                        if st.button("✏️", key=f"edit_{year}_{month}_{ev_date}_{ev_idx}_{ui}", help="編輯"):
-                            edit_event_dialog(ev_date, ev_idx)
+                for key, date_items in grouped_ev.items():
+                    ev_title, ev_emoji, ev_color, ev_start, ev_end = key
+                    dates = [item[0] for item in date_items]
+                    first_date = date_items[0][0]
+                    first_idx = date_items[0][1]
+                    
+                    date_str_formatted = _format_date_list(dates)
+                    
+                    js_click = (
+                        f"(function(){{"
+                        f"var u=new URL(window.location.href);"
+                        f"u.searchParams.set('edit_event','{first_date}|{first_idx}');"
+                        f"window.history.pushState(null,'',u.toString());"
+                        f"window.dispatchEvent(new PopStateEvent('popstate',{{state:null}}));"
+                        f"}})()"
+                    )
+                    
+                    st.markdown(
+                        f'<div onclick="{js_click}" style="cursor:pointer; font-size:13px; margin-bottom:6px; padding:4px 0; border-left:4px solid {ev_color}; padding-left:8px; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.7" onmouseout="this.style.opacity=1">'
+                        f'<strong>{date_str_formatted}</strong> {ev_emoji} {ev_title}</div>',
+                        unsafe_allow_html=True
+                    )
             else:
                 st.write("本月無新增行程")
                     
