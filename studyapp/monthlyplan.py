@@ -160,11 +160,19 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
             # Entire cell is clickable: onclick fires a query param URL change which triggers rerun
             if is_current:
                 cell_inner = f'{num_html}{events_html}'
-                # Use window.location to set ?add_event=DATE which triggers rerun
+                # Use pushState so Streamlit re-runs without a full page reload (preserves session_state)
+                js_click = (
+                    f"(function(){{"
+                    f"var u=new URL(window.location.href);"
+                    f"u.searchParams.set('add_event','{day_str}');"
+                    f"window.history.pushState(null,'',u.toString());"
+                    f"window.dispatchEvent(new PopStateEvent('popstate',{{state:null}}));"
+                    f"}})()"
+                )
                 row += (
                     f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; '
                     f'padding:0; width:14.2857%; height:110px; cursor:pointer;" '
-                    f'onclick="(function(){{var u=new URL(window.location.href);u.searchParams.set(\'add_event\',\'{day_str}\');window.location.href=u.toString();}})();">'
+                    f'onclick="{js_click}">'
                     f'<div style="padding:6px; height:100%; box-sizing:border-box;">{cell_inner}</div></td>'
                 )
             else:
