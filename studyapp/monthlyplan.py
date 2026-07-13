@@ -407,6 +407,23 @@ def render_monthly_plan_page() -> None:
                         user_events.append({"date": d_str, "event": e, "ev_idx": ev_idx})
 
             if user_events:
+                # Add CSS to left-align tertiary buttons
+                st.markdown(
+                    """
+                    <style>
+                    button[kind="tertiary"] {
+                        justify-content: flex-start !important;
+                        padding-left: 0px !important;
+                        padding-top: 2px !important;
+                        padding-bottom: 2px !important;
+                    }
+                    button[kind="tertiary"] p {
+                        font-size: 13px !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
                 # Sort by date
                 user_events.sort(key=lambda x: x["date"])
                 
@@ -431,20 +448,12 @@ def render_monthly_plan_page() -> None:
                     
                     date_str_formatted = _format_date_list(dates)
                     
-                    js_click = (
-                        f"(function(){{"
-                        f"var u=new URL(window.location.href);"
-                        f"u.searchParams.set('edit_event','{first_date}|{first_idx}');"
-                        f"window.history.pushState(null,'',u.toString());"
-                        f"window.dispatchEvent(new PopStateEvent('popstate',{{state:null}}));"
-                        f"}})()"
-                    )
-                    
-                    st.markdown(
-                        f'<div onclick="{js_click}" style="cursor:pointer; font-size:13px; margin-bottom:6px; padding:4px 0; border-left:4px solid {ev_color}; padding-left:8px; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.7" onmouseout="this.style.opacity=1">'
-                        f'<strong>{date_str_formatted}</strong> {ev_emoji} {ev_title}</div>',
-                        unsafe_allow_html=True
-                    )
+                    col_color, col_btn = st.columns([1, 20])
+                    with col_color:
+                        st.markdown(f'<div style="width:4px; height:24px; background:{ev_color}; border-radius:2px; margin-top:8px;"></div>', unsafe_allow_html=True)
+                    with col_btn:
+                        if st.button(f"**{date_str_formatted}** {ev_emoji} {ev_title}", key=f"edit_btn_{year}_{month}_{first_date}_{first_idx}", type="tertiary", use_container_width=True):
+                            edit_event_dialog(first_date, first_idx)
             else:
                 st.write("本月無新增行程")
                     
