@@ -118,6 +118,64 @@ def add_event_dialog(day_str: str):
             
         st.rerun()
 
+def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
+    """Build a pure HTML table for the calendar month."""
+    headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    weeks = _month_calendar_dates(year, month)
+
+    header_cells = "".join(
+        f'<th style="text-align:center; font-weight:600; color:#555; font-size:13px; padding:10px 4px; background:#f9f9f9; border:1px solid #cccccc;">{h}</th>'
+        for h in headers
+    )
+
+    rows_html = ""
+    for week in weeks:
+        row = "<tr>"
+        for day in week:
+            day_str = day.strftime("%Y-%m-%d")
+            item = plan_by_date.get(day_str)
+            is_current = day.month == month and start_date <= day <= end_date
+
+            num_color = "#333" if is_current else "#c0c0c0"
+            num_weight = "bold" if is_current else "normal"
+            bg = "#ffffff" if is_current else "#fafafa"
+
+            # Clickable date number
+            if is_current:
+                num_html = f'<span class="cal-date" data-date="{day_str}" onclick="window.parent.postMessage({{type:\'streamlit:setComponentValue\', value: \'{day_str}\'}}, \'*\')"></span><div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px; cursor:pointer;" onclick="document.getElementById(\'calclick_{day_str}\').click()">{day.day}</div>'
+            else:
+                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
+
+            # Events
+            events_html = ""
+            if is_current:
+                events = []
+                if item and item.get("fixed_events"):
+                    events.extend(item["fixed_events"])
+                override = st.session_state.get("daily_override_events", {})
+                if day_str in override:
+                    events.extend(override[day_str])
+                for ev in events:
+                    if ev.get("show_on_calendar", True):
+                        t = ev.get("title", "")
+                        c = ev.get("display_color", ev.get("color", "#4f84ff"))
+                        events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{t}</div>'
+                if item and item.get("tasks"):
+                    for task in item["tasks"]:
+                        events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
+
+            row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; min-height:110px; width:14.2857%;">{num_html}{events_html}</td>'
+        row += "</tr>"
+        rows_html += row
+
+    return f"""
+    <table style="border-collapse:collapse; width:100%; table-layout:fixed; font-family:sans-serif;">
+        <thead><tr>{header_cells}</tr></thead>
+        <tbody>{rows_html}</tbody>
+    </table>
+    """
+
+
 def render_monthly_plan_page() -> None:
     if not st.session_state.get("monthly_plan") or not st.session_state.get("plan"):
         st.info("請先完成初始設定。")
@@ -134,154 +192,34 @@ def render_monthly_plan_page() -> None:
         st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
         return
 
-    st.markdown("""
-    <style>
-    /* Reset gaps for the calendar rows to create a perfect contiguous table */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] {
-        gap: 0 !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        width: 100% !important;
-        margin-bottom: 0 !important;
-    }
-
-    /* Make columns identical width and perfectly touching */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-        min-width: 0 !important;
-        flex: 1 1 0% !important;
-        width: 14.2857% !important; /* Force exact 1/7 width */
-        padding: 6px !important;
-        background-color: #ffffff !important; /* Pure white background */
-        border-right: 1px solid #cccccc !important; /* More obvious border */
-        border-bottom: 1px solid #cccccc !important;
-        min-height: 120px !important;
-    }
-
-    /* Leftmost border for the first column of EVERY row */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
-        border-left: 1px solid #cccccc !important;
-    }
-
-    /* Topmost border for the first row (headers) */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"] {
-        border-top: 1px solid #cccccc !important;
-        min-height: 40px !important; /* Headers don't need to be 120px tall */
-        background-color: #f9f9f9 !important;
-    }
-
-    /* Outer rounded corners */
-    /* Top-Left */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"]:first-child {
-        border-top-left-radius: 8px !important;
-    }
-    /* Top-Right */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(1) > div[data-testid="column"]:last-child {
-        border-top-right-radius: 8px !important;
-    }
-    /* Bottom-Left (nth-child(7) because 1 header + 6 weeks = 7 rows) */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(7) > div[data-testid="column"]:first-child {
-        border-bottom-left-radius: 8px !important;
-    }
-    /* Bottom-Right */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"]:nth-child(7) > div[data-testid="column"]:last-child {
-        border-bottom-right-radius: 8px !important;
-    }
-
-    /* AGGRESSIVELY strip all borders, shadows, and backgrounds from the native st.button */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
-        border: 0px solid transparent !important; /* Explicitly 0px */
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        min-height: 0 !important;
-        height: auto !important;
-        display: flex !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-        border-radius: 0 !important;
-        -webkit-appearance: none !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
-        border: 0px solid transparent !important;
-        background-color: transparent !important;
-        color: #4f84ff !important;
-        box-shadow: none !important;
-        outline: none !important;
-    }
-
-    /* Target the paragraph inside the button to match non-clickable text exactly */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] p {
-        font-weight: bold !important;
-        color: #555 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        text-align: left !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p {
-        color: #4f84ff !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     grouped = _group_monthly_plan_by_month(monthly_plan)
-    headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
-    
-    # Process each month
+
+    # Check if a date was clicked via hidden buttons
+    clicked_date = st.session_state.pop("_cal_clicked_date", None)
+    if clicked_date:
+        add_event_dialog(clicked_date)
+
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
-        
+
         col_cal, col_overview = st.columns([2, 1], gap="medium")
-        
+
         with col_cal:
-            # Row 1: Render headers
-            hc = st.columns(7)
-            for i, h in enumerate(headers):
-                with hc[i]:
-                    st.markdown(f"<div style='text-align:center; font-weight:bold; color:#555;'>{h}</div>", unsafe_allow_html=True)
-            
+            # Render a pure HTML table for the calendar
+            calendar_html = _build_calendar_html(year, month, plan_by_date, start_date, end_date)
+            st.markdown(calendar_html, unsafe_allow_html=True)
+
+            # Hidden buttons for each day in the current month so clicks work
             weeks = _month_calendar_dates(year, month)
+            st.markdown('<div style="display:none">', unsafe_allow_html=True)
             for week in weeks:
-                cols = st.columns(7)
-                for i, day in enumerate(week):
-                    with cols[i]:
+                for day in week:
+                    if day.month == month and start_date <= day <= end_date:
                         day_str = day.strftime("%Y-%m-%d")
-                        item = plan_by_date.get(day_str)
-                        is_current_month = day.month == month and start_date <= day <= end_date
-                        
-                        text_color = "#555" if is_current_month else "#ccc"
-                        
-                        if is_current_month:
-                            if st.button(str(day.day), key=f"btn_add_{year}_{month}_{day_str}"):
-                                add_event_dialog(day_str)
-                        else:
-                            st.markdown(f"<div style='color:{text_color}; font-weight:bold; font-size:16px; line-height:1;'>{day.day}</div>", unsafe_allow_html=True)
-                        
-                        # Render events in this cell
-                        if is_current_month:
-                            events = []
-                            if item and item.get("fixed_events"):
-                                events.extend(item.get("fixed_events", []))
-                            if "daily_override_events" in st.session_state and day_str in st.session_state["daily_override_events"]:
-                                events.extend(st.session_state["daily_override_events"][day_str])
-                            
-                            for event in events:
-                                if event.get("show_on_calendar", True):
-                                    title = event.get("title", "")
-                                    color = event.get("display_color", event.get("color", "#4f84ff"))
-                                    st.markdown(f'<div style="font-size: 11px; font-weight: bold; color: #fff; padding: 3px 6px; border-radius: 6px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background-color: {color};">{title}</div>', unsafe_allow_html=True)
-                            
-                            if item and item.get("tasks"):
-                                for task in item.get("tasks", []):
-                                    st.markdown(f'<div style="font-size: 10px; color: #555; padding: 1px 3px; margin-top: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f0f0f0; border-left: 2px solid #ccc;">📖 {task}</div>', unsafe_allow_html=True)
-                        
-                        st.markdown('</div>', unsafe_allow_html=True)
+                        if st.button("x", key=f"calclick_{year}_{month}_{day_str}"):
+                            st.session_state["_cal_clicked_date"] = day_str
+                            st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
                                         
         with col_overview:
             st.markdown("#### 📅 行程總覽")
