@@ -157,22 +157,12 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                     for task in item["tasks"]:
                         events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
 
-            # Entire cell is clickable: onclick fires a query param URL change which triggers rerun
+            # Non-clickable cells (click-to-add moved to overview button)
             if is_current:
                 cell_inner = f'{num_html}{events_html}'
-                # Use pushState so Streamlit re-runs without a full page reload (preserves session_state)
-                js_click = (
-                    f"(function(){{"
-                    f"var u=new URL(window.location.href);"
-                    f"u.searchParams.set('add_event','{day_str}');"
-                    f"window.history.pushState(null,'',u.toString());"
-                    f"window.dispatchEvent(new PopStateEvent('popstate',{{state:null}}));"
-                    f"}})()"
-                )
                 row += (
                     f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; '
-                    f'padding:0; width:14.2857%; height:110px; cursor:pointer;" '
-                    f'onclick="{js_click}">'
+                    f'padding:0; width:14.2857%; height:110px;">'
                     f'<div style="padding:6px; height:100%; box-sizing:border-box;">{cell_inner}</div></td>'
                 )
             else:
@@ -206,14 +196,6 @@ def render_monthly_plan_page() -> None:
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
-    # Check if a date was clicked via query param set by the HTML table onclick
-    qp = st.query_params
-    clicked_date = qp.get("add_event", None)
-    if clicked_date:
-        # Clear the param immediately so we don't re-open on next render
-        st.query_params.clear()
-        add_event_dialog(clicked_date)
-
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
 
@@ -226,6 +208,13 @@ def render_monthly_plan_page() -> None:
                                         
         with col_overview:
             st.markdown("#### 📅 行程總覽")
+            
+            # 新增行程按鈕
+            if st.button("＋ 新增行程", key=f"add_btn_{year}_{month}", use_container_width=True, type="primary"):
+                # Default to first day of current month within plan range
+                default_day = max(start_date, date(year, month, 1))
+                add_event_dialog(default_day.strftime("%Y-%m-%d"))
+            
             # Only show user-added events (daily_override_events), not fixed events
             user_events: list[dict] = []
             override = st.session_state.get("daily_override_events", {})
