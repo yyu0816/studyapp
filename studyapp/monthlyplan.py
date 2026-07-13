@@ -157,12 +157,18 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                     for task in item["tasks"]:
                         events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
 
+            # Entire cell is clickable: onclick fires a query param URL change which triggers rerun
             if is_current:
-                # Wrap the whole cell in a form that submits the date on click
                 cell_inner = f'{num_html}{events_html}'
-                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:0; width:14.2857%; cursor:pointer;" onclick="document.getElementById(\'calclick_{day_str}\').click()"><div style="padding:6px; min-height:110px;">{cell_inner}</div></td>'
+                # Use window.location to set ?add_event=DATE which triggers rerun
+                row += (
+                    f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; '
+                    f'padding:0; width:14.2857%; height:110px; cursor:pointer;" '
+                    f'onclick="(function(){{var u=new URL(window.location.href);u.searchParams.set(\'add_event\',\'{day_str}\');window.location.href=u.toString();}})();">'
+                    f'<div style="padding:6px; height:100%; box-sizing:border-box;">{cell_inner}</div></td>'
+                )
             else:
-                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; min-height:110px; width:14.2857%;">{num_html}</td>'
+                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; height:110px; width:14.2857%;">{num_html}</td>'
         row += "</tr>"
         rows_html += row
 
@@ -192,9 +198,12 @@ def render_monthly_plan_page() -> None:
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
-    # Check if a date was clicked via hidden buttons
-    clicked_date = st.session_state.pop("_cal_clicked_date", None)
+    # Check if a date was clicked via query param set by the HTML table onclick
+    qp = st.query_params
+    clicked_date = qp.get("add_event", None)
     if clicked_date:
+        # Clear the param immediately so we don't re-open on next render
+        st.query_params.clear()
         add_event_dialog(clicked_date)
 
     for (year, month), _items in sorted(grouped.items()):
@@ -206,18 +215,6 @@ def render_monthly_plan_page() -> None:
             # Render a pure HTML table for the calendar
             calendar_html = _build_calendar_html(year, month, plan_by_date, start_date, end_date)
             st.markdown(calendar_html, unsafe_allow_html=True)
-
-            # Invisible buttons — styled to 0 size so they truly take no space
-            st.markdown('<div style="height:0;overflow:hidden;position:absolute;visibility:hidden;">', unsafe_allow_html=True)
-            weeks = _month_calendar_dates(year, month)
-            for week in weeks:
-                for day in week:
-                    if day.month == month and start_date <= day <= end_date:
-                        day_str = day.strftime("%Y-%m-%d")
-                        if st.button(".", key=f"calclick_{year}_{month}_{day_str}", help=""):
-                            st.session_state["_cal_clicked_date"] = day_str
-                            st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
                                         
         with col_overview:
             st.markdown("#### 📅 行程總覽")
