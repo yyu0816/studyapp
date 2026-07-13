@@ -151,20 +151,20 @@ def render_monthly_plan_page() -> None:
         flex: 1 1 0% !important;
         width: 14.2857% !important; /* Force exact 1/7 width */
         padding: 6px !important;
-        background-color: #ffffff !important;
-        border-right: 1px solid #e0e0e0 !important;
-        border-bottom: 1px solid #e0e0e0 !important;
+        background-color: #ffffff !important; /* Pure white background */
+        border-right: 1px solid #cccccc !important; /* More obvious border */
+        border-bottom: 1px solid #cccccc !important;
         min-height: 120px !important;
     }
 
     /* Leftmost border for the first column of EVERY row */
     .calendar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {
-        border-left: 1px solid #e0e0e0 !important;
+        border-left: 1px solid #cccccc !important;
     }
 
     /* Topmost border for the first row (headers) */
     .calendar-root ~ div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"] {
-        border-top: 1px solid #e0e0e0 !important;
+        border-top: 1px solid #cccccc !important;
         min-height: 40px !important; /* Headers don't need to be 120px tall */
         background-color: #f9f9f9 !important;
     }
@@ -187,39 +187,44 @@ def render_monthly_plan_page() -> None:
         border-bottom-right-radius: 8px !important;
     }
 
-    /* Target the Streamlit button container precisely to strip all borders/shadows */
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
-        border: none !important;
-        background: transparent !important;
+    /* AGGRESSIVELY strip all borders, shadows, and backgrounds from the native st.button */
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
+        border: 0px solid transparent !important; /* Explicitly 0px */
+        background-color: transparent !important;
         box-shadow: none !important;
         outline: none !important;
         padding: 0 !important;
+        margin: 0 !important;
         min-height: 0 !important;
         height: auto !important;
-        display: block !important;
-        text-align: left !important;
-        margin: 0 !important;
-        width: auto !important;
+        display: flex !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        -webkit-appearance: none !important;
     }
     
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover,
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:focus,
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:active {
-        background: transparent !important;
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
+        border: 0px solid transparent !important;
+        background-color: transparent !important;
         color: #4f84ff !important;
         box-shadow: none !important;
         outline: none !important;
     }
 
     /* Target the paragraph inside the button to match non-clickable text exactly */
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button p {
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] p {
         font-weight: bold !important;
         color: #555 !important;
         margin: 0 !important;
+        padding: 0 !important;
         font-size: 14px !important;
         line-height: 1 !important;
+        text-align: left !important;
     }
-    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover p {
+    .calendar-root ~ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p {
         color: #4f84ff !important;
     }
     </style>
