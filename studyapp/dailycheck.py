@@ -209,7 +209,9 @@ def render_daily_checkin_page() -> None:
             final[i] = (result[i], concurrent + 1)
         return final
 
-    event_layout = assign_columns(today_events)
+    # Only events that actually appear on the timeline (not all-day)
+    timeline_events = [e for e in today_events if not e.get("is_all_day")]
+    event_layout = assign_columns(timeline_events)
 
     col_timeline, col_main = st.columns([1, 2], gap="large")
 
@@ -242,10 +244,7 @@ def render_daily_checkin_page() -> None:
         CARD_LEFT_OFFSET = 10   # px from the timeline line
         CARD_WIDTH_BASE  = 160  # px total card area for one column
 
-        for i, event in enumerate(today_events):
-            # Skip all-day events — they show only in 今日行程, not on the timeline
-            if event.get("is_all_day"):
-                continue
+        for i, event in enumerate(timeline_events):
             col_idx, n_cols = event_layout.get(i, (0, 1))
             top_px, bottom_px = event_to_px(
                 event.get("start", "00:00"), event.get("end", "01:00")

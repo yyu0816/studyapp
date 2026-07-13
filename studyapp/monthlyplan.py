@@ -51,53 +51,105 @@ def _format_date_list(date_strs: list[str]) -> str:
     
     return ", ".join(formatted_ranges)
 
+import re as _re
+
+# A rich palette of swatchable colours shown in the custom colour mode
+_SWATCHES = [
+    "#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e",
+    "#10b981","#14b8a6","#06b6d4","#3b82f6","#6366f1","#8b5cf6",
+    "#a855f7","#ec4899","#f43f5e","#64748b","#78716c","#1e293b",
+    "#dc2626","#7c3aed","#0369a1","#065f46","#92400e","#ffffff",
+]
+
+
+def _colour_picker(key_prefix: str, default: str = "#3b82f6") -> str:
+    """A swatch-based colour picker that works inside @st.dialog."""
+    sel_key = f"{key_prefix}_color"
+    if sel_key not in st.session_state:
+        st.session_state[sel_key] = default
+
+    current = st.session_state[sel_key]
+
+    # Build swatch grid HTML
+    swatches_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
+    for c in _SWATCHES:
+        border = "3px solid #333" if c.lower() == current.lower() else "2px solid #ccc"
+        swatches_html += (
+            f'<div style="width:28px;height:28px;border-radius:5px;background:{c};'
+            f'border:{border};cursor:pointer;" '
+            f'title="{c}"></div>'
+        )
+    swatches_html += '</div>'
+    st.markdown(swatches_html, unsafe_allow_html=True)
+
+    # Let user click a swatch via selectbox (fallback that works in dialog)
+    chosen = st.selectbox(
+        "選擇顏色",
+        _SWATCHES,
+        index=_SWATCHES.index(current) if current in _SWATCHES else 0,
+        format_func=lambda c: c,
+        key=f"{key_prefix}_swatch_sel",
+        label_visibility="collapsed",
+    )
+    st.session_state[sel_key] = chosen
+
+    # Also allow typing a custom hex
+    custom = st.text_input("或輸入自訂色號", value=chosen, max_chars=7, key=f"{key_prefix}_hex")
+    if _re.match(r'^#[0-9A-Fa-f]{6}$', custom.strip()):
+        st.session_state[sel_key] = custom.strip()
+
+    final_color = st.session_state[sel_key]
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
+        f'<div style="width:32px;height:32px;border-radius:5px;background:{final_color};border:1px solid #ccc;"></div>'
+        f'<span style="font-size:13px;">目前顏色：{final_color}</span></div>',
+        unsafe_allow_html=True,
+    )
+    return final_color
+
+
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
-    st.write(f"**新增行程**")
     title = st.text_input("行程名稱")
-    
+
+    # Auto-sync end_date when start_date changes
+    _sd_key = "_add_dlg_start"
+    _ed_key = "_add_dlg_end"
+    init_day = _parse_date(day_str)
+    if _sd_key not in st.session_state:
+        st.session_state[_sd_key] = init_day
+        st.session_state[_ed_key] = init_day
+
+    def _on_start_change():
+        new_start = st.session_state[_sd_key]
+        if st.session_state[_ed_key] < new_start:
+            st.session_state[_ed_key] = new_start
+
     col_d1, col_d2 = st.columns(2)
     with col_d1:
-        start_date = st.date_input("開始日期", value=_parse_date(day_str))
+        start_date = st.date_input("開始日期", key=_sd_key, on_change=_on_start_change)
     with col_d2:
-        end_date = st.date_input("結束日期", value=_parse_date(day_str))
-        
+        end_date = st.date_input("結束日期", key=_ed_key)
+
     is_all_day = st.checkbox("整天", value=True)
-    
-    start_time = "00:00"
-    end_time = "23:59"
+    start_time, end_time = "00:00", "23:59"
     if not is_all_day:
         col1, col2 = st.columns(2)
         with col1:
-            start_val = st.time_input("開始時間")
-            if start_val: start_time = start_val.strftime("%H:%M")
+            sv = st.time_input("開始時間")
+            if sv: start_time = sv.strftime("%H:%M")
         with col2:
-            end_val = st.time_input("結束時間")
-            if end_val: end_time = end_val.strftime("%H:%M")
-            
+            ev = st.time_input("結束時間")
+            if ev: end_time = ev.strftime("%H:%M")
+
     emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
     color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True)
     if color_mode == "預設色板":
         color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
         color = color_option["value"] if isinstance(color_option, dict) else color_option
     else:
-        hex_input = st.text_input("輸入色號（例如 #ff5733）", value="#4f84ff", max_chars=7)
-        # Validate and normalize the hex input
-        import re
-        if re.match(r'^#[0-9A-Fa-f]{6}$', hex_input.strip()):
-            color = hex_input.strip()
-        else:
-            color = "#4f84ff"
-            st.caption("⚠️ 格式不正確，請輸入如 #ff5733 的格式")
-        # Show a live color preview
-        st.markdown(
-            f'<div style="display:flex;align-items:center;gap:10px;margin-top:4px;">'
-            f'<div style="width:40px;height:40px;border-radius:6px;background:{color};border:1px solid #ccc;"></div>'
-            f'<span style="font-size:14px;">預覽：{color}</span>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        
+        color = _colour_picker("add_dlg")
+
     if st.button("儲存", use_container_width=True):
         if not title:
             st.error("請輸入行程名稱")
@@ -105,29 +157,93 @@ def add_event_dialog(day_str: str):
         if start_date > end_date:
             st.error("開始日期不能晚於結束日期")
             return
-            
-        if "daily_override_events" not in st.session_state:
-            st.session_state["daily_override_events"] = {}
-            
-        current = start_date
-        while current <= end_date:
-            curr_str = current.strftime("%Y-%m-%d")
-            if curr_str not in st.session_state["daily_override_events"]:
-                st.session_state["daily_override_events"][curr_str] = []
-                
-            st.session_state["daily_override_events"][curr_str].append({
-                "title": title,
-                "start": start_time,
-                "end": end_time,
-                "emoji": emoji,
-                "color": color,
-                "display_color": color,
-                "is_all_day": is_all_day,
-                "show_on_calendar": True
+        # clean up temp keys
+        st.session_state.pop(_sd_key, None)
+        st.session_state.pop(_ed_key, None)
+
+        st.session_state.setdefault("daily_override_events", {})
+        cur = start_date
+        while cur <= end_date:
+            cs = cur.strftime("%Y-%m-%d")
+            st.session_state["daily_override_events"].setdefault(cs, []).append({
+                "title": title, "start": start_time, "end": end_time,
+                "emoji": emoji, "color": color, "display_color": color,
+                "is_all_day": is_all_day, "show_on_calendar": True,
             })
-            current += timedelta(days=1)
-            
+            cur += timedelta(days=1)
         st.rerun()
+
+
+@st.dialog("編輯行程")
+def edit_event_dialog(date_str: str, ev_idx: int):
+    override = st.session_state.get("daily_override_events", {})
+    ev = override.get(date_str, [])[ev_idx]
+
+    title = st.text_input("行程名稱", value=ev.get("title", ""))
+
+    _sd_key = "_edit_dlg_start"
+    _ed_key = "_edit_dlg_end"
+    if _sd_key not in st.session_state:
+        st.session_state[_sd_key] = _parse_date(date_str)
+        st.session_state[_ed_key] = _parse_date(date_str)
+
+    def _on_start_change():
+        if st.session_state[_ed_key] < st.session_state[_sd_key]:
+            st.session_state[_ed_key] = st.session_state[_sd_key]
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        start_date = st.date_input("開始日期", key=_sd_key, on_change=_on_start_change)
+    with col_d2:
+        end_date = st.date_input("結束日期", key=_ed_key)
+
+    is_all_day = st.checkbox("整天", value=ev.get("is_all_day", True))
+    start_time, end_time = ev.get("start", "00:00"), ev.get("end", "23:59")
+    if not is_all_day:
+        col1, col2 = st.columns(2)
+        with col1:
+            sv = st.time_input("開始時間")
+            if sv: start_time = sv.strftime("%H:%M")
+        with col2:
+            evt = st.time_input("結束時間")
+            if evt: end_time = evt.strftime("%H:%M")
+
+    emoji_idx = EMOJI_OPTIONS.index(ev.get("emoji", EMOJI_OPTIONS[0])) if ev.get("emoji") in EMOJI_OPTIONS else 0
+    emoji = st.selectbox("表情符號", EMOJI_OPTIONS, index=emoji_idx)
+    color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True)
+    if color_mode == "預設色板":
+        color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
+        color = color_option["value"] if isinstance(color_option, dict) else color_option
+    else:
+        color = _colour_picker("edit_dlg", default=ev.get("display_color", "#3b82f6"))
+
+    col_save, col_del = st.columns(2)
+    with col_save:
+        if st.button("儲存", use_container_width=True, type="primary"):
+            if not title:
+                st.error("請輸入行程名稱")
+                return
+            # Remove old event from this date
+            override[date_str].pop(ev_idx)
+            # Re-insert across new date range
+            cur = start_date
+            while cur <= end_date:
+                cs = cur.strftime("%Y-%m-%d")
+                st.session_state["daily_override_events"].setdefault(cs, []).append({
+                    "title": title, "start": start_time, "end": end_time,
+                    "emoji": emoji, "color": color, "display_color": color,
+                    "is_all_day": is_all_day, "show_on_calendar": True,
+                })
+                cur += timedelta(days=1)
+            st.session_state.pop(_sd_key, None)
+            st.session_state.pop(_ed_key, None)
+            st.rerun()
+    with col_del:
+        if st.button("🗑️ 刪除", use_container_width=True):
+            override[date_str].pop(ev_idx)
+            st.session_state.pop(_sd_key, None)
+            st.session_state.pop(_ed_key, None)
+            st.rerun()
 
 def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
     """Build a pure HTML table for the calendar month."""
@@ -235,30 +351,31 @@ def render_monthly_plan_page() -> None:
             override = st.session_state.get("daily_override_events", {})
             for _item in _items:
                 d_str = _item["date"]
-                if d_str in override:
-                    for e in override[d_str]:
-                        if e.get("show_on_calendar", True):
-                            user_events.append({"date": d_str, "event": e})
+                for ev_idx, e in enumerate(override.get(d_str, [])):
+                    if e.get("show_on_calendar", True):
+                        user_events.append({"date": d_str, "event": e, "ev_idx": ev_idx})
 
             if user_events:
-                # Sort by date
+                # Sort by date, then show each event individually with an edit button
                 user_events.sort(key=lambda x: x["date"])
-                # Group same title+emoji+color across consecutive dates
-                grouped_ev: dict = {}
-                for me in user_events:
+                for ui, me in enumerate(user_events):
+                    ev_date = me["date"]
                     ev_title = me["event"].get("title", "")
                     ev_emoji = me["event"].get("emoji", "📌")
                     ev_color = me["event"].get("display_color", me["event"].get("color", "#4f84ff"))
-                    key = (ev_title, ev_emoji, ev_color)
-                    grouped_ev.setdefault(key, []).append(me["date"])
+                    ev_idx   = me["ev_idx"]
+                    date_label = datetime.strptime(ev_date, "%Y-%m-%d").strftime("%m/%d")
 
-                for (ev_title, ev_emoji, ev_color), dates in grouped_ev.items():
-                    date_str_formatted = _format_date_list(dates)
-                    st.markdown(
-                        f'<div style="font-size:13px; margin-bottom:6px; padding:4px 0; border-left:4px solid {ev_color}; padding-left:8px;">'
-                        f'<strong>{date_str_formatted}</strong> {ev_emoji} {ev_title}</div>',
-                        unsafe_allow_html=True
-                    )
+                    col_txt, col_btn = st.columns([4, 1])
+                    with col_txt:
+                        st.markdown(
+                            f'<div style="font-size:13px;padding:4px 0;border-left:4px solid {ev_color};padding-left:8px;">'
+                            f'<strong>{date_label}</strong> {ev_emoji} {ev_title}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    with col_btn:
+                        if st.button("✏️", key=f"edit_{year}_{month}_{ev_date}_{ev_idx}_{ui}", help="編輯"):
+                            edit_event_dialog(ev_date, ev_idx)
             else:
                 st.write("本月無新增行程")
                     
