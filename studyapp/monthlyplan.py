@@ -81,7 +81,22 @@ def add_event_dialog(day_str: str):
         color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
         color = color_option["value"] if isinstance(color_option, dict) else color_option
     else:
-        color = st.color_picker("選擇顏色", "#4f84ff")
+        hex_input = st.text_input("輸入色號（例如 #ff5733）", value="#4f84ff", max_chars=7)
+        # Validate and normalize the hex input
+        import re
+        if re.match(r'^#[0-9A-Fa-f]{6}$', hex_input.strip()):
+            color = hex_input.strip()
+        else:
+            color = "#4f84ff"
+            st.caption("⚠️ 格式不正確，請輸入如 #ff5733 的格式")
+        # Show a live color preview
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:10px;margin-top:4px;">'
+            f'<div style="width:40px;height:40px;border-radius:6px;background:{color};border:1px solid #ccc;"></div>'
+            f'<span style="font-size:14px;">預覽：{color}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
         
     if st.button("儲存", use_container_width=True):
         if not title:
