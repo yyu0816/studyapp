@@ -44,9 +44,6 @@
       }
       Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
       Streamlit.setComponentReady();
-      cp.addEventListener("input", (e) => {
-          Streamlit.setComponentValue(e.target.value);
-      });
       cp.addEventListener("change", (e) => {
           Streamlit.setComponentValue(e.target.value);
       });
