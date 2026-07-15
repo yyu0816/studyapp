@@ -5,7 +5,6 @@ from typing import Any
 
 import streamlit as st
 from dailycheck import EMOJI_OPTIONS, COLOR_OPTIONS
-from streamlit_color_picker import color_picker as _cp
 
 
 def _parse_date(date_str: str) -> date:
@@ -95,7 +94,9 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        color = _cp("選擇顏色", default_color=preset_color, key="add_dlg_cp")
+        if "add_dlg_cp" not in st.session_state:
+            st.session_state["add_dlg_cp"] = preset_color
+        color = st.color_picker("選擇顏色", key="add_dlg_cp")
     else:
         color = preset_color
 
@@ -195,7 +196,9 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        color = _cp("選擇顏色", default_color=cur_color, key="edit_dlg_cp")
+        if "edit_dlg_cp" not in st.session_state:
+            st.session_state["edit_dlg_cp"] = cur_color
+        color = st.color_picker("選擇顏色", key="edit_dlg_cp")
     else:
         color = preset_color
 
