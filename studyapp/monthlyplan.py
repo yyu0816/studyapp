@@ -5,6 +5,7 @@ from typing import Any
 
 import streamlit as st
 from dailycheck import EMOJI_OPTIONS, COLOR_OPTIONS
+from streamlit_color_picker import color_picker as _cp
 
 
 def _parse_date(date_str: str) -> date:
@@ -52,85 +53,6 @@ def _format_date_list(date_strs: list[str]) -> str:
     return ", ".join(formatted_ranges)
 
 
-import re as _re
-
-_PALETTE = [
-    "#ef4444","#f97316","#f59e0b","#eab308",
-    "#84cc16","#22c55e","#10b981","#14b8a6",
-    "#06b6d4","#3b82f6","#6366f1","#8b5cf6",
-    "#a855f7","#ec4899","#f43f5e","#e11d48",
-    "#dc2626","#7c3aed","#0369a1","#065f46",
-    "#92400e","#374151","#6b7280","#ffffff",
-]
-_N_COLS = 8
-
-
-def _color_swatch_picker(key: str, default: str = "#3b82f6") -> str:
-    """
-    Clickable colour swatch grid that works inside @st.dialog.
-    Uses CSS :has() + adjacent-sibling combinator to colour each st.button.
-    Returns the hex string of the selected colour.
-    """
-    state_key = f"_swp_{key}"
-    if state_key not in st.session_state:
-        st.session_state[state_key] = default
-
-    current = st.session_state[state_key]
-    cid = f"swp_{key}"
-
-    # ── Build CSS ────────────────────────────────────────────────────────────
-    css = ["<style>"]
-    for i, color in enumerate(PALETTE := _PALETTE):
-        row = i // _N_COLS
-        col = (i % _N_COLS) + 1            # nth-child is 1-indexed
-        selected = color.lower() == current.lower()
-        outline = "outline:3px solid #111!important;outline-offset:2px;" if selected else ""
-        css.append(
-            f"[data-testid='stMarkdownContainer']:has(#{cid}_r{row})"
-            f"+[data-testid='stHorizontalBlock']"
-            f">[data-testid='column']:nth-child({col}) button{{"
-            f"background:{color}!important;"
-            f"min-height:30px!important;height:30px!important;"
-            f"padding:0!important;border-radius:5px!important;"
-            f"border:1px solid rgba(0,0,0,.15)!important;"
-            f"color:transparent!important;font-size:1px!important;"
-            f"{outline}}}"
-        )
-    css.append("</style>")
-    st.markdown("".join(css), unsafe_allow_html=True)
-
-    # ── Render rows of swatch buttons ────────────────────────────────────────
-    for row_start in range(0, len(_PALETTE), _N_COLS):
-        row_idx = row_start // _N_COLS
-        row_colors = _PALETTE[row_start : row_start + _N_COLS]
-        # Marker div — gives CSS a hook for the adjacent sibling selector
-        st.markdown(f'<div id="{cid}_r{row_idx}"></div>', unsafe_allow_html=True)
-        cols = st.columns(len(row_colors))
-        for i, color in enumerate(row_colors):
-            with cols[i]:
-                if st.button("x", key=f"sw_{key}_{row_start+i}"):
-                    st.session_state[state_key] = color
-                    st.rerun()
-
-    # ── Selected colour preview ───────────────────────────────────────────────
-    st.markdown(
-        f"<div style='display:flex;align-items:center;gap:8px;margin-top:6px;'>"
-        f"<div style='width:28px;height:28px;border-radius:5px;"
-        f"background:{current};border:1px solid #ccc;flex-shrink:0;'></div>"
-        f"<span style='font-size:13px;'>已選：{current}</span></div>",
-        unsafe_allow_html=True,
-    )
-    # Fallback text input for arbitrary hex
-    custom = st.text_input("或直接輸入色號", value=current, max_chars=7,
-                           placeholder="#rrggbb", key=f"{key}_hex_fallback",
-                           label_visibility="collapsed")
-    if _re.match(r'^#[0-9A-Fa-f]{6}$', custom.strip()):
-        if custom.strip().lower() != current.lower():
-            st.session_state[state_key] = custom.strip()
-            st.rerun()
-
-    return st.session_state[state_key]
-
 
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
@@ -173,7 +95,7 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        color = _color_swatch_picker("add_dlg", default=preset_color)
+        color = _cp("選擇顏色", default_color=preset_color, key="add_dlg_cp")
     else:
         color = preset_color
 
@@ -273,7 +195,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        color = _color_swatch_picker("edit_dlg", default=cur_color)
+        color = _cp("選擇顏色", default_color=cur_color, key="edit_dlg_cp")
     else:
         color = preset_color
 
