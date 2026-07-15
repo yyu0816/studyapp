@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.3.0/dist/streamlit.js"></script>
+    <style>
+      body { margin: 0; padding: 0; font-family: "Source Sans Pro", sans-serif; background-color: transparent; }
+      .container { display: flex; align-items: center; gap: 8px; }
+      input[type="color"] {
+        -webkit-appearance: none;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        cursor: pointer;
+        padding: 0;
+        background: none;
+      }
+      input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+      input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(250, 250, 250, 0.2); border-radius: 4px; }
+      span { font-size: 14px; color: rgb(250, 250, 250); white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <input type="color" id="cp">
+      <span id="label">選擇顏色</span>
+    </div>
+    <script>
+      const cp = document.getElementById("cp");
+      const label = document.getElementById("label");
+      let initialized = false;
+      function onRender(event) {
+          if (!initialized) {
+              const data = event.detail;
+              if (data.args && data.args.default_color) {
+                  cp.value = data.args.default_color;
+              }
+              if (data.args && data.args.label) {
+                  label.innerText = data.args.label;
+              }
+              initialized = true;
+          }
+          Streamlit.setFrameHeight(35);
+      }
+      Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+      Streamlit.setComponentReady();
+      cp.addEventListener("input", (e) => {
+          Streamlit.setComponentValue(e.target.value);
+      });
+      cp.addEventListener("change", (e) => {
+          Streamlit.setComponentValue(e.target.value);
+      });
+    </script>
+  </body>
+</html>

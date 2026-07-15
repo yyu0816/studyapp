@@ -5,6 +5,7 @@ from typing import Any
 
 import streamlit as st
 from dailycheck import EMOJI_OPTIONS, COLOR_OPTIONS
+from color_picker_component import native_color_picker
 
 
 def _parse_date(date_str: str) -> date:
@@ -96,7 +97,7 @@ def add_event_dialog(day_str: str):
     if use_custom_color:
         if "add_dlg_cp" not in st.session_state:
             st.session_state["add_dlg_cp"] = preset_color
-        color = st.color_picker("選擇顏色", key="add_dlg_cp")
+        color = native_color_picker("選擇顏色", default_color=preset_color, key="add_dlg_cp")
     else:
         color = preset_color
 
@@ -198,7 +199,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     if use_custom_color:
         if "edit_dlg_cp" not in st.session_state:
             st.session_state["edit_dlg_cp"] = cur_color
-        color = st.color_picker("選擇顏色", key="edit_dlg_cp")
+        color = native_color_picker("選擇顏色", default_color=cur_color, key="edit_dlg_cp")
     else:
         color = preset_color
 
