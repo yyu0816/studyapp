@@ -640,7 +640,6 @@ def render_dashboard_page() -> None:
 
 
 def render_home_page() -> None:
-    st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
     
     st.markdown("""
     <style>
@@ -669,7 +668,7 @@ def render_home_page() -> None:
     for i, opt in enumerate(page_options):
         with st.sidebar:
             st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
-            if st.button(opt, use_container_width=True, key=f"menu_btn_{i}"):
+            if st.button(opt, use_container_width=True, key=f"sidebar_main_menu_{i}_{opt}"):
                 st.session_state["main_page"] = opt
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -691,12 +690,5 @@ def render_home_page() -> None:
         render_daily_checkin_page()
 
 
-def main() -> None:
-    _initialize_session_state()
-    render_home_page()
-
-
 if __name__ == "__main__":
     render_home_page()
-
-
