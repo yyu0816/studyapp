@@ -92,9 +92,20 @@ def add_event_dialog(day_str: str):
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-    use_custom_color = st.checkbox("使用自訂顏色或色號", value=False)
+    use_custom_color = st.checkbox("使用自訂顏色（輸入色號）", value=False)
     if use_custom_color:
-        color = st.color_picker("自訂顏色", value=preset_color, key="add_dlg_custom_color")
+        import re as _re
+        hex_val = st.text_input("輸入色號", value=preset_color, max_chars=7,
+                                placeholder="例如 #ff5733", key="add_dlg_hex")
+        color = hex_val.strip() if _re.match(r'^#[0-9A-Fa-f]{6}$', hex_val.strip()) else preset_color
+        if not _re.match(r'^#[0-9A-Fa-f]{6}$', hex_val.strip()):
+            st.caption("⚠️ 格式不正確，使用預設顏色")
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:8px;margin-top:2px;'>"
+            f"<div style='width:28px;height:28px;border-radius:5px;background:{color};border:1px solid #ccc;'></div>"
+            f"<span style='font-size:13px;'>預覽：{color}</span></div>",
+            unsafe_allow_html=True
+        )
     else:
         color = preset_color
 
@@ -192,9 +203,20 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-    use_custom_color = st.checkbox("使用自訂顏色或色號", value=False)
+    use_custom_color = st.checkbox("使用自訂顏色（輸入色號）", value=False)
     if use_custom_color:
-        color = st.color_picker("自訂顏色", value=cur_color, key="edit_dlg_custom_color")
+        import re as _re
+        hex_val = st.text_input("輸入色號", value=cur_color, max_chars=7,
+                                placeholder="例如 #ff5733", key="edit_dlg_hex")
+        color = hex_val.strip() if _re.match(r'^#[0-9A-Fa-f]{6}$', hex_val.strip()) else preset_color
+        if not _re.match(r'^#[0-9A-Fa-f]{6}$', hex_val.strip()):
+            st.caption("⚠️ 格式不正確，使用預設顏色")
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:8px;margin-top:2px;'>"
+            f"<div style='width:28px;height:28px;border-radius:5px;background:{color};border:1px solid #ccc;'></div>"
+            f"<span style='font-size:13px;'>預覽：{color}</span></div>",
+            unsafe_allow_html=True
+        )
     else:
         color = preset_color
 
