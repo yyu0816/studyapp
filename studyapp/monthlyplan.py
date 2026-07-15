@@ -253,29 +253,42 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
     )
 
     rows_html = ""
+    override_all = st.session_state.get("daily_override_events", {})
     for week in weeks:
         row = "<tr>"
         for day in week:
             day_str = day.strftime("%Y-%m-%d")
             item = plan_by_date.get(day_str)
-            is_current = day.month == month and start_date <= day <= end_date
+            in_this_month = day.month == month
+            is_in_plan = in_this_month and start_date <= day <= end_date
+            has_override = in_this_month and bool(override_all.get(day_str))
+            # Show events for plan days AND days with user-added events outside plan range
+            is_active = is_in_plan or has_override
 
-            num_color = "#333" if is_current else "#c0c0c0"
-            num_weight = "bold" if is_current else "normal"
-            bg = "#ffffff" if is_current else "#fafafa"
+            if is_in_plan:
+                num_color = "#333"
+                num_weight = "bold"
+                bg = "#ffffff"
+            elif has_override:
+                # outside plan range but has events — slightly dimmed
+                num_color = "#888"
+                num_weight = "normal"
+                bg = "#f5f5f5"
+            else:
+                num_color = "#c0c0c0"
+                num_weight = "normal"
+                bg = "#fafafa"
 
-            # Date number (no onclick needed — entire cell is clickable via form submit below)
             num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
 
             # Events
             events_html = ""
-            if is_current:
+            if is_active:
                 events = []
                 if item and item.get("fixed_events"):
                     events.extend(item["fixed_events"])
-                override = st.session_state.get("daily_override_events", {})
-                if day_str in override:
-                    events.extend(override[day_str])
+                if day_str in override_all:
+                    events.extend(override_all[day_str])
                 for ev in events:
                     if ev.get("show_on_calendar", True):
                         t = ev.get("title", "")
@@ -285,8 +298,7 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                     for task in item["tasks"]:
                         events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
 
-            # Non-clickable cells (click-to-add moved to overview button)
-            if is_current:
+            if is_active:
                 cell_inner = f'{num_html}{events_html}'
                 row += (
                     f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; '
@@ -366,18 +378,23 @@ def render_monthly_plan_page() -> None:
                         user_events.append({"date": d_str, "event": e, "ev_idx": ev_idx})
 
             if user_events:
-                # Add CSS to left-align tertiary buttons
+                # CSS: force every tertiary button to be left-aligned text
                 st.markdown(
                     """
                     <style>
-                    button[kind="tertiary"] {
+                    [data-testid="stBaseButton-tertiary"] {
                         justify-content: flex-start !important;
+                        text-align: left !important;
                         padding-left: 0px !important;
                         padding-top: 2px !important;
                         padding-bottom: 2px !important;
+                        background: transparent !important;
+                        border: none !important;
+                        box-shadow: none !important;
                     }
-                    button[kind="tertiary"] p {
+                    [data-testid="stBaseButton-tertiary"] p {
                         font-size: 13px !important;
+                        text-align: left !important;
                     }
                     </style>
                     """,
