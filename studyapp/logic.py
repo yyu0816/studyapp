@@ -339,3 +339,139 @@ def find_plan_buffer_days(
             )
 
     return buffer_days
+
+
+import math
+from typing import Any, Dict
+
+def generate_daily_schedule(subjects_data: List[Dict[str, Any]], total_days: int, daily_hours: float) -> List[Dict[str, Any]]:
+    """
+    產生每日讀書進度排程，包含以下邏輯：
+    1. 八二法則緩衝：80% 天數為有效學習日，20% 天數為緩衝/總複習日。
+    2. 番茄鐘時間切割：每日時數轉換為番茄鐘 (1小時 = 2番茄鐘)。
+    3. 科目交錯防疲勞：同一個科目連續排程不超過 2 個番茄鐘。
+    """
+    if not subjects_data or total_days <= 0 or daily_hours <= 0:
+        return []
+
+    # 1. 計算有效天數與緩衝天數 (八二法則)
+    effective_days = math.floor(total_days * 0.8)
+    buffer_days = total_days - effective_days
+
+    # 2. 計算總可用番茄鐘
+    pomodoros_per_day = math.floor(daily_hours * 2)
+    if pomodoros_per_day == 0:
+        return []
+
+    total_pomodoros = effective_days * pomodoros_per_day
+
+    # 3. 處理科目資料，計算每個科目的總頁數/進度
+    subject_progress = []
+    for subject in subjects_data:
+        name = subject.get("name", "未命名科目")
+        materials = subject.get("materials", [])
+        total_qty = 0
+        unit = "單位"
+        for mat in materials:
+            total_qty += mat.get("quantity", 0)
+            if mat.get("type") in ["練習題", "模擬考"]:
+                unit = "回"
+            elif mat.get("type") in ["課本", "教材", "筆記"]:
+                unit = "頁"
+            elif mat.get("type") == "教學影片":
+                unit = "小時"
+        
+        subject_progress.append({
+            "name": name,
+            "total_qty": total_qty,
+            "unit": unit,
+            "remaining_qty": total_qty
+        })
+
+    # 計算每個科目可以分配到幾個番茄鐘 (平均分配)
+    num_subjects = len(subject_progress)
+    if num_subjects == 0:
+        return []
+
+    base_pomo_per_subject = total_pomodoros // num_subjects
+    remainder = total_pomodoros % num_subjects
+
+    for i, sp in enumerate(subject_progress):
+        pomo_count = base_pomo_per_subject + (1 if i < remainder else 0)
+        sp["allocated_pomodoros"] = pomo_count
+        sp["remaining_pomodoros"] = pomo_count
+        # 避免除以零
+        sp["progress_per_pomo"] = sp["total_qty"] / pomo_count if pomo_count > 0 else 0
+
+    # 4. 產生每一天的排程
+    schedule = []
+    
+    # 準備用來輪詢的科目隊列
+    available_subjects = [sp for sp in subject_progress if sp["remaining_pomodoros"] > 0]
+    last_subject_name = None
+    consecutive_count = 0
+
+    day = 1
+    # 安排有效學習日
+    for _ in range(effective_days):
+        for pomo_idx in range(1, pomodoros_per_day + 1):
+            if not available_subjects:
+                break
+            
+            # 依照剩餘番茄鐘數排序，優先安排剩比較多的科目
+            available_subjects.sort(key=lambda x: x["remaining_pomodoros"], reverse=True)
+            
+            # 尋找下一個要安排的科目
+            chosen_sp = None
+            
+            # 防疲勞規則：如果最高優先權的科目與上次相同且連續2次了，則嘗試找下一個
+            if available_subjects[0]["name"] == last_subject_name and consecutive_count >= 2:
+                if len(available_subjects) > 1:
+                    chosen_sp = available_subjects[1]
+                else:
+                    chosen_sp = available_subjects[0] # 只有一個科目能排了
+            else:
+                chosen_sp = available_subjects[0]
+            
+            # 記錄安排
+            progress_val = chosen_sp["progress_per_pomo"]
+            # 格式化進度數值，如果是整數則不顯示小數點
+            if progress_val.is_integer():
+                progress_str = f"{int(progress_val)} {chosen_sp['unit']}"
+            else:
+                progress_str = f"{progress_val:.1f} {chosen_sp['unit']}"
+
+            schedule.append({
+                "第幾天": f"Day {day}",
+                "屬性": "學習日",
+                "番茄鐘節次": f"第 {pomo_idx} 節",
+                "科目": chosen_sp["name"],
+                "目標進度": progress_str
+            })
+
+            # 更新狀態
+            chosen_sp["remaining_pomodoros"] -= 1
+            if chosen_sp["remaining_pomodoros"] <= 0:
+                available_subjects.remove(chosen_sp)
+            
+            if chosen_sp["name"] == last_subject_name:
+                consecutive_count += 1
+            else:
+                last_subject_name = chosen_sp["name"]
+                consecutive_count = 1
+                
+        day += 1
+
+    # 安排緩衝/總複習日
+    for _ in range(buffer_days):
+        for pomo_idx in range(1, pomodoros_per_day + 1):
+            schedule.append({
+                "第幾天": f"Day {day}",
+                "屬性": "緩衝/總複習日",
+                "番茄鐘節次": f"第 {pomo_idx} 節",
+                "科目": "總複習 (自由安排)",
+                "目標進度": "0 單位 (僅複習)"
+            })
+        day += 1
+
+    return schedule

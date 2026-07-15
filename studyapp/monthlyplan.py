@@ -6,6 +6,7 @@ from typing import Any
 import streamlit as st
 from dailycheck import EMOJI_OPTIONS, COLOR_OPTIONS
 from color_picker_component import native_color_picker
+import logic
 
 
 def _parse_date(date_str: str) -> date:
@@ -338,6 +339,26 @@ def render_monthly_plan_page() -> None:
     except Exception:
         st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
         return
+
+    st.markdown("## 每日讀書進度排程 (番茄鐘演算法)")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        daily_hours = st.number_input("每日可讀書時數 (小時)", min_value=1.0, max_value=24.0, value=4.0, step=0.5, key="daily_hours_input")
+        if st.button("生成排程計畫", key="generate_schedule_btn", type="primary"):
+            total_days = (end_date - start_date).days + 1
+            subjects_data = plan.get("subjects", [])
+            schedule_result = logic.generate_daily_schedule(subjects_data, total_days, daily_hours)
+            st.session_state["app_state"]["monthly_plan"] = schedule_result
+            st.rerun()
+            
+    with col2:
+        schedule_data = st.session_state["app_state"].get("monthly_plan")
+        if schedule_data is None:
+            st.info("請先設定並生成計畫")
+        else:
+            st.dataframe(schedule_data, use_container_width=True)
+
+    st.markdown("---")
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
