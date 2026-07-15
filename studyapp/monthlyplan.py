@@ -51,61 +51,6 @@ def _format_date_list(date_strs: list[str]) -> str:
     
     return ", ".join(formatted_ranges)
 
-import re as _re
-
-# A rich palette of swatchable colours shown in the custom colour mode
-_SWATCHES = [
-    "#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e",
-    "#10b981","#14b8a6","#06b6d4","#3b82f6","#6366f1","#8b5cf6",
-    "#a855f7","#ec4899","#f43f5e","#64748b","#78716c","#1e293b",
-    "#dc2626","#7c3aed","#0369a1","#065f46","#92400e","#ffffff",
-]
-
-
-def _colour_picker(key_prefix: str, default: str = "#3b82f6") -> str:
-    """A swatch-based colour picker that works inside @st.dialog."""
-    sel_key = f"{key_prefix}_color"
-    if sel_key not in st.session_state:
-        st.session_state[sel_key] = default
-
-    current = st.session_state[sel_key]
-
-    # Build swatch grid HTML
-    swatches_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
-    for c in _SWATCHES:
-        border = "3px solid #333" if c.lower() == current.lower() else "2px solid #ccc"
-        swatches_html += (
-            f'<div style="width:28px;height:28px;border-radius:5px;background:{c};'
-            f'border:{border};cursor:pointer;" '
-            f'title="{c}"></div>'
-        )
-    swatches_html += '</div>'
-    st.markdown(swatches_html, unsafe_allow_html=True)
-
-    # Let user click a swatch via selectbox (fallback that works in dialog)
-    chosen = st.selectbox(
-        "選擇顏色",
-        _SWATCHES,
-        index=_SWATCHES.index(current) if current in _SWATCHES else 0,
-        format_func=lambda c: c,
-        key=f"{key_prefix}_swatch_sel",
-        label_visibility="collapsed",
-    )
-    st.session_state[sel_key] = chosen
-
-    # Also allow typing a custom hex
-    custom = st.text_input("或輸入自訂色號", value=chosen, max_chars=7, key=f"{key_prefix}_hex")
-    if _re.match(r'^#[0-9A-Fa-f]{6}$', custom.strip()):
-        st.session_state[sel_key] = custom.strip()
-
-    final_color = st.session_state[sel_key]
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
-        f'<div style="width:32px;height:32px;border-radius:5px;background:{final_color};border:1px solid #ccc;"></div>'
-        f'<span style="font-size:13px;">目前顏色：{final_color}</span></div>',
-        unsafe_allow_html=True,
-    )
-    return final_color
 
 
 @st.dialog("新增行程")
@@ -143,12 +88,15 @@ def add_event_dialog(day_str: str):
             if ev: end_time = ev.strftime("%H:%M")
 
     emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
-    color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True)
-    if color_mode == "預設色板":
-        color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
-        color = color_option["value"] if isinstance(color_option, dict) else color_option
+    color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
+    preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
+    if isinstance(color_option, dict):
+        st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
+    use_custom_color = st.checkbox("使用自訂顏色或色號", value=False)
+    if use_custom_color:
+        color = st.color_picker("自訂顏色", value=preset_color, key="add_dlg_custom_color")
     else:
-        color = _colour_picker("add_dlg")
+        color = preset_color
 
     if st.button("儲存", use_container_width=True):
         if not title:
@@ -237,12 +185,18 @@ def edit_event_dialog(date_str: str, ev_idx: int):
 
     emoji_idx = EMOJI_OPTIONS.index(ev.get("emoji", EMOJI_OPTIONS[0])) if ev.get("emoji") in EMOJI_OPTIONS else 0
     emoji = st.selectbox("表情符號", EMOJI_OPTIONS, index=emoji_idx)
-    color_mode = st.radio("顏色模式", ["預設色板", "自訂顏色"], horizontal=True)
-    if color_mode == "預設色板":
-        color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
-        color = color_option["value"] if isinstance(color_option, dict) else color_option
+    # Find the current color's index in COLOR_OPTIONS
+    cur_color = ev.get("display_color", ev.get("color", "#4f84ff"))
+    color_idx = next((i for i, o in enumerate(COLOR_OPTIONS) if isinstance(o, dict) and o["value"] == cur_color), 0)
+    color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], index=color_idx)
+    preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
+    if isinstance(color_option, dict):
+        st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
+    use_custom_color = st.checkbox("使用自訂顏色或色號", value=False)
+    if use_custom_color:
+        color = st.color_picker("自訂顏色", value=cur_color, key="edit_dlg_custom_color")
     else:
-        color = _colour_picker("edit_dlg", default=ev.get("display_color", "#3b82f6"))
+        color = preset_color
 
     col_save, col_del = st.columns(2)
     with col_save:
@@ -397,11 +351,16 @@ def render_monthly_plan_page() -> None:
                 default_day = max(start_date, date(year, month, 1))
                 add_event_dialog(default_day.strftime("%Y-%m-%d"))
             
-            # Only show user-added events (daily_override_events), not fixed events
+            # Collect ALL user-added events for this month from override
+            # (not limited to _items dates — events can span outside plan range)
+            import calendar as _cal
             user_events: list[dict] = []
             override = st.session_state.get("daily_override_events", {})
-            for _item in _items:
-                d_str = _item["date"]
+            
+            # Scan every day of this month in override
+            _, last_day = _cal.monthrange(year, month)
+            for day_n in range(1, last_day + 1):
+                d_str = date(year, month, day_n).strftime("%Y-%m-%d")
                 for ev_idx, e in enumerate(override.get(d_str, [])):
                     if e.get("show_on_calendar", True):
                         user_events.append({"date": d_str, "event": e, "ev_idx": ev_idx})
@@ -427,7 +386,8 @@ def render_monthly_plan_page() -> None:
                 # Sort by date
                 user_events.sort(key=lambda x: x["date"])
                 
-                # Group same title+emoji+color+start+end across consecutive dates
+                # Group same title+emoji+color+start+end across ALL dates (not limited to this month)
+                # Collect all dates for each unique event key across the entire override dict
                 grouped_ev: dict = {}
                 for me in user_events:
                     ev = me["event"]
@@ -440,13 +400,28 @@ def render_monthly_plan_page() -> None:
                     )
                     grouped_ev.setdefault(key, []).append((me["date"], me["ev_idx"]))
 
+                # For display, compute the FULL date range across all override entries
                 for key, date_items in grouped_ev.items():
                     ev_title, ev_emoji, ev_color, ev_start, ev_end = key
+                    # Collect all dates across whole override for this event key
+                    all_dates_for_key = []
+                    for d_str2, ev_list2 in override.items():
+                        for e2 in ev_list2:
+                            k2 = (
+                                e2.get("title", ""),
+                                e2.get("emoji", "📌"),
+                                e2.get("display_color", e2.get("color", "#4f84ff")),
+                                e2.get("start", "00:00"),
+                                e2.get("end", "23:59")
+                            )
+                            if k2 == key and d_str2 not in all_dates_for_key:
+                                all_dates_for_key.append(d_str2)
+                    
                     dates = [item[0] for item in date_items]
                     first_date = date_items[0][0]
                     first_idx = date_items[0][1]
                     
-                    date_str_formatted = _format_date_list(dates)
+                    date_str_formatted = _format_date_list(all_dates_for_key)
                     
                     col_color, col_btn = st.columns([1, 20])
                     with col_color:
@@ -469,15 +444,13 @@ def render_monthly_plan_page() -> None:
                                 detail = parts[1].strip()
                                 if detail not in progress.setdefault(subj, []):
                                     progress[subj].append(detail)
-                            else:
-                                if task not in progress.setdefault("其他", []):
-                                    progress["其他"].append(task)
+                            # tasks without " - " separator are silently skipped
                                 
                 if progress:
                     for subj, details in progress.items():
-                        st.markdown(f"**{subj}**")
+                        st.markdown(f"<div style='font-size:15px; font-weight:bold; margin-top:6px; margin-bottom:2px;'>{subj}</div>", unsafe_allow_html=True)
                         for d in details:
-                            st.markdown(f"<div style='font-size:12px; margin-left:10px; margin-bottom:4px;'>• {d}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size:14px; margin-left:10px; margin-bottom:4px;'>• {d}</div>", unsafe_allow_html=True)
                 else:
                     st.write("本月無學習進度")
         
