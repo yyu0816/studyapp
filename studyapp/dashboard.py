@@ -56,9 +56,21 @@ def get_subject_ranking() -> list[dict]:
     ranking.sort(key=lambda x: x["progress"], reverse=True)
     return ranking[:3] # Max 3 items
 
-def get_mock_mood_history() -> list[int]:
-    """Generate 30 days of mock mood data (1-5 scale, 0 for missing data)."""
-    return [random.choice([0, 1, 2, 3, 4, 5]) for _ in range(30)]
+def get_mock_mood_history(month_offset=0):
+    """Generate 30 days of mock mood data with state persistence."""
+    if 'dashboard_mood_data' not in st.session_state:
+        st.session_state.dashboard_mood_data = {}
+        
+    if month_offset not in st.session_state.dashboard_mood_data:
+        st.session_state.dashboard_mood_data[month_offset] = [random.choice([0, 1, 2, 3, 4, 5]) for _ in range(30)]
+        
+    today = date.today()
+    month = today.month + month_offset - 1
+    year = today.year + month // 12
+    month = month % 12 + 1
+    month_str = f"{year}年{month}月"
+    
+    return st.session_state.dashboard_mood_data[month_offset], month_str
 
 def get_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str, margin_bottom="20px"):
     """Render a vibrant custom progress bar."""
@@ -80,10 +92,13 @@ def render_dashboard():
     if 'dashboard_week_offset' not in st.session_state:
         st.session_state.dashboard_week_offset = 0
         
+    if 'dashboard_month_offset' not in st.session_state:
+        st.session_state.dashboard_month_offset = 0
+        
     # Generate mock data
     df_weekly, start_week, end_week = get_mock_weekly_study_duration(st.session_state.dashboard_week_offset)
     subject_rankings = get_subject_ranking()
-    mood_history = get_mock_mood_history()
+    mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
     
     # Main Layout: Left 1/3, Right 2/3
     col_left, col_right = st.columns([1, 2], gap="large")
@@ -93,9 +108,7 @@ def render_dashboard():
         # --- Left Top (1/3 height visually) ---
         st.markdown("#### 🎯 總體進度")
         
-        right_box_width = 32 + len(subject_rankings) * 100 + max(0, len(subject_rankings) - 1) * 16 if subject_rankings else 364
-        
-        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: {right_box_width}px; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
+        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
     {get_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef", margin_bottom="20px")}
     {get_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
 </div>"""
@@ -106,7 +119,7 @@ def render_dashboard():
         with st.container(border=True):
             # Create Altair Line Chart
             chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
-                x=alt.X('date:T', title='日期', axis=alt.Axis(format='%m/%d', tickCount=7)),
+                x=alt.X('date:O', title='日期', axis=alt.Axis(labelAngle=-45)),
                 y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
                 tooltip=[
                     alt.Tooltip('date:T', title='日期', format='%Y-%m-%d'),
@@ -150,7 +163,7 @@ def render_dashboard():
         if not subject_rankings:
             st.info("目前尚無科目資料。")
         else:
-            boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; height: 166px; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px; box-sizing: border-box;">'
+            boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; height: 166px; display: flex; align-items: center; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px; box-sizing: border-box;">'
             for subj_data in subject_rankings:
                 boxes_html += f"""<div style="width: 100px; height: 100px; flex-shrink: 0; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33; box-sizing: border-box;">
     <h4 style="margin: 0 0 4px 0; color: #555; font-size: 14px;">{subj_data['name']}</h4>
@@ -189,10 +202,21 @@ def render_dashboard():
 <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
 </div>"""
 
-        container_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content;">
-<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>
-{circles_html}
-{legend_html}
-</div>"""
-        
-        st.markdown(container_html, unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
+            st.markdown(circles_html, unsafe_allow_html=True)
+            st.markdown(legend_html, unsafe_allow_html=True)
+            
+            # Month Navigation
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+            with nav_col1:
+                if st.button("◀", key="dash_prev_month", use_container_width=True):
+                    st.session_state.dashboard_month_offset -= 1
+                    st.rerun()
+            with nav_col2:
+                st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{month_str}</div>", unsafe_allow_html=True)
+            with nav_col3:
+                disabled_next_month = st.session_state.dashboard_month_offset >= 0
+                if st.button("▶", key="dash_next_month", disabled=disabled_next_month, use_container_width=True):
+                    st.session_state.dashboard_month_offset += 1
+                    st.rerun()
