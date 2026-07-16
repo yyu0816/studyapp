@@ -52,8 +52,8 @@ def get_subject_ranking() -> list[dict]:
     return ranking[:3] # Max 3 items
 
 def get_mock_mood_history() -> list[int]:
-    """Generate 30 days of mock mood data (1-5 scale)."""
-    return [random.randint(1, 5) for _ in range(30)]
+    """Generate 30 days of mock mood data (1-5 scale, 0 for missing data)."""
+    return [random.choice([0, 1, 2, 3, 4, 5]) for _ in range(30)]
 
 def render_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str):
     """Render a vibrant custom progress bar."""
@@ -91,8 +91,6 @@ def render_dashboard():
             render_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef")
             render_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb")
             st.markdown("</div>", unsafe_allow_html=True)
-            
-        st.markdown("<br/>", unsafe_allow_html=True)
         
         # --- Left Bottom (2/3 height visually) ---
         st.markdown("#### 📈 一周讀書時長")
@@ -132,14 +130,12 @@ def render_dashboard():
             else:
                 boxes_html = '<div style="display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap;">'
                 for subj_data in subject_rankings:
-                    boxes_html += f"""<div style="width: 140px; height: 140px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
+                    boxes_html += f"""<div style="flex: 1; aspect-ratio: 1/1; min-width: 90px; max-width: 120px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
     <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
     <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
 </div>"""
                 boxes_html += '</div>'
                 st.markdown(boxes_html, unsafe_allow_html=True)
-                        
-        st.markdown("<br/>", unsafe_allow_html=True)
 
         # --- Right Bottom (2/3 height visually) ---
         st.markdown("#### 🌈 心情與動力波動")
@@ -169,6 +165,7 @@ def render_dashboard():
             
             # Legend
             legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
+    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>
     <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
     <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
     <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
