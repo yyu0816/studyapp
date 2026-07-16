@@ -101,8 +101,8 @@ def render_dashboard():
     subject_rankings = get_subject_ranking()
     mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
     
-    # Main Layout: 50/50 to equalize left and right container widths
-    col_left, col_right = st.columns(2, gap="large")
+    # Main Layout: Left 1/3, Right 2/3
+    col_left, col_right = st.columns([1, 2], gap="large")
     
     # ================== LEFT COLUMN (1/3) ==================
     with col_left:
@@ -184,40 +184,45 @@ def render_dashboard():
             4: "#55efc4", # Light Green
             5: "#00b894"  # Dark Green
         }
+        # Split the 2/3 right column into two halves. 
+        # The first half (1/3 of total) will exactly match the left column's width.
+        col_mood, _ = st.columns(2)
         
-        circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px 0;">'
-        for idx, score in enumerate(mood_history):
-            color = mood_colors.get(score, "#dfe6e9")
-            label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
-            circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+        with col_mood:
+            with st.container(border=True):
+                st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
+                
+                circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px 0;">'
+                for idx, score in enumerate(mood_history):
+                    color = mood_colors.get(score, "#dfe6e9")
+                    label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
+                    circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
 <span style="font-size: 10px; color: #888; height: 14px; line-height: 14px;">{label}</span>
 <div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
 </div>"""
-        circles_html += '</div>'
-        
-        # Legend
-        legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
+                circles_html += '</div>'
+                
+                st.markdown(circles_html, unsafe_allow_html=True)
+                
+                # Legend
+                legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
 <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>
 <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
 <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
 <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
 </div>"""
-
-        with st.container(border=True):
-            st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
-            st.markdown(circles_html, unsafe_allow_html=True)
-            st.markdown(legend_html, unsafe_allow_html=True)
-            
-            # Month Navigation
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
-            with nav_col1:
-                if st.button("◀", key="dash_prev_month", use_container_width=True):
-                    st.session_state.dashboard_month_offset -= 1
-                    st.rerun()
-            with nav_col2:
-                st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{month_str}</div>", unsafe_allow_html=True)
-            with nav_col3:
-                disabled_next_month = st.session_state.dashboard_month_offset >= 0
-                if st.button("▶", key="dash_next_month", disabled=disabled_next_month, use_container_width=True):
-                    st.session_state.dashboard_month_offset += 1
-                    st.rerun()
+                st.markdown(legend_html, unsafe_allow_html=True)
+                
+                # Month Navigation
+                nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+                with nav_col1:
+                    if st.button("◀", key="dash_prev_month", use_container_width=True):
+                        st.session_state.dashboard_month_offset -= 1
+                        st.rerun()
+                with nav_col2:
+                    st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{month_str}</div>", unsafe_allow_html=True)
+                with nav_col3:
+                    disabled_next_month = st.session_state.dashboard_month_offset >= 0
+                    if st.button("▶", key="dash_next_month", disabled=disabled_next_month, use_container_width=True):
+                        st.session_state.dashboard_month_offset += 1
+                        st.rerun()
