@@ -121,45 +121,45 @@ def render_dashboard():
         with col_study:
             st.markdown("#### 📈 一周讀書時長")
             with st.container(border=True):
-            # Create Altair Line Chart
-            chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
-                x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
-                y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
-                tooltip=[
-                    alt.Tooltip('date:N', title='日期'),
-                    alt.Tooltip('duration_str:N', title='讀書時長')
-                ]
-            ).properties(
-                height=300
-            ).configure_axis(
-                grid=True,
-                gridColor="#f0f0f0",
-                domain=False
-            ).configure_view(
-                strokeWidth=0
-            ).configure_point(
-                color="#4f84ff"
-            ).configure_line(
-                color="#4f84ff",
-                strokeWidth=3
-            )
-            
-            st.altair_chart(chart, use_container_width=True)
-            
-            # Week Navigation
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
-            with nav_col1:
-                if st.button("◀", key="dash_prev_week", use_container_width=True):
-                    st.session_state.dashboard_week_offset -= 1
-                    st.rerun()
-            with nav_col2:
-                st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{start_week.strftime('%Y/%m/%d')} ~ {end_week.strftime('%Y/%m/%d')}</div>", unsafe_allow_html=True)
-            with nav_col3:
-                disabled_next = st.session_state.dashboard_week_offset >= 0
-                if st.button("▶", key="dash_next_week", disabled=disabled_next, use_container_width=True):
-                    st.session_state.dashboard_week_offset += 1
-                    st.rerun()
-
+                # Create Altair Line Chart
+                chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
+                    x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
+                    tooltip=[
+                        alt.Tooltip('date:N', title='日期'),
+                        alt.Tooltip('duration_str:N', title='讀書時長')
+                    ]
+                ).properties(
+                    height=300
+                ).configure_axis(
+                    grid=True,
+                    gridColor="#f0f0f0",
+                    domain=False
+                ).configure_view(
+                    strokeWidth=0
+                ).configure_point(
+                    color="#4f84ff"
+                ).configure_line(
+                    color="#4f84ff",
+                    strokeWidth=3
+                )
+                
+                st.altair_chart(chart, use_container_width=True)
+                
+                # Week Navigation
+                nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+                with nav_col1:
+                    if st.button("◀", key="dash_prev_week", use_container_width=True):
+                        st.session_state.dashboard_week_offset -= 1
+                        st.rerun()
+                with nav_col2:
+                    st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{start_week.strftime('%Y/%m/%d')} ~ {end_week.strftime('%Y/%m/%d')}</div>", unsafe_allow_html=True)
+                with nav_col3:
+                    disabled_next = st.session_state.dashboard_week_offset >= 0
+                    if st.button("▶", key="dash_next_week", disabled=disabled_next, use_container_width=True):
+                        st.session_state.dashboard_week_offset += 1
+                        st.rerun()
+    
     # ================== RIGHT COLUMN (2/3) ==================
     with col_right:
         # --- Right Top (1/3 height visually) ---
