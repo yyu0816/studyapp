@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 import streamlit as st
+import dashboard
 
 # 【關鍵修改】確保在任何程式碼執行前，session_state 已經準備好了
 if "app_state" not in st.session_state:
@@ -697,26 +698,10 @@ def render_setup_page() -> None:
 
 
 def render_dashboard_page() -> None:
-    st.subheader("Dashboard")
-    if not st.session_state.get("plan"):
-        st.info("目前尚未建立讀書計畫，請先到計劃頁面完成初始設定。")
+    if not st.session_state.get('plan'):
+        st.info('目前尚未建立讀書計畫，請先到計畫頁面完成初始設定。')
         return
-    plan = st.session_state["plan"]
-    st.markdown(f"### {st.session_state.get('plan_name', plan.get('plan_name', '未命名計畫'))}")
-    st.write(st.session_state.get("plan_goal", plan.get("plan_goal", "尚未設定計畫目標。")))
-    st.markdown("---")
-    st.write(f"**開始日期**：{plan.get('start_date', '未填')}")
-    st.write(f"**結束日期**：{plan.get('end_date', '未填')}")
-    st.write(f"**每天偏好的科目數量**：{plan.get('preferred_subject_count', '無偏好')}")
-    st.write(f"**科目數量**：{len(plan.get('subjects', []))}")
-    st.write(f"**固定行程數量**：{len(plan.get('fixed_events', []))}")
-    if st.session_state.get("monthly_plan"):
-        st.write(f"**已產生天數**：{len(st.session_state['monthly_plan'])}")
-    if st.session_state.get("daily_log"):
-        st.markdown("### 最新每日打卡")
-        st.write(st.session_state["daily_log"].get("daily_progress", ""))
-        st.write(f"心情：{st.session_state['daily_log'].get('mood', '')}")
-        st.write(f"建議：{st.session_state['daily_log'].get('recommendation', '')}")
+    dashboard.render_dashboard()
 
 
 def render_home_page() -> None:
