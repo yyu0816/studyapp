@@ -153,6 +153,24 @@ def render_daily_checkin_page() -> None:
         e_copy["_override_idx"] = o_idx
         today_events.append(e_copy)
 
+    # 3. Study Sessions
+    app_state_monthly = st.session_state.get("app_state", {}).get("monthly_plan") or []
+    today_study_sessions = [s for s in app_state_monthly if s.get("date") == today_str]
+    for s_idx, s in enumerate(today_study_sessions):
+        if "start_time" in s and "end_time" in s:
+            today_events.append({
+                "title": f"讀書: {s.get('科目', '')} ({s.get('教材', '')})",
+                "start": s["start_time"],
+                "end": s["end_time"],
+                "emoji": "📖",
+                "color": s.get("color", "#4f84ff"),
+                "display_color": s.get("color", "#4f84ff"),
+                "show_on_calendar": True,
+                "concurrent_with_study": False,
+                "_is_study_session": True,
+                "_study_idx": s_idx
+            })
+
     today_events.sort(key=lambda x: x.get("start", ""))
 
     col_timeline, col_main = st.columns([1, 2], gap="large")
@@ -359,14 +377,27 @@ def render_daily_checkin_page() -> None:
         with row1_col2:
             st.markdown("#### 📖 今日讀書進度")
             with st.container(border=True):
-                monthly_plan = st.session_state.get("monthly_plan", [])
-                today_plan = next(
-                    (item for item in monthly_plan if item.get("date") == today_str), None
-                )
-
+                # Group tasks by Subject and Material
+                grouped_tasks = {}
+                for s in today_study_sessions:
+                    subj = s.get("科目", "")
+                    mat = s.get("教材", "")
+                    prog_str = s.get("目標進度", "0")
+                    key = f"{subj} - {mat}"
+                    
+                    try:
+                        qty = float(prog_str.split(" ")[0])
+                        unit = prog_str.split(" ")[1] if " " in prog_str else ""
+                        grouped_tasks.setdefault(key, {"qty": 0.0, "unit": unit})
+                        grouped_tasks[key]["qty"] += qty
+                    except:
+                        pass
+                
                 tasks: list[str] = []
-                if today_plan and today_plan.get("tasks"):
-                    tasks.extend(today_plan.get("tasks"))
+                for k, v in grouped_tasks.items():
+                    qty_str = f"{int(v['qty'])}" if v["qty"].is_integer() else f"{v['qty']:.1f}"
+                    tasks.append(f"{k}：{qty_str} {v['unit']}")
+                    
                 tasks.extend(daily_tasks_overrides)
 
                 if tasks:

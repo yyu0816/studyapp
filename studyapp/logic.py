@@ -406,11 +406,20 @@ def calculate_daily_available_sessions(current_date, plan):
                     
     blocking_intervals = merge_intervals(blocking_intervals)
     
-    total_blocked_minutes = sum(b_end - b_start for b_start, b_end in blocking_intervals)
+    # Calculate exact free sessions matching get_daily_free_slots
+    total_sessions = 0
+    current_m = 0
+    for b_start, b_end in blocking_intervals:
+        if b_start > current_m:
+            free_duration = b_start - current_m
+            total_sessions += (free_duration + 10) // 70
+        current_m = max(current_m, b_end)
         
-    free_minutes = 1440 - total_blocked_minutes
-    free_hours = free_minutes / 60.0
-    return round(free_hours, 1)
+    if 1440 > current_m:
+        free_duration = 1440 - current_m
+        total_sessions += (free_duration + 10) // 70
+        
+    return float(total_sessions)
 
 def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
     is_weekend = current_date.weekday() >= 5
@@ -455,22 +464,22 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
                     
     blocking_intervals = merge_intervals(blocking_intervals)
     
-    # Extract free 60-minute slots
+    # Extract 60-minute slots with 10-minute breaks
     slots = []
     current_m = 0
     for b_start, b_end in blocking_intervals:
         if b_start > current_m:
             free_duration = b_start - current_m
-            num_slots = free_duration // 60
+            num_slots = (free_duration + 10) // 70
             for i in range(num_slots):
-                slots.append((current_m + i * 60, current_m + (i + 1) * 60))
+                slots.append((current_m + i * 70, current_m + i * 70 + 60))
         current_m = max(current_m, b_end)
         
     if 1440 > current_m:
         free_duration = 1440 - current_m
-        num_slots = free_duration // 60
+        num_slots = (free_duration + 10) // 70
         for i in range(num_slots):
-            slots.append((current_m + i * 60, current_m + (i + 1) * 60))
+            slots.append((current_m + i * 70, current_m + i * 70 + 60))
             
     return slots
 
