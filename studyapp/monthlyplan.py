@@ -5,7 +5,7 @@ from typing import Any
 
 import streamlit as st
 from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
-from logic import calculate_daily_available_sessions, _parse_date
+from logic import calculate_daily_available_sessions
 from color_picker_component import native_color_picker
 import logic
 
