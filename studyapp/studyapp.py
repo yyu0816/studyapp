@@ -788,13 +788,34 @@ def render_home_page() -> None:
                             target = item.get("目標進度", "")
                             color = item.get("color", "#4f84ff")
                             
-                            if subj not in grouped_progress:
-                                grouped_progress[subj] = {"color": color, "items": []}
+                            key = f"{subj} - {mat}"
+                            if key not in grouped_progress:
+                                grouped_progress[key] = {"subj": subj, "mat": mat, "color": color, "qty": 0.0, "unit": ""}
                                 
-                            display_text = f"{mat}：{target}" if mat and mat != "-" else target
-                            grouped_progress[subj]["items"].append(display_text)
+                            try:
+                                qty = float(target.split(" ")[0])
+                                unit = target.split(" ")[1] if " " in target else ""
+                                grouped_progress[key]["qty"] += qty
+                                grouped_progress[key]["unit"] = unit
+                            except:
+                                pass
+                                
+                        # Render grouped progress
+                        subj_render = {}
+                        for key, data in grouped_progress.items():
+                            subj = data["subj"]
+                            mat = data["mat"]
+                            color = data["color"]
+                            qty = data["qty"]
+                            unit = data["unit"]
+                            qty_str = f"{int(qty)}" if qty.is_integer() else f"{qty:.1f}"
+                            display_text = f"{mat}：{qty_str} {unit}" if mat and mat != "-" else f"{qty_str} {unit}"
                             
-                        for subj, data in grouped_progress.items():
+                            if subj not in subj_render:
+                                subj_render[subj] = {"color": color, "items": []}
+                            subj_render[subj]["items"].append(display_text)
+                            
+                        for subj, data in subj_render.items():
                             color = data["color"]
                             items_html = "<br/>".join([f"• {text}" for text in data["items"]])
                             st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{subj}</b><br/>{items_html}</div>", unsafe_allow_html=True)
