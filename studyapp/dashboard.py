@@ -134,7 +134,7 @@ def render_dashboard():
                 for idx, subj_data in enumerate(subject_rankings):
                     with rank_cols[idx]:
                         # Square box using HTML aspect-ratio
-                        box_html = f"""<div style="aspect-ratio: 1/1; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
+                        box_html = f"""<div style="height: 140px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
     <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
     <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
 </div>"""
