@@ -135,7 +135,7 @@ def render_dashboard():
         col_study = st.columns(1)[0]
         with col_study:
             st.markdown("#### 📈 一周讀書時長")
-            with st.container(border=True):
+            with st.container(border=True, height=420):
                 # Create Altair Line Chart
                 chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
                     x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
@@ -192,7 +192,6 @@ def render_dashboard():
             st.markdown(boxes_html, unsafe_allow_html=True)
 
         # --- Right Bottom (2/3 height visually) ---
-        st.markdown("#### 🌈 心情與動力波動")
         
         # Define colors for mood scores 1-5 (1: Terrible, 5: Excellent)
         mood_colors = {
@@ -214,7 +213,8 @@ def render_dashboard():
         col_mood, _ = st.columns(2)
         
         with col_mood:
-            with st.container(border=True):
+            st.markdown("#### 🌈 心情與動力波動")
+            with st.container(border=True, height=420):
                 st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
                 
                 circles_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; padding: 5px 0;">'
