@@ -474,8 +474,13 @@ def render_setup_page() -> None:
             with sc2:
                 if f"subject_color_{idx}" not in st.session_state:
                     st.session_state[f"subject_color_{idx}"] = subject.get("color", "#4f84ff")
+                    
+                def _update_subj_color(i=idx):
+                    st.session_state[f"subject_color_{i}"] = st.session_state[f"subj_hex_in_{i}"]
+                    
                 color_val = st.color_picker("科目代表色", key=f"subject_color_{idx}")
-                st.session_state["subjects"][idx]["color"] = color_val
+                st.text_input("或輸入色號", value=color_val, key=f"subj_hex_in_{idx}", on_change=_update_subj_color, kwargs={"i": idx})
+                st.session_state["subjects"][idx]["color"] = st.session_state[f"subject_color_{idx}"]
 
             materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1}])
             for mid, material in enumerate(materials):
