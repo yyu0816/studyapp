@@ -6,7 +6,6 @@ from typing import Any
 import streamlit as st
 from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
 from logic import calculate_daily_available_sessions
-from color_picker_component import native_color_picker
 import logic
 
 def _sync_hex_to_cp(hex_key: str, cp_key: str):
@@ -107,11 +106,7 @@ def add_event_dialog(day_str: str):
         with c1:
             if "add_dlg_cp" not in st.session_state:
                 st.session_state["add_dlg_cp"] = preset_color
-            
-            picked_color = native_color_picker("顏色", default_color=st.session_state["add_dlg_cp"], key="add_dlg_cp")
-            if picked_color != st.session_state["add_dlg_cp"]:
-                st.session_state["add_dlg_cp"] = picked_color
-                
+            picked_color = st.color_picker("顏色", key="add_dlg_cp", label_visibility="collapsed")
         with c2:
             hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("add_dlg_hex", "add_dlg_cp"))
             
@@ -229,11 +224,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         with c1:
             if "edit_dlg_cp" not in st.session_state:
                 st.session_state["edit_dlg_cp"] = cur_color
-                
-            picked_color = native_color_picker("顏色", default_color=st.session_state["edit_dlg_cp"], key="edit_dlg_cp")
-            if picked_color != st.session_state["edit_dlg_cp"]:
-                st.session_state["edit_dlg_cp"] = picked_color
-                
+            picked_color = st.color_picker("顏色", key="edit_dlg_cp", label_visibility="collapsed")
         with c2:
             hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("edit_dlg_hex", "edit_dlg_cp"))
             
