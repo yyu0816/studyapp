@@ -103,7 +103,12 @@ def render_daily_checkin_page() -> None:
 
     with col_r:
         free_sessions = logic.calculate_daily_available_sessions(today, plan)
-        st.metric("今日可安排讀書時間", f"{free_sessions} 小時")
+        st.markdown(f"""
+        <div style="text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 10px; background-color: #fafafa;">
+            <p style="font-size: 14px; color: #666; margin-bottom: 4px;">今日可安排讀書時間</p>
+            <p style="font-size: 20px; font-weight: bold; color: #333; margin: 0;">{free_sessions} 小時</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     fixed_events = plan.get("fixed_events", [])
 

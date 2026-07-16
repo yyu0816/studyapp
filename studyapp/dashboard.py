@@ -92,15 +92,11 @@ def render_dashboard():
     
     st.markdown("""
     <style>
-    /* Force both bottom bordered containers to have the exact same height and align their buttons to the bottom */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        height: 420px !important;
-    }
-    div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
-        height: 100% !important;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+    /* Safely target ONLY the bottom containers in dashboard columns to fix their width to 364px (equal to 3 leaderboard boxes) and height */
+    div[data-testid="column"]:nth-of-type(1) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="column"]:nth-of-type(2) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"] {
+        max-width: 364px !important;
+        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -124,7 +120,7 @@ def render_dashboard():
         # --- Left Top (1/3 height visually) ---
         st.markdown("#### 🎯 總體進度")
         
-        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
+        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; max-width: 364px; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
     {get_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef", margin_bottom="20px")}
     {get_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
 </div>"""
@@ -138,7 +134,7 @@ def render_dashboard():
             with st.container(border=True, height=420):
                 # Create Altair Line Chart
                 chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
-                    x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
+                    x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=-45, labelOverlap=False)),
                     y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
                     tooltip=[
                         alt.Tooltip('date:N', title='日期'),
