@@ -17,7 +17,7 @@ st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layo
 
 # 3. 再來才是 import 你的頁面函式
 from monthlyplan import render_monthly_plan_page
-from dailycheck import render_daily_check_page, get_adjustment_message
+from dailycheck import render_daily_checkin_page, get_adjustment_message
 from datetime import date, datetime, timedelta
 from timeline_utils import render_timeline
 
