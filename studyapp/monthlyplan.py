@@ -503,7 +503,7 @@ def render_monthly_plan_page() -> None:
                     
             st.markdown("#### 📖 月進度")
             with st.container(border=True):
-                schedule_data = st.session_state.get("app_state", {}).get("monthly_plan", [])
+                schedule_data = st.session_state.get("app_state", {}).get("monthly_plan") or []
                 prefix = f"{year}-{month:02d}-"
                 month_schedules = [s for s in schedule_data if s.get("date", "").startswith(prefix)]
                 
