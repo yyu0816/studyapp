@@ -378,9 +378,7 @@ def calculate_daily_available_sessions(current_date, plan):
     
     # 1. Sleep
     if sleep_m <= wake_m:
-        blocking_intervals.append((0, wake_m))
-        if sleep_m > 0:
-            blocking_intervals.append((sleep_m, 1440))
+        blocking_intervals.append((sleep_m, wake_m))
     else:
         blocking_intervals.append((0, wake_m))
         blocking_intervals.append((sleep_m, 1440))
@@ -429,9 +427,7 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
     
     # 1. Sleep
     if sleep_m <= wake_m:
-        blocking_intervals.append((0, wake_m))
-        if sleep_m > 0:
-            blocking_intervals.append((sleep_m, 1440))
+        blocking_intervals.append((sleep_m, wake_m))
     else:
         blocking_intervals.append((0, wake_m))
         blocking_intervals.append((sleep_m, 1440))
