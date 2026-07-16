@@ -605,6 +605,26 @@ def render_setup_page() -> None:
         if end_date < start_date:
             st.error("結束日期不能早於開始日期。")
             return
+            
+        import logic
+        for wake, sleep, day_type in [(weekday_wake, weekday_sleep, "平日"), (weekend_wake, weekend_sleep, "假日")]:
+            wake_m = logic.get_minutes(wake)
+            sleep_m = logic.get_minutes(sleep)
+            
+            prep_start_m = logic.get_minutes(prep_start)
+            if prep_start_m < wake_m:
+                st.error(f"「早上準備/早餐」開始時間 ({prep_start}) 不能早於{day_type}起床時間 ({wake})。")
+                return
+                
+            dinner_end_m = logic.get_minutes(dinner_end)
+            if sleep_m > wake_m and dinner_end_m > sleep_m:
+                st.error(f"「晚餐」結束時間 ({dinner_end}) 不能晚於{day_type}睡覺時間 ({sleep})。")
+                return
+                
+            bath_end_m = logic.get_minutes(bath_end)
+            if sleep_m > wake_m and bath_end_m > sleep_m:
+                st.error(f"「洗澡」結束時間 ({bath_end}) 不能晚於{day_type}睡覺時間 ({sleep})。")
+                return
         payload = {
             "plan_name": st.session_state.get("plan_name", ""),
             "plan_goal": st.session_state.get("plan_goal", ""),
@@ -692,6 +712,24 @@ def render_home_page() -> None:
             if st.button(opt, use_container_width=True, key=f"sidebar_main_menu_{i}_{opt}"):
                 st.session_state["main_page"] = opt
             st.markdown('</div>', unsafe_allow_html=True)
+            
+    cal_view_date = st.session_state.get("cal_view_date")
+    if cal_view_date:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown(f"### 📅 {cal_view_date} 讀書進度")
+        schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
+        if not schedule_data:
+            st.sidebar.info("尚未生成排程計畫")
+        else:
+            daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
+            if not daily_schedule:
+                st.sidebar.write("這天沒有排定進度或為非學習日。")
+            else:
+                st.sidebar.dataframe(daily_schedule, use_container_width=True)
+        
+        if st.sidebar.button("關閉", key="close_sidebar_daily_view", use_container_width=True):
+            st.session_state["cal_view_date"] = None
+            st.rerun()
 
     page = st.session_state["main_page"]
 

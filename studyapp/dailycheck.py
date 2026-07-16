@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 from datetime import date, timedelta
 import streamlit as st
+import logic
 
 # Full shared emoji library — kept in sync with studyapp.py EMOJI_OPTIONS
 EMOJI_OPTIONS = [
@@ -108,6 +109,10 @@ def render_daily_checkin_page() -> None:
                 if st.button("▶", key="next_day", use_container_width=True):
                     st.session_state["view_date"] += timedelta(days=1)
                     st.rerun()
+
+    with col_r:
+        free_sessions = logic.calculate_daily_available_sessions(today_date, plan)
+        st.metric("今日可安排讀書時間", f"{free_sessions} 小時")
 
     fixed_events = plan.get("fixed_events", [])
 
