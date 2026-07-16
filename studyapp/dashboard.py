@@ -90,6 +90,21 @@ def render_dashboard():
     
     st.markdown("## 📊 儀表板 (Dashboard)")
     
+    st.markdown("""
+    <style>
+    /* Force both bottom bordered containers to have the exact same height and align their buttons to the bottom */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        height: 420px !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
+        height: 100% !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     if 'dashboard_week_offset' not in st.session_state:
         st.session_state.dashboard_week_offset = 0
         
@@ -130,7 +145,7 @@ def render_dashboard():
                         alt.Tooltip('duration_str:N', title='讀書時長')
                     ]
                 ).properties(
-                    height=300
+                    height=240
                 ).configure_axis(
                     grid=True,
                     gridColor="#f0f0f0",
