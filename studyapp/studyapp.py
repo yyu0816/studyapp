@@ -81,6 +81,7 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
             if subject.get("name") or materials:
                 subjects.append({
                     "name": str(subject.get("name", "") or "").strip(),
+                    "color": str(subject.get("color", "#4f84ff") or "#4f84ff"),
                     "materials": materials,
                     "weekdays": list(subject.get("weekdays", []) or []),
                 })
