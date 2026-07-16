@@ -457,22 +457,21 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
     UNIT_MAP = {"課本": "頁", "教材": "頁", "筆記": "頁", "練習題": "回", "模擬考": "回", "教學影片": "小時"}
     subject_progress = []
     for subject in subjects_data:
-        name = subject.get("name", "未命名科目")
+        subj_name = subject.get("name", "未命名科目")
         materials = subject.get("materials", [])
-        # Group by unit so each material type keeps its own unit
-        qty_by_unit: dict = {}
         for mat in materials:
             mat_type = mat.get("type", "其他")
+            mat_name = mat.get("name", "未命名教材")
+            qty = mat.get("quantity", 0)
             unit = UNIT_MAP.get(mat_type, "項")
-            qty_by_unit[unit] = qty_by_unit.get(unit, 0) + mat.get("quantity", 0)
-        
-        for unit, total_qty in qty_by_unit.items():
-            if total_qty > 0:
+            if qty > 0:
                 subject_progress.append({
-                    "name": name,
-                    "total_qty": total_qty,
+                    "subject": subj_name,
+                    "material": mat_name,
+                    "name": subj_name,  # Keep the original name field for consecutive checking
+                    "total_qty": qty,
                     "unit": unit,
-                    "remaining_qty": total_qty
+                    "remaining_qty": qty
                 })
 
     num_subjects = len(subject_progress)
@@ -530,7 +529,8 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                 "第幾天": f"Day {day_idx + 1}",
                 "屬性": "學習日",
                 "學習區塊": f"第 {session_idx} 節 (1小時)",
-                "科目": chosen_sp["name"],
+                "科目": chosen_sp["subject"],
+                "教材": chosen_sp["material"],
                 "目標進度": progress_str
             })
 
@@ -559,6 +559,7 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                 "屬性": "緩衝/總複習日",
                 "學習區塊": f"第 {session_idx} 節 (1小時)",
                 "科目": "總複習 (自由安排)",
+                "教材": "-",
                 "目標進度": "0 單位 (僅複習)"
             })
 

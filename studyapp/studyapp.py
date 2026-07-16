@@ -650,6 +650,12 @@ def render_setup_page() -> None:
         }
         plan_data, daily_data = collect_plan_and_daily_data(payload)
         st.session_state["plan"] = plan_data
+        
+        # 1. Generate monthly plan schedule automatically
+        import logic
+        schedule_result = logic.generate_daily_schedule(plan_data)
+        st.session_state.setdefault("app_state", {})["monthly_plan"] = schedule_result
+        
         st.session_state["monthly_plan"] = build_monthly_plan(plan_data)
         st.session_state["main_page"] = "月計畫"
         st.success("初始設定已完成，月計畫已建立。")
@@ -749,9 +755,16 @@ def render_home_page() -> None:
                             attr = item.get("屬性", "")
                             block = item.get("學習區塊", "")
                             subj = item.get("科目", "")
+                            mat = item.get("教材", "")
                             target = item.get("目標進度", "")
                             color = "#4f84ff" if attr == "學習日" else "#ff9f43"
-                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{block}</b><br/>{subj}：{target}</div>", unsafe_allow_html=True)
+                            
+                            if mat and mat != "-":
+                                display_text = f"{subj} - {mat}：{target}"
+                            else:
+                                display_text = f"{subj}：{target}"
+                                
+                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{block}</b><br/>{display_text}</div>", unsafe_allow_html=True)
                 if st.button("✕ 關閉", key="close_daily_view", use_container_width=True):
                     st.session_state["cal_view_date"] = None
                     st.rerun()

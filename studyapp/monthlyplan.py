@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import streamlit as st
-from dailycheck import EMOJI_OPTIONS, COLOR_OPTIONS
-from color_picker_component import native_color_picker
+from utils import COLOR_OPTIONS, EMOJI_OPTIONS
+from logic import calculate_daily_available_sessions
 import logic
 
 
@@ -96,11 +96,11 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        if "add_dlg_cp" not in st.session_state:
-            st.session_state["add_dlg_cp"] = preset_color
-        color = native_color_picker("選擇顏色", default_color=preset_color, key="add_dlg_cp")
+        color = st.color_picker("選擇顏色", value=preset_color, key="add_dlg_cp")
     else:
         color = preset_color
+
+    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=False)
 
     if st.button("儲存", use_container_width=True):
         if not title:
@@ -121,6 +121,7 @@ def add_event_dialog(day_str: str):
                 "title": title, "start": start_time, "end": end_time,
                 "emoji": emoji, "color": color, "display_color": color,
                 "is_all_day": is_all_day, "show_on_calendar": True,
+                "concurrent_with_study": concurrent_with_study,
             })
             cur += timedelta(days=1)
         st.rerun()
@@ -139,8 +140,10 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     title_orig = ev.get("title", "")
     emoji_orig = ev.get("emoji", "📌")
     color_orig = ev.get("display_color", ev.get("color", "#4f84ff"))
-    start_orig = ev.get("start", "00:00")
-    end_orig   = ev.get("end", "23:59")
+    is_all_day_orig = ev.get("is_all_day", True)
+    start_time_orig = ev.get("start", "00:00")
+    end_time_orig = ev.get("end", "23:59")
+    concurrent_orig = ev.get("concurrent_with_study", False)
     
     # Find all dates that have this exact event (for grouped editing)
     matching_dates = []
@@ -149,8 +152,8 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             if (e.get("title", "") == title_orig and 
                 e.get("emoji", "📌") == emoji_orig and 
                 e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
-                e.get("start", "00:00") == start_orig and
-                e.get("end", "23:59") == end_orig):
+                e.get("start", "00:00") == start_time_orig and
+                e.get("end", "23:59") == end_time_orig):
                 matching_dates.append(d_str)
                 break # only count the date once
 
@@ -176,33 +179,33 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     with col_d2:
         end_date = st.date_input("結束日期", key=_ed_key)
 
-    is_all_day = st.checkbox("整天", value=ev.get("is_all_day", True))
-    start_time, end_time = ev.get("start", "00:00"), ev.get("end", "23:59")
+    is_all_day = st.checkbox("整天", value=is_all_day_orig)
+    start_time, end_time = start_time_orig, end_time_orig
     if not is_all_day:
         col1, col2 = st.columns(2)
         with col1:
-            sv = st.time_input("開始時間")
+            sv = st.time_input("開始時間", value=datetime.strptime(start_time, "%H:%M").time())
             if sv: start_time = sv.strftime("%H:%M")
         with col2:
-            evt = st.time_input("結束時間")
+            evt = st.time_input("結束時間", value=datetime.strptime(end_time, "%H:%M").time())
             if evt: end_time = evt.strftime("%H:%M")
 
     emoji_idx = EMOJI_OPTIONS.index(ev.get("emoji", EMOJI_OPTIONS[0])) if ev.get("emoji") in EMOJI_OPTIONS else 0
     emoji = st.selectbox("表情符號", EMOJI_OPTIONS, index=emoji_idx)
-    # Find the current color's index in COLOR_OPTIONS
-    cur_color = ev.get("display_color", ev.get("color", "#4f84ff"))
+    cur_color = color_orig
+    is_custom = not any(o["value"] == cur_color for o in COLOR_OPTIONS if isinstance(o, dict))
     color_idx = next((i for i, o in enumerate(COLOR_OPTIONS) if isinstance(o, dict) and o["value"] == cur_color), 0)
     color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], index=color_idx)
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-    use_custom_color = st.checkbox("使用自訂顏色", value=False)
+    use_custom_color = st.checkbox("使用自訂顏色", value=bool(is_custom), key="edit_custom_color")
     if use_custom_color:
-        if "edit_dlg_cp" not in st.session_state:
-            st.session_state["edit_dlg_cp"] = cur_color
-        color = native_color_picker("選擇顏色", default_color=cur_color, key="edit_dlg_cp")
+        color = st.color_picker("選擇顏色", value=cur_color, key="edit_dlg_cp")
     else:
         color = preset_color
+
+    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=concurrent_orig, key="edit_concurrent")
 
     col_save, col_del = st.columns(2)
     with col_save:
@@ -217,8 +220,8 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                     e.get("title", "") == title_orig and 
                     e.get("emoji", "📌") == emoji_orig and 
                     e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
-                    e.get("start", "00:00") == start_orig and
-                    e.get("end", "23:59") == end_orig
+                    e.get("start", "00:00") == start_time_orig and
+                    e.get("end", "23:59") == end_time_orig
                 )]
                 
             # Re-insert across new date range
@@ -229,6 +232,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                     "title": title, "start": start_time, "end": end_time,
                     "emoji": emoji, "color": color, "display_color": color,
                     "is_all_day": is_all_day, "show_on_calendar": True,
+                    "concurrent_with_study": concurrent_with_study,
                 })
                 cur += timedelta(days=1)
             st.session_state.pop(_sd_key, None)
@@ -300,9 +304,6 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                         t = ev.get("title", "")
                         c = ev.get("display_color", ev.get("color", "#4f84ff"))
                         events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{t}</div>'
-                if item and item.get("tasks"):
-                    for task in item["tasks"]:
-                        events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
 
             if is_active:
                 cell_inner = f'{num_html}{events_html}'
@@ -339,24 +340,6 @@ def render_monthly_plan_page() -> None:
     except Exception:
         st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
         return
-
-    st.markdown("## 每日讀書進度排程")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.write("系統會根據您在初始設定的「每日作息」與「固定行程」，自動計算每日可用時間並安排讀書計畫。")
-        if st.button("生成排程計畫", key="generate_schedule_btn", type="primary"):
-            schedule_result = logic.generate_daily_schedule(plan)
-            st.session_state["app_state"]["monthly_plan"] = schedule_result
-            st.rerun()
-            
-    with col2:
-        schedule_data = st.session_state["app_state"].get("monthly_plan")
-        if schedule_data is None:
-            st.info("請先設定並生成計畫")
-        else:
-            st.dataframe(schedule_data, use_container_width=True)
-
-    st.markdown("---")
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
