@@ -57,17 +57,15 @@ def get_mock_mood_history() -> list[int]:
 
 def render_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str):
     """Render a vibrant custom progress bar."""
-    html = f"""
-    <div style="margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-weight: 600; font-size: 14px; color: #444;">{title}</span>
-            <span style="font-weight: bold; font-size: 14px; color: {color_end};">{percentage}%</span>
-        </div>
-        <div style="width: 100%; background-color: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden;">
-            <div style="width: {percentage}%; height: 100%; background: linear-gradient(90deg, {color_start} 0%, {color_end} 100%); border-radius: 8px; transition: width 0.5s ease-in-out;"></div>
-        </div>
+    html = f"""<div style="margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-weight: 600; font-size: 14px; color: #444;">{title}</span>
+        <span style="font-weight: bold; font-size: 14px; color: {color_end};">{percentage}%</span>
     </div>
-    """
+    <div style="width: 100%; background-color: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden;">
+        <div style="width: {percentage}%; height: 100%; background: linear-gradient(90deg, {color_start} 0%, {color_end} 100%); border-radius: 8px; transition: width 0.5s ease-in-out;"></div>
+    </div>
+</div>"""
     st.markdown(html, unsafe_allow_html=True)
 
 def render_dashboard():
@@ -136,12 +134,10 @@ def render_dashboard():
                 for idx, subj_data in enumerate(subject_rankings):
                     with rank_cols[idx]:
                         # Square box using HTML aspect-ratio
-                        box_html = f"""
-                        <div style="aspect-ratio: 1/1; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
-                            <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
-                            <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
-                        </div>
-                        """
+                        box_html = f"""<div style="aspect-ratio: 1/1; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
+    <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
+    <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
+</div>"""
                         st.markdown(box_html, unsafe_allow_html=True)
                         
         st.markdown("<br/>", unsafe_allow_html=True)
@@ -163,20 +159,15 @@ def render_dashboard():
             circles_html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; padding: 10px;">'
             for idx, score in enumerate(mood_history):
                 color = mood_colors.get(score, "#dfe6e9")
-                circles_html += f"""
-                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                </div>
-                """
+                circles_html += f"""<div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>"""
             circles_html += '</div>'
             
             st.markdown(circles_html, unsafe_allow_html=True)
             
             # Legend
-            legend_html = """
-            <div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
-            </div>
-            """
+            legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
+    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
+    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
+    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
+</div>"""
             st.markdown(legend_html, unsafe_allow_html=True)
