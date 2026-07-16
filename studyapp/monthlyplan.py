@@ -252,7 +252,12 @@ def render_calendar_grid(year: int, month: int, plan_by_date: dict, start_date: 
     st.markdown("""
     <style>
     div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) {
-        gap: 4px !important;
+        gap: 0px !important;
+        margin-bottom: -1px !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 0px !important;
+        margin-right: -1px;
     }
     div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] > div {
         padding: 4px 6px !important;
