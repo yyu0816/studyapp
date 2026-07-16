@@ -756,8 +756,13 @@ def render_home_page() -> None:
                     st.session_state["cal_view_date"] = None
                     st.rerun()
         
-        container = col_main if col_main else st
-        with container:
+        if col_main:
+            with col_main:
+                st.title("讀書計畫安排助手")
+                st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
+                if st.session_state.get("plan_name"):
+                    st.markdown(f"### {st.session_state['plan_name']}")
+        else:
             st.title("讀書計畫安排助手")
             st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
             if st.session_state.get("plan_name"):
