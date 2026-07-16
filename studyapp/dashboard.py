@@ -129,9 +129,9 @@ def render_dashboard():
         else:
             boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px;">'
             for subj_data in subject_rankings:
-                boxes_html += f"""<div style="flex: 1; aspect-ratio: 1/1; min-width: 90px; max-width: 120px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
-    <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
-    <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
+                boxes_html += f"""<div style="width: 100px; height: 100px; flex-shrink: 0; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33; box-sizing: border-box;">
+    <h4 style="margin: 0 0 4px 0; color: #555; font-size: 14px;">{subj_data['name']}</h4>
+    <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 24px;">{subj_data['progress']}%</h2>
 </div>"""
             boxes_html += '</div>'
             st.markdown(boxes_html, unsafe_allow_html=True)
