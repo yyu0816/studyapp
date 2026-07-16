@@ -128,7 +128,7 @@ def render_dashboard():
             if not subject_rankings:
                 st.info("目前尚無科目資料。")
             else:
-                boxes_html = '<div style="display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap;">'
+                boxes_html = '<div style="display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; padding: 8px 4px 16px 4px;">'
                 for subj_data in subject_rankings:
                     boxes_html += f"""<div style="flex: 1; aspect-ratio: 1/1; min-width: 90px; max-width: 120px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
     <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
