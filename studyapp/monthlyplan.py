@@ -5,7 +5,8 @@ from typing import Any
 
 import streamlit as st
 from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
-from logic import calculate_daily_available_sessions
+from logic import calculate_daily_available_sessions, _parse_date
+from color_picker_component import native_color_picker
 import logic
 
 
@@ -96,12 +97,9 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        if "add_dlg_cp" not in st.session_state:
-            st.session_state["add_dlg_cp"] = preset_color
-        color = st.color_picker("選擇顏色", key="add_dlg_cp")
+        color = native_color_picker("選擇顏色", default_color=preset_color, key="add_dlg_cp")
     else:
         color = preset_color
-        st.session_state.pop("add_dlg_cp", None)
 
     concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=False)
 
@@ -205,12 +203,9 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=bool(is_custom), key="edit_custom_color")
     if use_custom_color:
-        if "edit_dlg_cp" not in st.session_state:
-            st.session_state["edit_dlg_cp"] = cur_color
-        color = st.color_picker("選擇顏色", key="edit_dlg_cp")
+        color = native_color_picker("選擇顏色", default_color=cur_color, key="edit_dlg_cp")
     else:
         color = preset_color
-        st.session_state.pop("edit_dlg_cp", None)
 
     concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=concurrent_orig, key="edit_concurrent")
 

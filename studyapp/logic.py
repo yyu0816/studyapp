@@ -364,55 +364,7 @@ def get_minutes(time_str):
         return 0
 
 def calculate_daily_available_sessions(current_date, plan):
-    is_weekend = current_date.weekday() >= 5
-    wake_key = "weekend_wake" if is_weekend else "weekday_wake"
-    sleep_key = "weekend_sleep" if is_weekend else "weekday_sleep"
-    
-    wake_time = plan.get(wake_key, "07:00")
-    sleep_time = plan.get(sleep_key, "23:30")
-    
-    wake_m = get_minutes(wake_time)
-    sleep_m = get_minutes(sleep_time)
-    
-    blocking_intervals = []
-    
-    # 1. Sleep
-    if sleep_m <= wake_m:
-        blocking_intervals.append((0, wake_m))
-        if sleep_m > 0:
-            blocking_intervals.append((sleep_m, 1440))
-    else:
-        blocking_intervals.append((0, wake_m))
-        blocking_intervals.append((sleep_m, 1440))
-        
-    # 2. Routines
-    routines = plan.get("routines", {})
-    for r_name, r_data in routines.items():
-        if r_data.get("start") and r_data.get("end"):
-            sm = get_minutes(r_data["start"])
-            em = get_minutes(r_data["end"])
-            if sm < em:
-                blocking_intervals.append((sm, em))
-                
-    # 3. Non-parallel fixed events
-    weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
-    fixed_events = plan.get("fixed_events", [])
-    
-    for ev in fixed_events:
-        if weekday_str in ev.get("weekdays", []):
-            sm = get_minutes(ev.get("start", "00:00"))
-            em = get_minutes(ev.get("end", "00:00"))
-            if sm < em:
-                if not ev.get("concurrent_with_study", False):
-                    blocking_intervals.append((sm, em))
-                    
-    blocking_intervals = merge_intervals(blocking_intervals)
-    
-    total_blocked_minutes = sum(b_end - b_start for b_start, b_end in blocking_intervals)
-        
-    free_minutes = 1440 - total_blocked_minutes
-    free_hours = free_minutes / 60.0
-    return math.floor(free_hours)
+    return len(get_daily_free_slots(current_date, plan))
 
 def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
     is_weekend = current_date.weekday() >= 5
@@ -532,6 +484,7 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             if qty > 0:
                 subject_progress.append({
                     "subject": subj_name,
+                    "color": subject.get("color", "#4f84ff"),
                     "material": mat_name,
                     "name": subj_name,  # Keep the original name field for consecutive checking
                     "total_qty": qty,
@@ -601,6 +554,7 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                 "start_time": start_str,
                 "end_time": end_str,
                 "科目": chosen_sp["subject"],
+                "color": chosen_sp["color"],
                 "教材": chosen_sp["material"],
                 "目標進度": progress_str
             })

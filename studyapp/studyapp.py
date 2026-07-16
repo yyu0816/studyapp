@@ -20,6 +20,7 @@ from monthlyplan import render_monthly_plan_page
 from dailycheck import render_daily_checkin_page, get_adjustment_message
 from datetime import date, datetime, timedelta
 from timeline_utils import render_timeline
+from color_picker_component import native_color_picker
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -381,7 +382,7 @@ def _initialize_session_state() -> None:
         st.session_state["daily_log"] = None
 
     if "subjects" not in st.session_state:
-        st.session_state["subjects"] = [{"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}]
+        st.session_state["subjects"] = [{"name": "", "color": "#4f84ff", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}]
     if "fixed_events" not in st.session_state:
         st.session_state["fixed_events"] = [{"title": "", "weekdays": [], "start": "", "end": "", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}]
     if "plan_name" not in st.session_state:
@@ -401,7 +402,7 @@ def get_material_unit(material_type: str) -> str:
 
 
 def _add_subject():
-    st.session_state["subjects"].append({"name": "", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
+    st.session_state["subjects"].append({"name": "", "color": "#4f84ff", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
 
 def _del_subject(idx):
     st.session_state["subjects"].pop(idx)
@@ -462,8 +463,13 @@ def render_setup_page() -> None:
     for idx, subject in enumerate(st.session_state["subjects"]):
         with st.container():
             st.markdown(f"### 科目 {idx + 1}")
-            name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}")
-            st.session_state["subjects"][idx]["name"] = name_value
+            sc1, sc2 = st.columns([3, 1])
+            with sc1:
+                name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}")
+                st.session_state["subjects"][idx]["name"] = name_value
+            with sc2:
+                color_val = native_color_picker("科目代表色", default_color=subject.get("color", "#4f84ff"), key=f"subject_color_{idx}")
+                st.session_state["subjects"][idx]["color"] = color_val
 
             materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1}])
             for mid, material in enumerate(materials):
@@ -734,8 +740,9 @@ def render_home_page() -> None:
     page = st.session_state["main_page"]
 
     cal_view_date = st.session_state.get("cal_view_date")
+    col_main = None
 
-    if page != "每日打卡與微調":
+    if page == "月計畫":
         if cal_view_date:
             col_progress, col_main = st.columns([1, 3])
         else:
@@ -744,12 +751,26 @@ def render_home_page() -> None:
         if col_progress:
             with col_progress:
                 st.markdown(f"### 📅 {cal_view_date}")
-                
                 schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
                 if not schedule_data:
                     st.info("尚未生成排程計畫")
                 else:
                     daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
+                    
+                    st.markdown("#### 📚 當日讀書進度")
+                    if not daily_schedule:
+                        st.write("今日無排定讀書進度")
+                    else:
+                        for item in daily_schedule:
+                            subj = item.get("科目", "")
+                            mat = item.get("教材", "")
+                            target = item.get("目標進度", "")
+                            color = item.get("color", "#4f84ff")
+                            
+                            display_text = f"{mat}：{target}" if mat and mat != "-" else target
+                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{subj}</b><br/>{display_text}</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("---")
                     
                     plan = st.session_state.get("plan", {})
                     fixed_events = plan.get("fixed_events", [])
@@ -799,12 +820,16 @@ def render_home_page() -> None:
                         else:
                             display_text = f"{target}"
                             
+                        subj_color = item.get("color", "#4f84ff")
+                        if attr != "學習日":
+                            subj_color = "#ff9f43" # buffer day color
+                            
                         today_events.append({
                             "title": subj,
                             "subtitle": display_text,
                             "start": start_time,
                             "end": end_time,
-                            "color": "#4f84ff" if attr == "學習日" else "#ff9f43",
+                            "color": subj_color,
                             "emoji": "📖",
                             "is_all_day": False
                         })
