@@ -398,30 +398,17 @@ def calculate_daily_available_sessions(current_date, plan):
     weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
     fixed_events = plan.get("fixed_events", [])
     
-    parallel_intervals = []
-    
     for ev in fixed_events:
         if weekday_str in ev.get("weekdays", []):
             sm = get_minutes(ev.get("start", "00:00"))
             em = get_minutes(ev.get("end", "00:00"))
             if sm < em:
-                if ev.get("concurrent_with_study", False):
-                    parallel_intervals.append((sm, em))
-                else:
+                if not ev.get("concurrent_with_study", False):
                     blocking_intervals.append((sm, em))
                     
     blocking_intervals = merge_intervals(blocking_intervals)
-    parallel_intervals = merge_intervals(parallel_intervals)
     
-    total_blocked_minutes = 0
-    for b_start, b_end in blocking_intervals:
-        overlap = 0
-        for p_start, p_end in parallel_intervals:
-            o_start = max(b_start, p_start)
-            o_end = min(b_end, p_end)
-            if o_start < o_end:
-                overlap += (o_end - o_start)
-        total_blocked_minutes += (b_end - b_start) - overlap
+    total_blocked_minutes = sum(b_end - b_start for b_start, b_end in blocking_intervals)
         
     free_minutes = 1440 - total_blocked_minutes
     free_hours = free_minutes / 60.0
@@ -467,27 +454,26 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
     effective_sessions = sum(d["sessions"] for d in daily_sessions[:effective_days])
 
     # 3. 處理科目資料，計算每個科目的總頁數/進度
+    UNIT_MAP = {"課本": "頁", "教材": "頁", "筆記": "頁", "練習題": "回", "模擬考": "回", "教學影片": "小時"}
     subject_progress = []
     for subject in subjects_data:
         name = subject.get("name", "未命名科目")
         materials = subject.get("materials", [])
-        total_qty = 0
-        unit = "單位"
+        # Group by unit so each material type keeps its own unit
+        qty_by_unit: dict = {}
         for mat in materials:
-            total_qty += mat.get("quantity", 0)
-            if mat.get("type") in ["練習題", "模擬考"]:
-                unit = "回"
-            elif mat.get("type") in ["課本", "教材", "筆記"]:
-                unit = "頁"
-            elif mat.get("type") == "教學影片":
-                unit = "小時"
+            mat_type = mat.get("type", "其他")
+            unit = UNIT_MAP.get(mat_type, "項")
+            qty_by_unit[unit] = qty_by_unit.get(unit, 0) + mat.get("quantity", 0)
         
-        subject_progress.append({
-            "name": name,
-            "total_qty": total_qty,
-            "unit": unit,
-            "remaining_qty": total_qty
-        })
+        for unit, total_qty in qty_by_unit.items():
+            if total_qty > 0:
+                subject_progress.append({
+                    "name": name,
+                    "total_qty": total_qty,
+                    "unit": unit,
+                    "remaining_qty": total_qty
+                })
 
     num_subjects = len(subject_progress)
     if num_subjects == 0:

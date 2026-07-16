@@ -587,9 +587,13 @@ def render_setup_page() -> None:
         weekend_sleep = render_time_picker("假日睡覺", st.session_state.get("weekend_sleep", "00:30"), "weekend_sleep")
         
     st.markdown("#### 日常行程 (系統將自動扣除這些時段以計算可用讀書時數)")
+    # Auto-default prep_start to the later of weekday/weekend wake
+    auto_prep_start = max(weekday_wake, weekend_wake)
+    if "prep_start" not in st.session_state:
+        st.session_state["prep_start"] = auto_prep_start
     r1, r2, r3, r4 = st.columns(4)
     with r1:
-        prep_start = render_time_picker("早上準備/早餐開始", st.session_state.get("prep_start", "07:00"), "prep_start")
+        prep_start = render_time_picker("早上準備/早餐開始", st.session_state.get("prep_start", auto_prep_start), "prep_start")
         prep_end = render_time_picker("早上準備/早餐結束", st.session_state.get("prep_end", "08:00"), "prep_end")
     with r2:
         lunch_start = render_time_picker("午餐開始", st.session_state.get("lunch_start", "12:00"), "lunch_start")
@@ -712,39 +716,71 @@ def render_home_page() -> None:
             if st.button(opt, use_container_width=True, key=f"sidebar_main_menu_{i}_{opt}"):
                 st.session_state["main_page"] = opt
             st.markdown('</div>', unsafe_allow_html=True)
-            
-    cal_view_date = st.session_state.get("cal_view_date")
-    if cal_view_date:
-        st.sidebar.markdown("---")
-        st.sidebar.markdown(f"### 📅 {cal_view_date} 讀書進度")
-        schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
-        if not schedule_data:
-            st.sidebar.info("尚未生成排程計畫")
-        else:
-            daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
-            if not daily_schedule:
-                st.sidebar.write("這天沒有排定進度或為非學習日。")
-            else:
-                st.sidebar.dataframe(daily_schedule, use_container_width=True)
-        
-        if st.sidebar.button("關閉", key="close_sidebar_daily_view", use_container_width=True):
-            st.session_state["cal_view_date"] = None
-            st.rerun()
+
+    # Handle view_date query param from HTML calendar links
+    qp_view = st.query_params.get("view_date")
+    if qp_view:
+        st.query_params.clear()
+        st.session_state["cal_view_date"] = qp_view
 
     page = st.session_state["main_page"]
 
+    cal_view_date = st.session_state.get("cal_view_date")
+
     if page != "每日打卡與微調":
-        st.title("讀書計畫安排助手")
-        st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
-        if st.session_state.get("plan_name"):
-            st.markdown(f"### {st.session_state['plan_name']}")
+        if cal_view_date:
+            col_progress, col_main = st.columns([1, 3])
+        else:
+            col_progress, col_main = None, None
+        
+        if col_progress:
+            with col_progress:
+                st.markdown(f"### 📅 {cal_view_date}")
+                st.markdown("當日讀書進度")
+                schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
+                if not schedule_data:
+                    st.info("尚未生成排程計畫")
+                else:
+                    daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
+                    if not daily_schedule:
+                        st.write("這天沒有排定進度或為非學習日。")
+                    else:
+                        for item in daily_schedule:
+                            attr = item.get("屬性", "")
+                            block = item.get("學習區塊", "")
+                            subj = item.get("科目", "")
+                            target = item.get("目標進度", "")
+                            color = "#4f84ff" if attr == "學習日" else "#ff9f43"
+                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{block}</b><br/>{subj}：{target}</div>", unsafe_allow_html=True)
+                if st.button("✕ 關閉", key="close_daily_view", use_container_width=True):
+                    st.session_state["cal_view_date"] = None
+                    st.rerun()
+        
+        container = col_main if col_main else st
+        with container:
+            st.title("讀書計畫安排助手")
+            st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
+            if st.session_state.get("plan_name"):
+                st.markdown(f"### {st.session_state['plan_name']}")
 
     if page == "計劃頁面":
-        render_setup_page()
+        if col_main:
+            with col_main:
+                render_setup_page()
+        else:
+            render_setup_page()
     elif page == "dashboard":
-        render_dashboard_page()
+        if col_main:
+            with col_main:
+                render_dashboard_page()
+        else:
+            render_dashboard_page()
     elif page == "月計畫":
-        render_monthly_plan_page()
+        if col_main:
+            with col_main:
+                render_monthly_plan_page()
+        else:
+            render_monthly_plan_page()
     else:
         render_daily_checkin_page()
 

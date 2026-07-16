@@ -248,98 +248,80 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.session_state.pop(_ed_key, None)
             st.rerun()
 
-def render_calendar_grid(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date):
-    st.markdown("""
-    <style>
-    /* Remove horizontal gap between columns */
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) {
-        gap: 0px !important;
-    }
-    /* Remove vertical gap between rows inside the calendar column */
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stHorizontalBlock"] > div:nth-child(7)) {
-        gap: 0px !important;
-    }
-    /* Square corners and negative margins to overlap borders (border-collapse effect) */
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 0px !important;
-        margin-right: -1px !important;
-        margin-bottom: -1px !important;
-        border: 1px solid #e0e0e0 !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding: 4px 6px !important;
-        gap: 2px !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) .stButton > button {
-        padding: 0 !important;
-        min-height: 28px !important;
-        height: 28px !important;
-        margin-bottom: 2px !important;
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        font-weight: bold;
-    }
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) .stButton > button:hover {
-        background: #f0f0f0;
-    }
-    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stMarkdownContainer"] p {
-        margin-bottom: 0px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
+    """Build a pure HTML table for the calendar month with clickable dates."""
     headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     weeks = _month_calendar_dates(year, month)
 
-    cols = st.columns(7)
-    for i, h in enumerate(headers):
-        with cols[i]:
-            st.markdown(f"<div style='text-align:center; font-weight:bold; padding-bottom:5px; border-bottom:1px solid #ddd; margin-bottom:10px;'>{h}</div>", unsafe_allow_html=True)
-            
+    header_cells = "".join(
+        f'<th style="text-align:center; font-weight:600; color:#555; font-size:13px; padding:10px 4px; background:#f9f9f9; border:1px solid #cccccc;">{h}</th>'
+        for h in headers
+    )
+
+    rows_html = ""
     override_all = st.session_state.get("daily_override_events", {})
-    
     for week in weeks:
-        cols = st.columns(7)
-        for i, day in enumerate(week):
-            with cols[i]:
-                day_str = day.strftime("%Y-%m-%d")
-                item = plan_by_date.get(day_str)
-                in_this_month = day.month == month
-                is_in_plan = in_this_month and start_date <= day <= end_date
-                has_override = in_this_month and bool(override_all.get(day_str))
-                is_active = is_in_plan or has_override
-                
-                with st.container(border=True):
-                    if in_this_month:
-                        if is_active:
-                            if st.button(str(day.day), key=f"cal_btn_{day_str}", use_container_width=True):
-                                st.session_state["cal_view_date"] = day_str
-                                st.rerun()
-                        else:
-                            st.markdown(f"<div style='text-align:center; color:#c0c0c0; font-size:14px; margin-bottom:4px; padding:6px;'>{day.day}</div>", unsafe_allow_html=True)
-                            
-                        events_html = ""
-                        if is_active:
-                            events = []
-                            if item and item.get("fixed_events"):
-                                events.extend(item["fixed_events"])
-                            if day_str in override_all:
-                                events.extend(override_all[day_str])
-                            for ev in events:
-                                if ev.get("show_on_calendar", True):
-                                    t = ev.get("title", "")
-                                    c = ev.get("display_color", ev.get("color", "#4f84ff"))
-                                    events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{t}</div>'
-                            if item and item.get("tasks"):
-                                for task in item["tasks"]:
-                                    events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
-                        
-                        if events_html:
-                            st.markdown(events_html, unsafe_allow_html=True)
-                        else:
-                            st.markdown("<div style='min-height:30px;'></div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<div style='height:80px;'></div>", unsafe_allow_html=True)
+        row = "<tr>"
+        for day in week:
+            day_str = day.strftime("%Y-%m-%d")
+            item = plan_by_date.get(day_str)
+            in_this_month = day.month == month
+            is_in_plan = in_this_month and start_date <= day <= end_date
+            has_override = in_this_month and bool(override_all.get(day_str))
+            is_active = is_in_plan or has_override
+
+            if is_in_plan:
+                num_color = "#333"
+                num_weight = "bold"
+                bg = "#ffffff"
+            elif has_override:
+                num_color = "#888"
+                num_weight = "normal"
+                bg = "#f5f5f5"
+            else:
+                num_color = "#c0c0c0"
+                num_weight = "normal"
+                bg = "#fafafa"
+
+            if is_active:
+                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;"><a href="?view_date={day_str}" target="_self" style="text-decoration:none; color:inherit;">{day.day}</a></div>'
+            else:
+                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
+
+            events_html = ""
+            if is_active:
+                events = []
+                if item and item.get("fixed_events"):
+                    events.extend(item["fixed_events"])
+                if day_str in override_all:
+                    events.extend(override_all[day_str])
+                for ev in events:
+                    if ev.get("show_on_calendar", True):
+                        t = ev.get("title", "")
+                        c = ev.get("display_color", ev.get("color", "#4f84ff"))
+                        events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{t}</div>'
+                if item and item.get("tasks"):
+                    for task in item["tasks"]:
+                        events_html += f'<div style="font-size:10px;color:#555;padding:1px 3px;margin-top:2px;border-radius:3px;background:#f0f0f0;border-left:2px solid #ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 {task}</div>'
+
+            if is_active:
+                cell_inner = f'{num_html}{events_html}'
+                row += (
+                    f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; '
+                    f'padding:0; width:14.2857%; height:110px;">'
+                    f'<div style="padding:6px; height:100%; box-sizing:border-box;">{cell_inner}</div></td>'
+                )
+            else:
+                row += f'<td style="vertical-align:top; border:1px solid #cccccc; background:{bg}; padding:6px; height:110px; width:14.2857%;">{num_html}</td>'
+        row += "</tr>"
+        rows_html += row
+
+    return f"""
+    <table style="border-collapse:collapse; width:100%; table-layout:fixed; font-family:sans-serif;">
+        <thead><tr>{header_cells}</tr></thead>
+        <tbody>{rows_html}</tbody>
+    </table>
+    """
 
 
 def render_monthly_plan_page() -> None:
@@ -358,7 +340,7 @@ def render_monthly_plan_page() -> None:
         st.error("計畫日期格式錯誤，請回到設定頁確認開始與結束日期。")
         return
 
-    st.markdown("## 每日讀書進度排程 (番茄鐘演算法)")
+    st.markdown("## 每日讀書進度排程")
     col1, col2 = st.columns([1, 2])
     with col1:
         st.write("系統會根據您在初始設定的「每日作息」與「固定行程」，自動計算每日可用時間並安排讀書計畫。")
@@ -393,8 +375,8 @@ def render_monthly_plan_page() -> None:
         col_cal, col_overview = st.columns([2, 1], gap="medium")
 
         with col_cal:
-            # Render Streamlit native grid calendar
-            render_calendar_grid(year, month, plan_by_date, start_date, end_date)
+            calendar_html = _build_calendar_html(year, month, plan_by_date, start_date, end_date)
+            st.markdown(calendar_html, unsafe_allow_html=True)
         with col_overview:
             st.markdown("#### 📅 行程總覽")
             
