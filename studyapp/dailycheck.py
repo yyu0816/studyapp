@@ -111,7 +111,7 @@ def render_daily_checkin_page() -> None:
                     st.rerun()
 
     with col_r:
-        free_sessions = logic.calculate_daily_available_sessions(today_date, plan)
+        free_sessions = logic.calculate_daily_available_sessions(today, plan)
         st.metric("今日可安排讀書時間", f"{free_sessions} 小時")
 
     fixed_events = plan.get("fixed_events", [])

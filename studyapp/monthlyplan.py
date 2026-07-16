@@ -249,6 +249,33 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.rerun()
 
 def render_calendar_grid(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date):
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) {
+        gap: 4px !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        padding: 4px 6px !important;
+        gap: 2px !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) .stButton > button {
+        padding: 0 !important;
+        min-height: 28px !important;
+        height: 28px !important;
+        margin-bottom: 2px !important;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        font-weight: bold;
+    }
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) .stButton > button:hover {
+        background: #f0f0f0;
+    }
+    div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stMarkdownContainer"] p {
+        margin-bottom: 0px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     weeks = _month_calendar_dates(year, month)
 
