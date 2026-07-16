@@ -20,7 +20,6 @@ from monthlyplan import render_monthly_plan_page
 from dailycheck import render_daily_checkin_page, get_adjustment_message
 from datetime import date, datetime, timedelta
 from timeline_utils import render_timeline
-from color_picker_component import native_color_picker
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -468,7 +467,9 @@ def render_setup_page() -> None:
                 name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}")
                 st.session_state["subjects"][idx]["name"] = name_value
             with sc2:
-                color_val = native_color_picker("科目代表色", default_color=subject.get("color", "#4f84ff"), key=f"subject_color_{idx}")
+                if f"subject_color_{idx}" not in st.session_state:
+                    st.session_state[f"subject_color_{idx}"] = subject.get("color", "#4f84ff")
+                color_val = st.color_picker("科目代表色", key=f"subject_color_{idx}")
                 st.session_state["subjects"][idx]["color"] = color_val
 
             materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1}])
@@ -761,14 +762,23 @@ def render_home_page() -> None:
                     if not daily_schedule:
                         st.write("今日無排定讀書進度")
                     else:
+                        grouped_progress = {}
                         for item in daily_schedule:
                             subj = item.get("科目", "")
                             mat = item.get("教材", "")
                             target = item.get("目標進度", "")
                             color = item.get("color", "#4f84ff")
                             
+                            if subj not in grouped_progress:
+                                grouped_progress[subj] = {"color": color, "items": []}
+                                
                             display_text = f"{mat}：{target}" if mat and mat != "-" else target
-                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{subj}</b><br/>{display_text}</div>", unsafe_allow_html=True)
+                            grouped_progress[subj]["items"].append(display_text)
+                            
+                        for subj, data in grouped_progress.items():
+                            color = data["color"]
+                            items_html = "<br/>".join([f"• {text}" for text in data["items"]])
+                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{subj}</b><br/>{items_html}</div>", unsafe_allow_html=True)
                     
                     st.markdown("---")
                     
