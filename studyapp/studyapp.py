@@ -282,6 +282,11 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
         "preferred_subject_count": int(str(_get_field(form_data, "preferred_subject_count") or "0").strip() or 0),
         "subjects": parse_subject_entries(form_data),
         "fixed_events": fixed_events,
+        "weekday_wake": _get_field(form_data, "weekday_wake"),
+        "weekday_sleep": _get_field(form_data, "weekday_sleep"),
+        "weekend_wake": _get_field(form_data, "weekend_wake"),
+        "weekend_sleep": _get_field(form_data, "weekend_sleep"),
+        "routines": form_data.get("routines", {}),
         "daily_routine": {
             "weekday_wake": _get_field(form_data, "weekday_wake"),
             "weekday_sleep": _get_field(form_data, "weekday_sleep"),
