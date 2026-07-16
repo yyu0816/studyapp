@@ -251,13 +251,20 @@ def edit_event_dialog(date_str: str, ev_idx: int):
 def render_calendar_grid(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date):
     st.markdown("""
     <style>
+    /* Remove horizontal gap between columns */
     div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) {
         gap: 0px !important;
-        margin-bottom: -1px !important;
     }
+    /* Remove vertical gap between rows inside the calendar column */
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stHorizontalBlock"] > div:nth-child(7)) {
+        gap: 0px !important;
+    }
+    /* Square corners and negative margins to overlap borders (border-collapse effect) */
     div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] {
         border-radius: 0px !important;
-        margin-right: -1px;
+        margin-right: -1px !important;
+        margin-bottom: -1px !important;
+        border: 1px solid #e0e0e0 !important;
     }
     div[data-testid="stHorizontalBlock"]:has(> div:nth-child(7)) div[data-testid="stVerticalBlockBorderWrapper"] > div {
         padding: 4px 6px !important;
