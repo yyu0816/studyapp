@@ -116,8 +116,11 @@ def render_dashboard():
         st.markdown(left_html, unsafe_allow_html=True)
         
         # --- Left Bottom (2/3 height visually) ---
-        st.markdown("#### 📈 一周讀書時長")
-        with st.container(border=True):
+        # Wrap in a nested column so it matches the exact vertical padding of the right column's col_mood
+        col_study = st.columns(1)[0]
+        with col_study:
+            st.markdown("#### 📈 一周讀書時長")
+            with st.container(border=True):
             # Create Altair Line Chart
             chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
                 x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
@@ -178,11 +181,18 @@ def render_dashboard():
         
         # Define colors for mood scores 1-5 (1: Terrible, 5: Excellent)
         mood_colors = {
-            1: "#ff7675", # Red
-            2: "#fab1a0", # Light Red/Orange
-            3: "#ffeaa7", # Yellow
-            4: "#55efc4", # Light Green
-            5: "#00b894"  # Dark Green
+            1: "#ff7675", # Red (Terrible)
+            2: "#fab1a0", # Light Red/Orange (Poor)
+            3: "#ffeaa7", # Yellow (Fair)
+            4: "#55efc4", # Light Green (Good)
+            5: "#00b894"  # Dark Green (Excellent)
+        }
+        mood_labels = {
+            1: "低落",
+            2: "微低",
+            3: "平穩",
+            4: "良好",
+            5: "極佳"
         }
         # Split the 2/3 right column into two halves. 
         # The first half (1/3 of total) will exactly match the left column's width.
@@ -192,25 +202,25 @@ def render_dashboard():
             with st.container(border=True):
                 st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
                 
-                circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px 0;">'
+                circles_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; padding: 5px 0;">'
                 for idx, score in enumerate(mood_history):
                     color = mood_colors.get(score, "#dfe6e9")
-                    label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
-                    circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-<span style="font-size: 10px; color: #888; height: 14px; line-height: 14px;">{label}</span>
-<div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
+                    label = f"Day {idx+1}"
+                    circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+<span style="font-size: 9px; color: #aaa; height: 12px; line-height: 12px;">{label}</span>
+<div style="width: 32px; height: 32px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
 </div>"""
                 circles_html += '</div>'
                 
                 st.markdown(circles_html, unsafe_allow_html=True)
                 
                 # Legend
-                legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
-<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>
-<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
-<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
-<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
-</div>"""
+                # Legend built programmatically from parameters
+                legend_html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; font-size: 11px; color: #888; justify-content: center;">'
+                legend_html += '<div style="display: flex; align-items: center; gap: 4px;"><div style="width:10px; height:10px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>'
+                for score, color in mood_colors.items():
+                    legend_html += f'<div style="display: flex; align-items: center; gap: 4px;"><div style="width:10px; height:10px; border-radius:50%; background:{color};"></div>{mood_labels[score]}</div>'
+                legend_html += '</div>'
                 st.markdown(legend_html, unsafe_allow_html=True)
                 
                 # Month Navigation
