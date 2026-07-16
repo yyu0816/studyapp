@@ -265,7 +265,9 @@ def view_daily_progress_dialog(date_str: str):
             st.dataframe(daily_schedule, use_container_width=True)
             
     if st.button("關閉", type="primary", use_container_width=True):
-        st.rerun()def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
+        st.rerun()
+
+def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
     """Build a pure HTML table for the calendar month."""
     headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     weeks = _month_calendar_dates(year, month)
