@@ -124,50 +124,52 @@ def render_dashboard():
     with col_right:
         # --- Right Top (1/3 height visually) ---
         st.markdown("#### 🏆 科目完成進度排行榜")
-        with st.container(border=True):
-            if not subject_rankings:
-                st.info("目前尚無科目資料。")
-            else:
-                boxes_html = '<div style="display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; padding: 8px 4px 16px 4px;">'
-                for subj_data in subject_rankings:
-                    boxes_html += f"""<div style="flex: 1; aspect-ratio: 1/1; min-width: 90px; max-width: 120px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
+        if not subject_rankings:
+            st.info("目前尚無科目資料。")
+        else:
+            boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px;">'
+            for subj_data in subject_rankings:
+                boxes_html += f"""<div style="flex: 1; aspect-ratio: 1/1; min-width: 90px; max-width: 120px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
     <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
     <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
 </div>"""
-                boxes_html += '</div>'
-                st.markdown(boxes_html, unsafe_allow_html=True)
+            boxes_html += '</div>'
+            st.markdown(boxes_html, unsafe_allow_html=True)
 
         # --- Right Bottom (2/3 height visually) ---
         st.markdown("#### 🌈 心情與動力波動")
-        with st.container(border=True):
-            # Define colors for mood scores 1-5 (1: Terrible, 5: Excellent)
-            mood_colors = {
-                1: "#ff7675", # Red
-                2: "#fab1a0", # Light Red/Orange
-                3: "#ffeaa7", # Yellow
-                4: "#55efc4", # Light Green
-                5: "#00b894"  # Dark Green
-            }
-            
-            st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 16px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
-            
-            circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px;">'
-            for idx, score in enumerate(mood_history):
-                color = mood_colors.get(score, "#dfe6e9")
-                label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
-                circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-    <span style="font-size: 10px; color: #888; height: 14px; line-height: 14px;">{label}</span>
-    <div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
+        
+        # Define colors for mood scores 1-5 (1: Terrible, 5: Excellent)
+        mood_colors = {
+            1: "#ff7675", # Red
+            2: "#fab1a0", # Light Red/Orange
+            3: "#ffeaa7", # Yellow
+            4: "#55efc4", # Light Green
+            5: "#00b894"  # Dark Green
+        }
+        
+        circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px 0;">'
+        for idx, score in enumerate(mood_history):
+            color = mood_colors.get(score, "#dfe6e9")
+            label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
+            circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+<span style="font-size: 10px; color: #888; height: 14px; line-height: 14px;">{label}</span>
+<div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
 </div>"""
-            circles_html += '</div>'
-            
-            st.markdown(circles_html, unsafe_allow_html=True)
-            
-            # Legend
-            legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
-    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>
-    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
-    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
-    <div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
+        circles_html += '</div>'
+        
+        # Legend
+        legend_html = """<div style="display: flex; gap: 16px; margin-top: 24px; font-size: 12px; color: #888; justify-content: flex-end;">
+<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#dfe6e9;"></div>無紀錄</div>
+<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ff7675;"></div>低落</div>
+<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#ffeaa7;"></div>平穩</div>
+<div style="display: flex; align-items: center; gap: 4px;"><div style="width:12px; height:12px; border-radius:50%; background:#00b894;"></div>極佳</div>
 </div>"""
-            st.markdown(legend_html, unsafe_allow_html=True)
+
+        container_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content;">
+<p style='font-size: 14px; color: #666; margin-bottom: 8px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>
+{circles_html}
+{legend_html}
+</div>"""
+        
+        st.markdown(container_html, unsafe_allow_html=True)
