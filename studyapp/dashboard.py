@@ -4,12 +4,17 @@ import altair as alt
 import random
 from datetime import date, timedelta
 
-def get_mock_weekly_study_duration() -> pd.DataFrame:
+def get_mock_weekly_study_duration(week_offset=0):
     """Generate mock weekly study duration for the line chart."""
     today = date.today()
+    target_date = today + timedelta(days=week_offset * 7)
+    # Get Monday of the target week
+    start_of_week = target_date - timedelta(days=target_date.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
     data = []
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
+    for i in range(7):
+        day = start_of_week + timedelta(days=i)
         # Random duration between 1.0 and 8.0 hours
         duration = round(random.uniform(1.0, 8.0), 1)
         
@@ -23,7 +28,7 @@ def get_mock_weekly_study_duration() -> pd.DataFrame:
             "duration": duration,
             "duration_str": duration_str
         })
-    return pd.DataFrame(data)
+    return pd.DataFrame(data), start_of_week, end_of_week
 
 def get_subject_ranking() -> list[dict]:
     """Get subject completion rankings. Uses real subjects if available, else mock."""
@@ -55,9 +60,9 @@ def get_mock_mood_history() -> list[int]:
     """Generate 30 days of mock mood data (1-5 scale, 0 for missing data)."""
     return [random.choice([0, 1, 2, 3, 4, 5]) for _ in range(30)]
 
-def render_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str):
+def get_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str, margin_bottom="20px"):
     """Render a vibrant custom progress bar."""
-    html = f"""<div style="margin-bottom: 20px;">
+    return f"""<div style="margin-bottom: {margin_bottom};">
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
         <span style="font-weight: 600; font-size: 14px; color: #444;">{title}</span>
         <span style="font-weight: bold; font-size: 14px; color: {color_end};">{percentage}%</span>
@@ -66,15 +71,17 @@ def render_html_progress_bar(title: str, percentage: int, color_start: str, colo
         <div style="width: {percentage}%; height: 100%; background: linear-gradient(90deg, {color_start} 0%, {color_end} 100%); border-radius: 8px; transition: width 0.5s ease-in-out;"></div>
     </div>
 </div>"""
-    st.markdown(html, unsafe_allow_html=True)
 
 def render_dashboard():
     """Main render function for the dashboard page."""
     
     st.markdown("## 📊 儀表板 (Dashboard)")
     
+    if 'dashboard_week_offset' not in st.session_state:
+        st.session_state.dashboard_week_offset = 0
+        
     # Generate mock data
-    df_weekly = get_mock_weekly_study_duration()
+    df_weekly, start_week, end_week = get_mock_weekly_study_duration(st.session_state.dashboard_week_offset)
     subject_rankings = get_subject_ranking()
     mood_history = get_mock_mood_history()
     
@@ -85,12 +92,14 @@ def render_dashboard():
     with col_left:
         # --- Left Top (1/3 height visually) ---
         st.markdown("#### 🎯 總體進度")
-        with st.container(border=True):
-            st.markdown("<div style='padding: 10px 0;'>", unsafe_allow_html=True)
-            # Mock percentages for demonstration
-            render_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef")
-            render_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb")
-            st.markdown("</div>", unsafe_allow_html=True)
+        
+        right_box_width = 32 + len(subject_rankings) * 100 + max(0, len(subject_rankings) - 1) * 16 if subject_rankings else 364
+        
+        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: {right_box_width}px; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
+    {get_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef", margin_bottom="20px")}
+    {get_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
+</div>"""
+        st.markdown(left_html, unsafe_allow_html=True)
         
         # --- Left Bottom (2/3 height visually) ---
         st.markdown("#### 📈 一周讀書時長")
@@ -119,6 +128,20 @@ def render_dashboard():
             )
             
             st.altair_chart(chart, use_container_width=True)
+            
+            # Week Navigation
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+            with nav_col1:
+                if st.button("◀", key="dash_prev_week", use_container_width=True):
+                    st.session_state.dashboard_week_offset -= 1
+                    st.rerun()
+            with nav_col2:
+                st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold; color: #555;'>{start_week.strftime('%Y/%m/%d')} ~ {end_week.strftime('%Y/%m/%d')}</div>", unsafe_allow_html=True)
+            with nav_col3:
+                disabled_next = st.session_state.dashboard_week_offset >= 0
+                if st.button("▶", key="dash_next_week", disabled=disabled_next, use_container_width=True):
+                    st.session_state.dashboard_week_offset += 1
+                    st.rerun()
 
     # ================== RIGHT COLUMN (2/3) ==================
     with col_right:
@@ -127,7 +150,7 @@ def render_dashboard():
         if not subject_rankings:
             st.info("目前尚無科目資料。")
         else:
-            boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px;">'
+            boxes_html = '<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; width: fit-content; height: 166px; display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px; box-sizing: border-box;">'
             for subj_data in subject_rankings:
                 boxes_html += f"""<div style="width: 100px; height: 100px; flex-shrink: 0; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33; box-sizing: border-box;">
     <h4 style="margin: 0 0 4px 0; color: #555; font-size: 14px;">{subj_data['name']}</h4>
