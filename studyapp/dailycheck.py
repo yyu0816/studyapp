@@ -185,8 +185,11 @@ def render_daily_checkin_page() -> None:
         with row1_col1:
             st.markdown("#### 📝 今日行程")
             with st.container(border=True):
-                if today_events:
+                editable_events = [e for e in today_events if not e.get("_is_study_session")]
+                if editable_events:
                     for i, event in enumerate(today_events):
+                        if event.get("_is_study_session"):
+                            continue
                         emoji = event.get("emoji", "📌")
                         title = event.get("title", "未命名行程")
                         start = event.get("start", "")
