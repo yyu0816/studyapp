@@ -96,9 +96,19 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", key="add_custom_color_cb")
     if use_custom_color:
-        if "add_dlg_cp" not in st.session_state:
-            st.session_state["add_dlg_cp"] = preset_color
-        color = st.color_picker("選擇顏色", key="add_dlg_cp")
+        st.caption("※ 若選擇器無反應，可直接輸入 HEX 色號 (如 #ff0000)")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            if "add_dlg_cp" not in st.session_state:
+                st.session_state["add_dlg_cp"] = preset_color
+            picked_color = st.color_picker("顏色", key="add_dlg_cp", label_visibility="collapsed")
+        with c2:
+            hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", label_visibility="collapsed")
+            
+        if hex_val.startswith("#") and len(hex_val) == 7:
+            color = hex_val
+        else:
+            color = picked_color
     else:
         color = preset_color
 
@@ -204,9 +214,19 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=bool(is_custom), key="edit_custom_color")
     if use_custom_color:
-        if "edit_dlg_cp" not in st.session_state:
-            st.session_state["edit_dlg_cp"] = cur_color
-        color = st.color_picker("選擇顏色", key="edit_dlg_cp")
+        st.caption("※ 若選擇器無反應，可直接輸入 HEX 色號 (如 #ff0000)")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            if "edit_dlg_cp" not in st.session_state:
+                st.session_state["edit_dlg_cp"] = cur_color
+            picked_color = st.color_picker("顏色", key="edit_dlg_cp", label_visibility="collapsed")
+        with c2:
+            hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed")
+            
+        if hex_val.startswith("#") and len(hex_val) == 7:
+            color = hex_val
+        else:
+            color = picked_color
     else:
         color = preset_color
 
