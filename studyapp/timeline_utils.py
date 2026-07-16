@@ -110,7 +110,7 @@ def render_timeline(events: list[dict], title: str = "### 🕒 時間軸") -> No
         
         # Additional text for study targets etc.
         subtitle = event.get("subtitle", "")
-        subtitle_html = f"<div style='margin-top:2px; font-size:11px; font-weight:bold;'>{subtitle}</div>" if subtitle else ""
+        subtitle_html = f"<div style='margin-top:2px; font-size:11px; font-weight:bold; color:{text_color};'>{subtitle}</div>" if subtitle else ""
 
         card_width  = CARD_WIDTH_BASE // n_cols
         card_left   = CARD_LEFT_OFFSET + col_idx * card_width

@@ -94,7 +94,7 @@ def add_event_dialog(day_str: str):
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-    use_custom_color = st.checkbox("使用自訂顏色", value=False)
+    use_custom_color = st.checkbox("使用自訂顏色", key="add_custom_color_cb")
     if use_custom_color:
         if "add_dlg_cp" not in st.session_state:
             st.session_state["add_dlg_cp"] = preset_color

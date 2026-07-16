@@ -590,19 +590,17 @@ def render_setup_page() -> None:
     c1, c2 = st.columns(2)
     with c1:
         weekday_wake = render_time_picker("平日起床", st.session_state.get("weekday_wake", "07:00"), "weekday_wake")
-        weekend_wake = render_time_picker("假日起床", st.session_state.get("weekend_wake", "08:30"), "weekend_wake")
+        weekend_wake = render_time_picker("假日起床", st.session_state.get("weekend_wake", "07:30"), "weekend_wake")
     with c2:
         weekday_sleep = render_time_picker("平日睡覺", st.session_state.get("weekday_sleep", "23:30"), "weekday_sleep")
         weekend_sleep = render_time_picker("假日睡覺", st.session_state.get("weekend_sleep", "00:30"), "weekend_sleep")
         
     st.markdown("#### 日常行程 (系統將自動扣除這些時段以計算可用讀書時數)")
-    # Auto-default prep_start to the later of weekday/weekend wake
-    auto_prep_start = max(weekday_wake, weekend_wake)
     if "prep_start" not in st.session_state:
-        st.session_state["prep_start"] = auto_prep_start
+        st.session_state["prep_start"] = "07:30"
     r1, r2, r3, r4 = st.columns(4)
     with r1:
-        prep_start = render_time_picker("早上準備/早餐開始", st.session_state.get("prep_start", auto_prep_start), "prep_start")
+        prep_start = render_time_picker("早上準備/早餐開始", st.session_state.get("prep_start", "07:30"), "prep_start")
         prep_end = render_time_picker("早上準備/早餐結束", st.session_state.get("prep_end", "08:00"), "prep_end")
     with r2:
         lunch_start = render_time_picker("午餐開始", st.session_state.get("lunch_start", "12:00"), "lunch_start")
@@ -620,6 +618,17 @@ def render_setup_page() -> None:
             return
             
         import logic
+        
+        for start_val, end_val, label in [
+            (prep_start, prep_end, "早上準備/早餐"),
+            (lunch_start, lunch_end, "午餐"),
+            (dinner_start, dinner_end, "晚餐"),
+            (bath_start, bath_end, "洗澡")
+        ]:
+            if logic.get_minutes(end_val) <= logic.get_minutes(start_val):
+                st.error(f"「{label}」結束時間必須晚於開始時間。")
+                return
+
         for wake, sleep, day_type in [(weekday_wake, weekday_sleep, "平日"), (weekend_wake, weekend_sleep, "假日")]:
             wake_m = logic.get_minutes(wake)
             sleep_m = logic.get_minutes(sleep)
