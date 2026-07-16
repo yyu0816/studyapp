@@ -344,26 +344,127 @@ def find_plan_buffer_days(
 import math
 from typing import Any, Dict
 
-def generate_daily_schedule(subjects_data: List[Dict[str, Any]], total_days: int, daily_hours: float) -> List[Dict[str, Any]]:
-    """
-    產生每日讀書進度排程，包含以下邏輯：
-    1. 八二法則緩衝：80% 天數為有效學習日，20% 天數為緩衝/總複習日。
-    2. 番茄鐘時間切割：每日時數轉換為番茄鐘 (1小時 = 2番茄鐘)。
-    3. 科目交錯防疲勞：同一個科目連續排程不超過 2 個番茄鐘。
-    """
-    if not subjects_data or total_days <= 0 or daily_hours <= 0:
+def merge_intervals(intervals):
+    if not intervals: return []
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+    for current in intervals[1:]:
+        last = merged[-1]
+        if current[0] <= last[1]:
+            merged[-1] = (last[0], max(last[1], current[1]))
+        else:
+            merged.append(current)
+    return merged
+
+def get_minutes(time_str):
+    try:
+        t = datetime.strptime(time_str, "%H:%M").time()
+        return t.hour * 60 + t.minute
+    except:
+        return 0
+
+def calculate_daily_available_pomodoros(current_date, plan):
+    is_weekend = current_date.weekday() >= 5
+    wake_key = "weekend_wake" if is_weekend else "weekday_wake"
+    sleep_key = "weekend_sleep" if is_weekend else "weekday_sleep"
+    
+    wake_time = plan.get(wake_key, "07:00")
+    sleep_time = plan.get(sleep_key, "23:30")
+    
+    wake_m = get_minutes(wake_time)
+    sleep_m = get_minutes(sleep_time)
+    
+    blocking_intervals = []
+    
+    # 1. Sleep
+    if sleep_m <= wake_m:
+        blocking_intervals.append((0, wake_m))
+        if sleep_m > 0:
+            blocking_intervals.append((sleep_m, 1440))
+    else:
+        blocking_intervals.append((0, wake_m))
+        blocking_intervals.append((sleep_m, 1440))
+        
+    # 2. Routines
+    routines = plan.get("routines", {})
+    for r_name, r_data in routines.items():
+        if r_data.get("start") and r_data.get("end"):
+            sm = get_minutes(r_data["start"])
+            em = get_minutes(r_data["end"])
+            if sm < em:
+                blocking_intervals.append((sm, em))
+                
+    # 3. Non-parallel fixed events
+    weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
+    fixed_events = plan.get("fixed_events", [])
+    
+    parallel_intervals = []
+    
+    for ev in fixed_events:
+        if weekday_str in ev.get("weekdays", []):
+            sm = get_minutes(ev.get("start", "00:00"))
+            em = get_minutes(ev.get("end", "00:00"))
+            if sm < em:
+                if ev.get("concurrent_with_study", False):
+                    parallel_intervals.append((sm, em))
+                else:
+                    blocking_intervals.append((sm, em))
+                    
+    blocking_intervals = merge_intervals(blocking_intervals)
+    parallel_intervals = merge_intervals(parallel_intervals)
+    
+    total_blocked_minutes = 0
+    for b_start, b_end in blocking_intervals:
+        overlap = 0
+        for p_start, p_end in parallel_intervals:
+            o_start = max(b_start, p_start)
+            o_end = min(b_end, p_end)
+            if o_start < o_end:
+                overlap += (o_end - o_start)
+        total_blocked_minutes += (b_end - b_start) - overlap
+        
+    free_minutes = 1440 - total_blocked_minutes
+    free_hours = free_minutes / 60.0
+    return math.floor(free_hours * 2)
+
+def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
+    subjects_data = plan.get("subjects", [])
+    start_date_str = plan.get("start_date")
+    end_date_str = plan.get("end_date")
+    
+    if not subjects_data or not start_date_str or not end_date_str:
+        return []
+        
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except Exception:
+        return []
+        
+    if end_date < start_date:
+        return []
+        
+    total_days = (end_date - start_date).days + 1
+    
+    # 1. 計算每天的可用番茄鐘數
+    daily_pomodoros = []
+    total_pomodoros = 0
+    current_date = start_date
+    for _ in range(total_days):
+        p = calculate_daily_available_pomodoros(current_date, plan)
+        daily_pomodoros.append({"date": current_date.strftime("%Y-%m-%d"), "pomodoros": p})
+        total_pomodoros += p
+        current_date += timedelta(days=1)
+        
+    if total_pomodoros == 0:
         return []
 
-    # 1. 計算有效天數與緩衝天數 (八二法則)
+    # 2. 計算有效天數與緩衝天數 (八二法則)
     effective_days = math.floor(total_days * 0.8)
     buffer_days = total_days - effective_days
-
-    # 2. 計算總可用番茄鐘
-    pomodoros_per_day = math.floor(daily_hours * 2)
-    if pomodoros_per_day == 0:
-        return []
-
-    total_pomodoros = effective_days * pomodoros_per_day
+    
+    # 計算「有效學習日」的番茄鐘總數
+    effective_pomodoros = sum(d["pomodoros"] for d in daily_pomodoros[:effective_days])
 
     # 3. 處理科目資料，計算每個科目的總頁數/進度
     subject_progress = []
@@ -388,68 +489,62 @@ def generate_daily_schedule(subjects_data: List[Dict[str, Any]], total_days: int
             "remaining_qty": total_qty
         })
 
-    # 計算每個科目可以分配到幾個番茄鐘 (平均分配)
     num_subjects = len(subject_progress)
     if num_subjects == 0:
         return []
 
-    base_pomo_per_subject = total_pomodoros // num_subjects
-    remainder = total_pomodoros % num_subjects
+    base_pomo_per_subject = effective_pomodoros // num_subjects
+    remainder = effective_pomodoros % num_subjects
 
     for i, sp in enumerate(subject_progress):
         pomo_count = base_pomo_per_subject + (1 if i < remainder else 0)
         sp["allocated_pomodoros"] = pomo_count
         sp["remaining_pomodoros"] = pomo_count
-        # 避免除以零
         sp["progress_per_pomo"] = sp["total_qty"] / pomo_count if pomo_count > 0 else 0
 
     # 4. 產生每一天的排程
     schedule = []
     
-    # 準備用來輪詢的科目隊列
     available_subjects = [sp for sp in subject_progress if sp["remaining_pomodoros"] > 0]
     last_subject_name = None
     consecutive_count = 0
 
-    day = 1
     # 安排有效學習日
-    for _ in range(effective_days):
-        for pomo_idx in range(1, pomodoros_per_day + 1):
+    for day_idx in range(effective_days):
+        day_info = daily_pomodoros[day_idx]
+        d_str = day_info["date"]
+        p_count = day_info["pomodoros"]
+        
+        for pomo_idx in range(1, p_count + 1):
             if not available_subjects:
                 break
             
-            # 依照剩餘番茄鐘數排序，優先安排剩比較多的科目
             available_subjects.sort(key=lambda x: x["remaining_pomodoros"], reverse=True)
-            
-            # 尋找下一個要安排的科目
             chosen_sp = None
             
-            # 防疲勞規則：如果最高優先權的科目與上次相同且連續2次了，則嘗試找下一個
             if available_subjects[0]["name"] == last_subject_name and consecutive_count >= 2:
                 if len(available_subjects) > 1:
                     chosen_sp = available_subjects[1]
                 else:
-                    chosen_sp = available_subjects[0] # 只有一個科目能排了
+                    chosen_sp = available_subjects[0]
             else:
                 chosen_sp = available_subjects[0]
             
-            # 記錄安排
             progress_val = chosen_sp["progress_per_pomo"]
-            # 格式化進度數值，如果是整數則不顯示小數點
             if progress_val.is_integer():
                 progress_str = f"{int(progress_val)} {chosen_sp['unit']}"
             else:
                 progress_str = f"{progress_val:.1f} {chosen_sp['unit']}"
 
             schedule.append({
-                "第幾天": f"Day {day}",
+                "date": d_str,
+                "第幾天": f"Day {day_idx + 1}",
                 "屬性": "學習日",
                 "番茄鐘節次": f"第 {pomo_idx} 節",
                 "科目": chosen_sp["name"],
                 "目標進度": progress_str
             })
 
-            # 更新狀態
             chosen_sp["remaining_pomodoros"] -= 1
             if chosen_sp["remaining_pomodoros"] <= 0:
                 available_subjects.remove(chosen_sp)
@@ -459,19 +554,21 @@ def generate_daily_schedule(subjects_data: List[Dict[str, Any]], total_days: int
             else:
                 last_subject_name = chosen_sp["name"]
                 consecutive_count = 1
-                
-        day += 1
 
     # 安排緩衝/總複習日
-    for _ in range(buffer_days):
-        for pomo_idx in range(1, pomodoros_per_day + 1):
+    for day_idx in range(effective_days, total_days):
+        day_info = daily_pomodoros[day_idx]
+        d_str = day_info["date"]
+        p_count = day_info["pomodoros"]
+        
+        for pomo_idx in range(1, p_count + 1):
             schedule.append({
-                "第幾天": f"Day {day}",
+                "date": d_str,
+                "第幾天": f"Day {day_idx + 1}",
                 "屬性": "緩衝/總複習日",
                 "番茄鐘節次": f"第 {pomo_idx} 節",
                 "科目": "總複習 (自由安排)",
                 "目標進度": "0 單位 (僅複習)"
             })
-        day += 1
 
     return schedule

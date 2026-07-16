@@ -585,6 +585,21 @@ def render_setup_page() -> None:
     with c2:
         weekday_sleep = render_time_picker("平日睡覺", st.session_state.get("weekday_sleep", "23:30"), "weekday_sleep")
         weekend_sleep = render_time_picker("假日睡覺", st.session_state.get("weekend_sleep", "00:30"), "weekend_sleep")
+        
+    st.markdown("#### 日常行程 (系統將自動扣除這些時段以計算可用讀書時數)")
+    r1, r2, r3, r4 = st.columns(4)
+    with r1:
+        prep_start = render_time_picker("早上準備/早餐開始", st.session_state.get("prep_start", "07:00"), "prep_start")
+        prep_end = render_time_picker("早上準備/早餐結束", st.session_state.get("prep_end", "08:00"), "prep_end")
+    with r2:
+        lunch_start = render_time_picker("午餐開始", st.session_state.get("lunch_start", "12:00"), "lunch_start")
+        lunch_end = render_time_picker("午餐結束", st.session_state.get("lunch_end", "13:00"), "lunch_end")
+    with r3:
+        dinner_start = render_time_picker("晚餐開始", st.session_state.get("dinner_start", "18:00"), "dinner_start")
+        dinner_end = render_time_picker("晚餐結束", st.session_state.get("dinner_end", "19:00"), "dinner_end")
+    with r4:
+        bath_start = render_time_picker("洗澡開始", st.session_state.get("bath_start", "21:00"), "bath_start")
+        bath_end = render_time_picker("洗澡結束", st.session_state.get("bath_end", "21:30"), "bath_end")
 
     if st.button("生成完整讀書計畫"):
         if end_date < start_date:
@@ -602,6 +617,12 @@ def render_setup_page() -> None:
             "weekday_sleep": weekday_sleep,
             "weekend_wake": weekend_wake,
             "weekend_sleep": weekend_sleep,
+            "routines": {
+                "prep": {"start": prep_start, "end": prep_end},
+                "lunch": {"start": lunch_start, "end": lunch_end},
+                "dinner": {"start": dinner_start, "end": dinner_end},
+                "bath": {"start": bath_start, "end": bath_end},
+            }
         }
         plan_data, daily_data = collect_plan_and_daily_data(payload)
         st.session_state["plan"] = plan_data

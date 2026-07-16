@@ -248,7 +248,24 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.session_state.pop(_ed_key, None)
             st.rerun()
 
-def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
+@st.dialog("📅 當日讀書進度")
+def view_daily_progress_dialog(date_str: str):
+    st.markdown(f"### {date_str}")
+    schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
+    
+    if not schedule_data:
+        st.info("尚未生成排程計畫")
+    else:
+        # Filter for this specific date
+        daily_schedule = [s for s in schedule_data if s.get("date") == date_str]
+        
+        if not daily_schedule:
+            st.write("這天沒有排定進度或為非學習日。")
+        else:
+            st.dataframe(daily_schedule, use_container_width=True)
+            
+    if st.button("關閉", type="primary", use_container_width=True):
+        st.rerun()def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
     """Build a pure HTML table for the calendar month."""
     headers = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     weeks = _month_calendar_dates(year, month)
@@ -285,7 +302,10 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                 num_weight = "normal"
                 bg = "#fafafa"
 
-            num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
+            if is_active:
+                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;"><a href="?view_date={day_str}" target="_self" style="text-decoration:none; color:inherit;">{day.day}</a></div>'
+            else:
+                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
 
             # Events
             events_html = ""
@@ -343,11 +363,9 @@ def render_monthly_plan_page() -> None:
     st.markdown("## 每日讀書進度排程 (番茄鐘演算法)")
     col1, col2 = st.columns([1, 2])
     with col1:
-        daily_hours = st.number_input("每日可讀書時數 (小時)", min_value=1.0, max_value=24.0, value=4.0, step=0.5, key="daily_hours_input")
+        st.write("系統會根據您在初始設定的「每日作息」與「固定行程」，自動計算每日可用時間並安排讀書計畫。")
         if st.button("生成排程計畫", key="generate_schedule_btn", type="primary"):
-            total_days = (end_date - start_date).days + 1
-            subjects_data = plan.get("subjects", [])
-            schedule_result = logic.generate_daily_schedule(subjects_data, total_days, daily_hours)
+            schedule_result = logic.generate_daily_schedule(plan)
             st.session_state["app_state"]["monthly_plan"] = schedule_result
             st.rerun()
             
@@ -364,11 +382,17 @@ def render_monthly_plan_page() -> None:
 
     qp = st.query_params
     edit_val = qp.get("edit_event", None)
+    view_val = qp.get("view_date", None)
+    
     if edit_val:
         st.query_params.clear()
         parts = edit_val.split("|")
         if len(parts) == 2:
             edit_event_dialog(parts[0], int(parts[1]))
+            
+    if view_val:
+        st.query_params.clear()
+        view_daily_progress_dialog(view_val)
 
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
@@ -477,23 +501,34 @@ def render_monthly_plan_page() -> None:
                     
             st.markdown("#### 📖 月進度")
             with st.container(border=True):
+                schedule_data = st.session_state.get("app_state", {}).get("monthly_plan", [])
+                prefix = f"{year}-{month:02d}-"
+                month_schedules = [s for s in schedule_data if s.get("date", "").startswith(prefix)]
+                
                 progress = {}
-                for _item in _items:
-                    if _item.get("tasks"):
-                        for task in _item["tasks"]:
-                            parts = task.split(" - ", 1)
-                            if len(parts) == 2:
-                                subj = parts[0].strip()
-                                detail = parts[1].strip()
-                                if detail not in progress.setdefault(subj, []):
-                                    progress[subj].append(detail)
-                            # tasks without " - " separator are silently skipped
+                if month_schedules:
+                    for s in month_schedules:
+                        subj = s.get("科目", "")
+                        if subj == "總複習 (自由安排)":
+                            continue
+                        tgt = s.get("目標進度", "")
+                        parts = tgt.split(" ")
+                        if len(parts) == 2:
+                            try:
+                                val = float(parts[0])
+                                unit = parts[1]
+                                if subj not in progress:
+                                    progress[subj] = {}
+                                progress[subj][unit] = progress[subj].get(unit, 0) + val
+                            except:
+                                pass
                                 
                 if progress:
-                    for subj, details in progress.items():
+                    for subj, units in progress.items():
                         st.markdown(f"<div style='font-size:15px; font-weight:bold; margin-top:6px; margin-bottom:2px;'>{subj}</div>", unsafe_allow_html=True)
-                        for d in details:
-                            st.markdown(f"<div style='font-size:14px; margin-left:10px; margin-bottom:4px;'>• {d}</div>", unsafe_allow_html=True)
+                        for unit, val in units.items():
+                            val_str = f"{int(val)}" if val.is_integer() else f"{val:.1f}"
+                            st.markdown(f"<div style='font-size:14px; margin-left:10px; margin-bottom:4px;'>• 共 {val_str} {unit}</div>", unsafe_allow_html=True)
                 else:
                     st.write("本月無學習進度")
         
