@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import streamlit as st
-from utils import COLOR_OPTIONS, EMOJI_OPTIONS
+from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
 from logic import calculate_daily_available_sessions
 import logic
 
