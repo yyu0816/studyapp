@@ -130,15 +130,14 @@ def render_dashboard():
             if not subject_rankings:
                 st.info("目前尚無科目資料。")
             else:
-                rank_cols = st.columns(len(subject_rankings))
-                for idx, subj_data in enumerate(subject_rankings):
-                    with rank_cols[idx]:
-                        # Square box using HTML aspect-ratio
-                        box_html = f"""<div style="height: 140px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
+                boxes_html = '<div style="display: flex; gap: 16px; justify-content: flex-start; flex-wrap: wrap;">'
+                for subj_data in subject_rankings:
+                    boxes_html += f"""<div style="width: 140px; height: 140px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 2px solid {subj_data['color']}33;">
     <h4 style="margin: 0 0 8px 0; color: #555; font-size: 16px;">{subj_data['name']}</h4>
     <h2 style="margin: 0; color: {subj_data['color']}; font-weight: 800; font-size: 32px;">{subj_data['progress']}%</h2>
 </div>"""
-                        st.markdown(box_html, unsafe_allow_html=True)
+                boxes_html += '</div>'
+                st.markdown(boxes_html, unsafe_allow_html=True)
                         
         st.markdown("<br/>", unsafe_allow_html=True)
 
@@ -156,10 +155,14 @@ def render_dashboard():
             
             st.markdown("<p style='font-size: 14px; color: #666; margin-bottom: 16px;'>過去 30 天的心情紀錄（未來將支援自訂圖案與顏色）：</p>", unsafe_allow_html=True)
             
-            circles_html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; padding: 10px;">'
+            circles_html = '<div style="display: grid; grid-template-columns: repeat(10, max-content); gap: 12px; justify-content: flex-start; padding: 10px;">'
             for idx, score in enumerate(mood_history):
                 color = mood_colors.get(score, "#dfe6e9")
-                circles_html += f"""<div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>"""
+                label = f"Day {idx+1}" if (idx % 10 == 0 or idx % 10 == 9) else "&nbsp;"
+                circles_html += f"""<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+    <span style="font-size: 10px; color: #888; height: 14px; line-height: 14px;">{label}</span>
+    <div style="width: 36px; height: 36px; border-radius: 50%; background-color: {color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; transition: transform 0.2s;" title="第 {idx+1} 天 - 狀態分數: {score}" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
+</div>"""
             circles_html += '</div>'
             
             st.markdown(circles_html, unsafe_allow_html=True)
