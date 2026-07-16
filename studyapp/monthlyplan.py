@@ -96,9 +96,12 @@ def add_event_dialog(day_str: str):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=False)
     if use_custom_color:
-        color = st.color_picker("選擇顏色", value=preset_color, key="add_dlg_cp")
+        if "add_dlg_cp" not in st.session_state:
+            st.session_state["add_dlg_cp"] = preset_color
+        color = st.color_picker("選擇顏色", key="add_dlg_cp")
     else:
         color = preset_color
+        st.session_state.pop("add_dlg_cp", None)
 
     concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=False)
 
@@ -112,6 +115,7 @@ def add_event_dialog(day_str: str):
         # clean up temp keys
         st.session_state.pop(_sd_key, None)
         st.session_state.pop(_ed_key, None)
+        st.session_state.pop("add_dlg_cp", None)
 
         st.session_state.setdefault("daily_override_events", {})
         cur = start_date
@@ -201,9 +205,12 @@ def edit_event_dialog(date_str: str, ev_idx: int):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
     use_custom_color = st.checkbox("使用自訂顏色", value=bool(is_custom), key="edit_custom_color")
     if use_custom_color:
-        color = st.color_picker("選擇顏色", value=cur_color, key="edit_dlg_cp")
+        if "edit_dlg_cp" not in st.session_state:
+            st.session_state["edit_dlg_cp"] = cur_color
+        color = st.color_picker("選擇顏色", key="edit_dlg_cp")
     else:
         color = preset_color
+        st.session_state.pop("edit_dlg_cp", None)
 
     concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=concurrent_orig, key="edit_concurrent")
 
@@ -237,19 +244,20 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                 cur += timedelta(days=1)
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
+            st.session_state.pop("edit_dlg_cp", None)
             st.rerun()
     with col_del:
-        if st.button("🗑️ 刪除", use_container_width=True):
+        if st.button("刪除", use_container_width=True, type="secondary"):
             for d_str in matching_dates:
-                override[d_str] = [e for e in override[d_str] if not (
-                    e.get("title", "") == title_orig and 
-                    e.get("emoji", "📌") == emoji_orig and 
-                    e.get("display_color", e.get("color", "#4f84ff")) == color_orig and
-                    e.get("start", "00:00") == start_orig and
-                    e.get("end", "23:59") == end_orig
-                )]
+                for idx, event in enumerate(st.session_state["daily_override_events"][d_str]):
+                    if (event.get("title", "") == title_orig and 
+                        event.get("start", "") == start_time_orig and
+                        event.get("end", "") == end_time_orig):
+                        st.session_state["daily_override_events"][d_str].pop(idx)
+                        break
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
+            st.session_state.pop("edit_dlg_cp", None)
             st.rerun()
 
 def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:

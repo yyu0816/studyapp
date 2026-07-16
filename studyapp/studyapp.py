@@ -17,7 +17,9 @@ st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layo
 
 # 3. 再來才是 import 你的頁面函式
 from monthlyplan import render_monthly_plan_page
-from dailycheck import render_daily_checkin_page, get_adjustment_message
+from dailycheck import render_daily_check_page, get_adjustment_message
+from datetime import date, datetime, timedelta
+from timeline_utils import render_timeline
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -742,29 +744,76 @@ def render_home_page() -> None:
         if col_progress:
             with col_progress:
                 st.markdown(f"### 📅 {cal_view_date}")
-                st.markdown("當日讀書進度")
+                
                 schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
                 if not schedule_data:
                     st.info("尚未生成排程計畫")
                 else:
                     daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
-                    if not daily_schedule:
-                        st.write("這天沒有排定進度或為非學習日。")
-                    else:
-                        for item in daily_schedule:
-                            attr = item.get("屬性", "")
-                            block = item.get("學習區塊", "")
-                            subj = item.get("科目", "")
-                            mat = item.get("教材", "")
-                            target = item.get("目標進度", "")
-                            color = "#4f84ff" if attr == "學習日" else "#ff9f43"
-                            
-                            if mat and mat != "-":
-                                display_text = f"{subj} - {mat}：{target}"
+                    
+                    plan = st.session_state.get("plan", {})
+                    fixed_events = plan.get("fixed_events", [])
+                    overrides = st.session_state.get("daily_override_events", {}).get(cal_view_date, [])
+                    modified_fixed = st.session_state.get("daily_modified_fixed", {}).get(cal_view_date, {})
+                    
+                    try:
+                        cal_date_obj = datetime.strptime(cal_view_date, "%Y-%m-%d").date()
+                        weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][cal_date_obj.weekday()]
+                    except Exception:
+                        weekday_str = ""
+                    
+                    today_events = []
+                    
+                    # 1. Fixed events
+                    for f_idx, e in enumerate(fixed_events):
+                        if weekday_str in e.get("weekdays", []):
+                            if f_idx in modified_fixed:
+                                if not modified_fixed[f_idx].get("deleted"):
+                                    m_event = modified_fixed[f_idx].copy()
+                                    m_event["_is_fixed"] = True
+                                    today_events.append(m_event)
                             else:
-                                display_text = f"{subj}：{target}"
+                                e_copy = e.copy()
+                                e_copy["_is_fixed"] = True
+                                today_events.append(e_copy)
                                 
-                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{block}</b><br/>{display_text}</div>", unsafe_allow_html=True)
+                    # 2. Overrides
+                    for o_idx, e in enumerate(overrides):
+                        e_copy = e.copy()
+                        e_copy["_is_override"] = True
+                        today_events.append(e_copy)
+                        
+                    # 3. Study Sessions
+                    for item in daily_schedule:
+                        attr = item.get("屬性", "")
+                        block = item.get("學習區塊", "")
+                        subj = item.get("科目", "")
+                        mat = item.get("教材", "")
+                        target = item.get("目標進度", "")
+                        
+                        start_time = item.get("start_time", "08:00")
+                        end_time = item.get("end_time", "09:00")
+                        
+                        if mat and mat != "-":
+                            display_text = f"{mat}：{target}"
+                        else:
+                            display_text = f"{target}"
+                            
+                        today_events.append({
+                            "title": subj,
+                            "subtitle": display_text,
+                            "start": start_time,
+                            "end": end_time,
+                            "color": "#4f84ff" if attr == "學習日" else "#ff9f43",
+                            "emoji": "📖",
+                            "is_all_day": False
+                        })
+                        
+                    if not today_events:
+                        st.write("這天沒有排定進度或行程。")
+                    else:
+                        render_timeline(today_events, title="")
+                        
                 if st.button("✕ 關閉", key="close_daily_view", use_container_width=True):
                     st.session_state["cal_view_date"] = None
                     st.rerun()

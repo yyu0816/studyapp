@@ -414,6 +414,70 @@ def calculate_daily_available_sessions(current_date, plan):
     free_hours = free_minutes / 60.0
     return math.floor(free_hours)
 
+def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
+    is_weekend = current_date.weekday() >= 5
+    wake_key = "weekend_wake" if is_weekend else "weekday_wake"
+    sleep_key = "weekend_sleep" if is_weekend else "weekday_sleep"
+    
+    wake_time = plan.get(wake_key, "07:00")
+    sleep_time = plan.get(sleep_key, "23:30")
+    
+    wake_m = get_minutes(wake_time)
+    sleep_m = get_minutes(sleep_time)
+    
+    blocking_intervals = []
+    
+    # 1. Sleep
+    if sleep_m <= wake_m:
+        blocking_intervals.append((0, wake_m))
+        if sleep_m > 0:
+            blocking_intervals.append((sleep_m, 1440))
+    else:
+        blocking_intervals.append((0, wake_m))
+        blocking_intervals.append((sleep_m, 1440))
+        
+    # 2. Routines
+    routines = plan.get("routines", {})
+    for r_name, r_data in routines.items():
+        if r_data.get("start") and r_data.get("end"):
+            sm = get_minutes(r_data["start"])
+            em = get_minutes(r_data["end"])
+            if sm < em:
+                blocking_intervals.append((sm, em))
+                
+    # 3. Non-parallel fixed events
+    weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
+    fixed_events = plan.get("fixed_events", [])
+    
+    for ev in fixed_events:
+        if weekday_str in ev.get("weekdays", []):
+            sm = get_minutes(ev.get("start", "00:00"))
+            em = get_minutes(ev.get("end", "00:00"))
+            if sm < em:
+                if not ev.get("concurrent_with_study", False):
+                    blocking_intervals.append((sm, em))
+                    
+    blocking_intervals = merge_intervals(blocking_intervals)
+    
+    # Extract free 60-minute slots
+    slots = []
+    current_m = 0
+    for b_start, b_end in blocking_intervals:
+        if b_start > current_m:
+            free_duration = b_start - current_m
+            num_slots = free_duration // 60
+            for i in range(num_slots):
+                slots.append((current_m + i * 60, current_m + (i + 1) * 60))
+        current_m = max(current_m, b_end)
+        
+    if 1440 > current_m:
+        free_duration = 1440 - current_m
+        num_slots = free_duration // 60
+        for i in range(num_slots):
+            slots.append((current_m + i * 60, current_m + (i + 1) * 60))
+            
+    return slots
+
 def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
     subjects_data = plan.get("subjects", [])
     start_date_str = plan.get("start_date")
@@ -438,8 +502,9 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
     total_sessions = 0
     current_date = start_date
     for _ in range(total_days):
-        s = calculate_daily_available_sessions(current_date, plan)
-        daily_sessions.append({"date": current_date.strftime("%Y-%m-%d"), "sessions": s})
+        slots = get_daily_free_slots(current_date, plan)
+        s = len(slots)
+        daily_sessions.append({"date": current_date.strftime("%Y-%m-%d"), "sessions": s, "slots": slots})
         total_sessions += s
         current_date += timedelta(days=1)
         
@@ -524,11 +589,17 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             else:
                 progress_str = f"{progress_val:.1f} {chosen_sp['unit']}"
 
+            slot = day_info["slots"][session_idx - 1] if session_idx - 1 < len(day_info["slots"]) else (0, 60)
+            start_str = f"{slot[0]//60:02d}:{slot[0]%60:02d}"
+            end_str = f"{slot[1]//60:02d}:{slot[1]%60:02d}"
+            
             schedule.append({
                 "date": d_str,
                 "第幾天": f"Day {day_idx + 1}",
                 "屬性": "學習日",
                 "學習區塊": f"第 {session_idx} 節 (1小時)",
+                "start_time": start_str,
+                "end_time": end_str,
                 "科目": chosen_sp["subject"],
                 "教材": chosen_sp["material"],
                 "目標進度": progress_str
@@ -553,11 +624,17 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
         s_count = day_info["sessions"]
         
         for session_idx in range(1, s_count + 1):
+            slot = day_info["slots"][session_idx - 1] if session_idx - 1 < len(day_info["slots"]) else (0, 60)
+            start_str = f"{slot[0]//60:02d}:{slot[0]%60:02d}"
+            end_str = f"{slot[1]//60:02d}:{slot[1]%60:02d}"
+            
             schedule.append({
                 "date": d_str,
                 "第幾天": f"Day {day_idx + 1}",
                 "屬性": "緩衝/總複習日",
                 "學習區塊": f"第 {session_idx} 節 (1小時)",
+                "start_time": start_str,
+                "end_time": end_str,
                 "科目": "總複習 (自由安排)",
                 "教材": "-",
                 "目標進度": "0 單位 (僅複習)"
