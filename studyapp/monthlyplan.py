@@ -8,6 +8,11 @@ from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
 from logic import calculate_daily_available_sessions
 import logic
 
+def _sync_hex_to_cp(hex_key: str, cp_key: str):
+    val = st.session_state.get(hex_key, "")
+    if val.startswith("#") and len(val) == 7:
+        st.session_state[cp_key] = val
+
 
 def _parse_date(date_str: str) -> date:
     return datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -103,7 +108,7 @@ def add_event_dialog(day_str: str):
                 st.session_state["add_dlg_cp"] = preset_color
             picked_color = st.color_picker("顏色", key="add_dlg_cp", label_visibility="collapsed")
         with c2:
-            hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", label_visibility="collapsed")
+            hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("add_dlg_hex", "add_dlg_cp"))
             
         if hex_val.startswith("#") and len(hex_val) == 7:
             color = hex_val
@@ -221,7 +226,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                 st.session_state["edit_dlg_cp"] = cur_color
             picked_color = st.color_picker("顏色", key="edit_dlg_cp", label_visibility="collapsed")
         with c2:
-            hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed")
+            hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("edit_dlg_hex", "edit_dlg_cp"))
             
         if hex_val.startswith("#") and len(hex_val) == 7:
             color = hex_val
