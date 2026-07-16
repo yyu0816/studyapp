@@ -25,6 +25,7 @@ def get_mock_weekly_study_duration(week_offset=0):
         
         data.append({
             "date": day.strftime("%Y-%m-%d"),
+            "date_label": day.strftime("%m/%d"),
             "duration": duration,
             "duration_str": duration_str
         })
@@ -100,8 +101,8 @@ def render_dashboard():
     subject_rankings = get_subject_ranking()
     mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
     
-    # Main Layout: Left 1/3, Right 2/3
-    col_left, col_right = st.columns([1, 2], gap="large")
+    # Main Layout: 50/50 to equalize left and right container widths
+    col_left, col_right = st.columns(2, gap="large")
     
     # ================== LEFT COLUMN (1/3) ==================
     with col_left:
@@ -119,10 +120,10 @@ def render_dashboard():
         with st.container(border=True):
             # Create Altair Line Chart
             chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
-                x=alt.X('date:O', title='日期', axis=alt.Axis(labelAngle=-45)),
+                x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=0)),
                 y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
                 tooltip=[
-                    alt.Tooltip('date:T', title='日期', format='%Y-%m-%d'),
+                    alt.Tooltip('date:N', title='日期'),
                     alt.Tooltip('duration_str:N', title='讀書時長')
                 ]
             ).properties(
