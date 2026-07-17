@@ -85,6 +85,14 @@ def render_daily_checkin_page() -> None:
             pass
 
     col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_l:
+        plan_name = st.session_state.get("plan_name", "")
+        plan_goal = st.session_state.get("plan_goal", "")
+        if plan_name:
+            st.markdown(f"<div style='font-size: 20px; font-weight: bold; color: #333; margin-top: 10px;'>{plan_name}</div>", unsafe_allow_html=True)
+        if plan_goal:
+            st.markdown(f"<div style='font-size: 13px; color: #666; margin-top: 4px;'>{plan_goal}</div>", unsafe_allow_html=True)
+
     with col_m:
         with st.container(border=True):
             hc1, hc2, hc3 = st.columns([1, 6, 1])

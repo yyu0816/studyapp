@@ -455,8 +455,8 @@ def render_setup_page() -> None:
     st.subheader("1. 初始設定")
     _initialize_session_state()
 
-    plan_name = st.text_input("讀書計畫名稱", value=st.session_state.get("plan_name", ""), key="plan_name")
-    plan_goal = st.text_area("計畫目標", value=st.session_state.get("plan_goal", ""), placeholder="例如：每天至少看完 50 頁，並保持穩定複習節奏。", key="plan_goal")
+    plan_name = st.text_input("讀書計畫名稱", key="plan_name")
+    plan_goal = st.text_area("計畫目標", placeholder="進入班排前十、書卷獎、比上次進步五名...", key="plan_goal")
 
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
     end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date")
@@ -721,6 +721,10 @@ def render_home_page() -> None:
         color: white;
         border-color: #4f84ff;
     }
+    /* Reduce spacing between sidebar and main content/timeline */
+    .block-container {
+        padding-left: 2rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -881,15 +885,21 @@ def render_home_page() -> None:
         
         if col_main:
             with col_main:
+                if st.session_state.get("plan_name"):
+                    st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
+                    if st.session_state.get("plan_goal"):
+                        st.markdown(f"<p style='font-size: 16px; color: #555;'>🎯 <b>目標：</b>{st.session_state['plan_goal']}</p>", unsafe_allow_html=True)
+                else:
+                    st.title("讀書計畫安排助手")
+                    st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
+        else:
+            if st.session_state.get("plan_name"):
+                st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
+                if st.session_state.get("plan_goal"):
+                    st.markdown(f"<p style='font-size: 16px; color: #555;'>🎯 <b>目標：</b>{st.session_state['plan_goal']}</p>", unsafe_allow_html=True)
+            else:
                 st.title("讀書計畫安排助手")
                 st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
-                if st.session_state.get("plan_name"):
-                    st.markdown(f"### {st.session_state['plan_name']}")
-        else:
-            st.title("讀書計畫安排助手")
-            st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
-            if st.session_state.get("plan_name"):
-                st.markdown(f"### {st.session_state['plan_name']}")
 
     if page == "計劃頁面":
         if col_main:
@@ -916,4 +926,4 @@ def render_home_page() -> None:
 if __name__ == "__main__":
     render_home_page()
 
-# Trigger refresh 10
+# Trigger refresh 11
