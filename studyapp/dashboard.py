@@ -134,7 +134,7 @@ def render_dashboard():
             with st.container(border=True, height=420):
                 # Create Altair Line Chart
                 chart = alt.Chart(df_weekly).mark_line(point=alt.OverlayMarkDef(size=80, filled=True)).encode(
-                    x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=-45, labelOverlap=False)),
+                    x=alt.X('date_label:O', title='日期', axis=alt.Axis(labelAngle=-45)),
                     y=alt.Y('duration:Q', title='讀書時長 (小時)', scale=alt.Scale(domain=[0, max(df_weekly['duration']) + 2])),
                     tooltip=[
                         alt.Tooltip('date:N', title='日期'),
