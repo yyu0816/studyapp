@@ -455,12 +455,11 @@ def render_setup_page() -> None:
     st.subheader("1. 初始設定")
     _initialize_session_state()
 
-    def _sync_plan_info():
-        st.session_state["plan_name"] = st.session_state["_widget_plan_name"]
-        st.session_state["plan_goal"] = st.session_state["_widget_plan_goal"]
+    if "plan_name" not in st.session_state: st.session_state["plan_name"] = ""
+    if "plan_goal" not in st.session_state: st.session_state["plan_goal"] = ""
 
-    plan_name = st.text_input("讀書計畫名稱", value=st.session_state.get("plan_name", ""), key="_widget_plan_name", on_change=_sync_plan_info)
-    plan_goal = st.text_area("計畫目標", value=st.session_state.get("plan_goal", ""), placeholder="進入班排前十、書卷獎、比上次進步五名...", key="_widget_plan_goal", on_change=_sync_plan_info)
+    st.session_state["plan_name"] = st.text_input("讀書計畫名稱", value=st.session_state["plan_name"])
+    st.session_state["plan_goal"] = st.text_area("計畫目標", value=st.session_state["plan_goal"], placeholder="進入班排前十、書卷獎、比上次進步五名...")
 
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
     end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date")
@@ -930,4 +929,4 @@ def render_home_page() -> None:
 if __name__ == "__main__":
     render_home_page()
 
-# Trigger refresh 12
+# Trigger refresh 13
