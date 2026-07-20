@@ -91,10 +91,11 @@ def render_dashboard():
     st.markdown("## 📊 儀表板 (Dashboard)")
     
     st.markdown("""
+    <span id="dashboard-marker"></span>
     <style>
-    /* Safely target ONLY the bottom containers in dashboard columns to fix their width to 364px (equal to 3 leaderboard boxes) and height */
-    div[data-testid="column"]:nth-of-type(1) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"],
-    div[data-testid="column"]:nth-of-type(2) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* Safely target ONLY the dashboard columns by checking for the dashboard marker */
+    div[data-testid="stVerticalBlock"]:has(#dashboard-marker) div[data-testid="column"]:nth-of-type(1) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stVerticalBlock"]:has(#dashboard-marker) div[data-testid="column"]:nth-of-type(2) > div[data-testid="stVerticalBlock"] > div.element-container:nth-of-type(4) div[data-testid="stVerticalBlockBorderWrapper"] {
         max-width: 364px !important;
         width: 100% !important;
     }
