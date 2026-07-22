@@ -514,7 +514,9 @@ def render_setup_page() -> None:
                     st.session_state[f"subject_color_{idx}"] = subject.get("color", "#4f84ff")
                     
                 def _update_subj_color(i=idx):
-                    st.session_state[f"subject_color_{i}"] = st.session_state[f"subj_hex_in_{i}"]
+                    hex_val = st.session_state.get(f"subj_hex_in_{i}")
+                    if hex_val:
+                        st.session_state[f"subject_color_{i}"] = hex_val
                     
                 color_val = st.color_picker("科目代表色", key=f"subject_color_{idx}")
                 st.text_input("或輸入色號", value=color_val, key=f"subj_hex_in_{idx}", on_change=_update_subj_color, kwargs={"i": idx})
