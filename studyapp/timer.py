@@ -11,7 +11,11 @@ def render_timer_page():
     today_str = now.strftime("%Y/%m/%d")
     time_str = now.strftime("%H:%M")
     
-    st.markdown(f"### {today_str}(星期{weekday_map[now.weekday()]}) {time_str}")
+    # 左右排版：時間軸拉到最上方
+    col_left, col_right = st.columns(2, gap="large")
+    
+    with col_left:
+        st.markdown(f"### {today_str}(星期{weekday_map[now.weekday()]}) {time_str}")
     
     # 取得當前進度與預設進度
     app_state = st.session_state.get("app_state", {})
@@ -20,83 +24,78 @@ def render_timer_page():
     
     daily_checks = st.session_state.get("daily_task_checks", {}).get(now.strftime("%Y-%m-%d"), {})
     
-    # 格式化科目名稱
-    def format_task(s):
-        subj = s.get('科目', '')
-        mat = s.get('教材', '')
-        if not mat or mat == '-' or subj == mat:
-            return subj
-        return f"{subj} - {mat}"
+        # 格式化科目名稱
+        def format_task(s):
+            subj = s.get('科目', '')
+            mat = s.get('教材', '')
+            if not mat or mat == '-' or subj == mat:
+                return subj
+            return f"{subj} - {mat}"
 
-    # 判斷該 session 是否在打卡中已完成
-    def is_session_done(s):
-        subj_mat_prefix = f"{s.get('科目', '')} - {s.get('教材', '')}："
-        for task_name, checked in daily_checks.items():
-            if task_name.startswith(subj_mat_prefix) and checked:
-                return True
-        return False
+        # 判斷該 session 是否在打卡中已完成
+        def is_session_done(s):
+            subj_mat_prefix = f"{s.get('科目', '')} - {s.get('教材', '')}："
+            for task_name, checked in daily_checks.items():
+                if task_name.startswith(subj_mat_prefix) and checked:
+                    return True
+            return False
 
-    # 計算現在進度 (第一個未完成的)
-    current_progress = "無"
-    current_idx = -1
-    for i, s in enumerate(today_sessions):
-        if not is_session_done(s):
-            current_progress = format_task(s)
-            current_idx = i
-            break
-            
-    if current_progress == "無" and today_sessions:
-        current_progress = "今日進度已全數完成！🎉"
-        current_idx = len(today_sessions)
-        
-    # 計算預設進度 (當前時間應該做的)
-    default_progress = "無"
-    default_idx = -1
-    now_minutes = now.hour * 60 + now.minute
-    for i, s in enumerate(today_sessions):
-        if "start_time" in s and "end_time" in s:
-            sm = logic.get_minutes(s["start_time"])
-            em = logic.get_minutes(s["end_time"])
-            if sm <= now_minutes <= em:
-                default_progress = format_task(s)
-                default_idx = i
+        # 計算現在進度 (第一個未完成的)
+        current_progress = "無"
+        current_idx = -1
+        for i, s in enumerate(today_sessions):
+            if not is_session_done(s):
+                current_progress = format_task(s)
+                current_idx = i
                 break
-            elif now_minutes < sm and default_idx == -1:
-                # 這是下一個即將開始的進度
-                default_progress = format_task(s)
-                default_idx = i
+                
+        if current_progress == "無" and today_sessions:
+            current_progress = "今日進度已全數完成！🎉"
+            current_idx = len(today_sessions)
+        
+        # 計算預設進度 (當前時間應該做的)
+        default_progress = "無"
+        default_idx = -1
+        now_minutes = now.hour * 60 + now.minute
+        for i, s in enumerate(today_sessions):
+            if "start_time" in s and "end_time" in s:
+                sm = logic.get_minutes(s["start_time"])
+                em = logic.get_minutes(s["end_time"])
+                if sm <= now_minutes <= em:
+                    default_progress = format_task(s)
+                    default_idx = i
+                    break
+                elif now_minutes < sm and default_idx == -1:
+                    # 這是下一個即將開始的進度
+                    default_progress = format_task(s)
+                    default_idx = i
 
-    st.markdown(f"**現在進度:** {current_progress}")
-    st.markdown(f"**預設進度:** {default_progress}")
+        st.markdown(f"**現在進度:** {current_progress}")
+        st.markdown(f"**預設進度:** {default_progress}")
     
-    # 計算狀態
-    status_msg = "無排定進度"
-    status_color = "#999"
-    if current_idx != -1 and default_idx != -1:
-        if current_idx == default_idx:
-            status_msg = "進度穩定"
-            status_color = "#2ecc71" # 綠色
-        elif current_idx < default_idx:
-            status_msg = "進度落後"
-            status_color = "#e74c3c" # 紅色
-        else:
+        # 計算狀態
+        status_msg = "無排定進度"
+        status_color = "#999"
+        if current_idx != -1 and default_idx != -1:
+            if current_idx == default_idx:
+                status_msg = "進度穩定"
+                status_color = "#2ecc71" # 綠色
+            elif current_idx < default_idx:
+                status_msg = "進度落後"
+                status_color = "#e74c3c" # 紅色
+            else:
+                status_msg = "進度提前"
+                status_color = "#3498db" # 藍色
+        elif current_idx == len(today_sessions) and today_sessions:
             status_msg = "進度提前"
-            status_color = "#3498db" # 藍色
-    elif current_idx == len(today_sessions) and today_sessions:
-        status_msg = "進度提前"
-        status_color = "#3498db"
+            status_color = "#3498db"
 
-    st.markdown(f"""
-    <div style="border: 2px solid {status_color}; padding: 10px; border-radius: 8px; width: fit-content; margin-top: 10px; margin-bottom: 20px;">
-        <span style="color: {status_color}; font-weight: bold; font-size: 18px;">{status_msg}</span>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    
-    # 左右排版
-    col_left, col_right = st.columns(2, gap="large")
-    
-    with col_left:
+        st.markdown(f"""
+        <div style="border: 2px solid {status_color}; padding: 10px; border-radius: 8px; width: fit-content; margin-top: 10px; margin-bottom: 20px;">
+            <span style="color: {status_color}; font-weight: bold; font-size: 18px;">{status_msg}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("### ⏳ 計時器")
         
         st.markdown("#### 選擇計時進度")
