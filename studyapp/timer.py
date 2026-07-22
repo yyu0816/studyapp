@@ -92,7 +92,6 @@ def render_timer_page():
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
     
     # 左右排版
     col_left, col_right = st.columns(2, gap="large")
@@ -131,15 +130,19 @@ def render_timer_page():
         selected_task = st.selectbox("選擇項目", task_options, index=default_task_idx)
         
         # 計時器狀態
-        if "timer_start_time" not in st.session_state:
+        if "timer_state" not in st.session_state:
+            st.session_state.timer_state = "stopped"
             st.session_state.timer_start_time = None
+            st.session_state.timer_accumulated_sec = 0.0
             
         if "timer_records" not in st.session_state:
             st.session_state.timer_records = {}
             
-        if st.session_state.timer_start_time is None:
+        if st.session_state.timer_state == "stopped":
             if st.button("▶ 開始", use_container_width=True, type="primary"):
+                st.session_state.timer_state = "running"
                 st.session_state.timer_start_time = time.time()
+                st.session_state.timer_accumulated_sec = 0.0
                 st.session_state.timer_selected_task = selected_task
                 st.rerun()
             
@@ -149,42 +152,68 @@ def render_timer_page():
             </div>
             """, unsafe_allow_html=True)
         else:
-            if st.button("⏹ 結束", use_container_width=True):
-                end_time = time.time()
-                elapsed = end_time - st.session_state.timer_start_time
-                
-                # 紀錄起來，確保時間是本地時間
-                today_key = now.strftime("%Y-%m-%d")
-                if today_key not in st.session_state.timer_records:
-                    st.session_state.timer_records[today_key] = []
+            bc1, bc2 = st.columns(2)
+            
+            if st.session_state.timer_state == "running":
+                with bc1:
+                    if st.button("⏸ 暫停", use_container_width=True):
+                        elapsed_since_start = time.time() - st.session_state.timer_start_time
+                        st.session_state.timer_accumulated_sec += elapsed_since_start
+                        st.session_state.timer_state = "paused"
+                        st.session_state.timer_start_time = None
+                        st.rerun()
+            elif st.session_state.timer_state == "paused":
+                with bc1:
+                    if st.button("▶ 繼續", use_container_width=True, type="primary"):
+                        st.session_state.timer_start_time = time.time()
+                        st.session_state.timer_state = "running"
+                        st.rerun()
+                        
+            with bc2:
+                if st.button("⏹ 結束", use_container_width=True):
+                    total_elapsed = st.session_state.timer_accumulated_sec
+                    if st.session_state.timer_state == "running":
+                        total_elapsed += (time.time() - st.session_state.timer_start_time)
                     
-                end_dt = now
-                start_dt = end_dt - datetime.timedelta(seconds=elapsed)
-                
-                # 找對應的 session 來取得顏色，或預設顏色
-                task_color = "#4f84ff"
-                for s in today_sessions:
-                    if format_task(s) == st.session_state.timer_selected_task:
-                        task_color = s.get("color", "#4f84ff")
-                        break
-                
-                st.session_state.timer_records[today_key].append({
-                    "title": st.session_state.timer_selected_task,
-                    "start": start_dt.strftime("%H:%M"),
-                    "end": end_dt.strftime("%H:%M"),
-                    "duration_seconds": elapsed,
-                    "color": task_color,
-                    "emoji": "⏳"
-                })
-                
-                st.session_state.timer_start_time = None
-                st.rerun()
-                
+                    # 紀錄起來，確保時間是本地時間
+                    today_key = now.strftime("%Y-%m-%d")
+                    if today_key not in st.session_state.timer_records:
+                        st.session_state.timer_records[today_key] = []
+                        
+                    end_dt = now
+                    start_dt = end_dt - datetime.timedelta(seconds=total_elapsed)
+                    
+                    # 找對應的 session 來取得顏色，或預設顏色
+                    task_color = "#4f84ff"
+                    for s in today_sessions:
+                        if format_task(s) == st.session_state.timer_selected_task:
+                            task_color = s.get("color", "#4f84ff")
+                            break
+                    
+                    st.session_state.timer_records[today_key].append({
+                        "title": st.session_state.timer_selected_task,
+                        "start": start_dt.strftime("%H:%M"),
+                        "end": end_dt.strftime("%H:%M"),
+                        "duration_seconds": total_elapsed,
+                        "color": task_color,
+                        "emoji": "⏳"
+                    })
+                    
+                    st.session_state.timer_state = "stopped"
+                    st.session_state.timer_start_time = None
+                    st.session_state.timer_accumulated_sec = 0.0
+                    st.rerun()
+                    
             # 即時更新的計時器 (使用 JavaScript)
-            # 避免 Server 與 Browser 時鐘不同步，直接傳遞「已經過秒數」
-            elapsed_sec = time.time() - st.session_state.timer_start_time
+            if st.session_state.timer_state == "running":
+                elapsed_sec = st.session_state.timer_accumulated_sec + (time.time() - st.session_state.timer_start_time)
+                is_running = "true"
+            else:
+                elapsed_sec = st.session_state.timer_accumulated_sec
+                is_running = "false"
+                
             html_code = f"""
-            <div id="live-timer" style="font-size: 64px; font-weight: bold; font-family: monospace; text-align: center; margin: 20px 0; padding: 20px; background-color: #e8f0fe; border-radius: 12px; color: #1a73e8;">
+            <div id="live-timer" style="font-size: 64px; font-weight: bold; font-family: monospace; text-align: center; margin: 20px 0; padding: 20px; border-radius: 12px; transition: all 0.3s ease;">
                 00:00
             </div>
             <script>
@@ -192,21 +221,31 @@ def render_timer_page():
                 const initialElapsedMs = {elapsed_sec} * 1000;
                 const renderTimeMs = Date.now();
                 const timerEl = document.getElementById("live-timer");
+                const isRunning = {is_running};
                 
-                setInterval(() => {{
-                    const now = Date.now();
-                    const diffMs = (now - renderTimeMs) + initialElapsedMs;
+                function formatTime(diffMs) {{
                     let diffSec = Math.floor(diffMs / 1000);
-                    
-                    // Cap at 179:59 (10799 seconds)
                     if (diffSec < 0) diffSec = 0;
                     if (diffSec > 10799) diffSec = 10799; 
-                    
                     const min = Math.floor(diffSec / 60);
                     const sec = diffSec % 60;
-                    
-                    timerEl.innerText = String(min).padStart(2, '0') + ":" + String(sec).padStart(2, '0');
-                }}, 1000);
+                    return String(min).padStart(2, '0') + ":" + String(sec).padStart(2, '0');
+                }}
+                
+                if (isRunning) {{
+                    timerEl.style.backgroundColor = "#e8f0fe";
+                    timerEl.style.color = "#1a73e8";
+                    setInterval(() => {{
+                        const now = Date.now();
+                        const diffMs = (now - renderTimeMs) + initialElapsedMs;
+                        timerEl.innerText = formatTime(diffMs);
+                    }}, 1000);
+                }} else {{
+                    // 暫停狀態
+                    timerEl.innerText = formatTime(initialElapsedMs);
+                    timerEl.style.backgroundColor = "#fff3cd";
+                    timerEl.style.color = "#856404";
+                }}
             </script>
             """
             st.components.v1.html(html_code, height=150)
