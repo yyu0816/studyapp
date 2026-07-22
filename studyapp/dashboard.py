@@ -292,19 +292,16 @@ def render_dashboard():
                     subj_df = df_daily[df_daily['subject'] == subj['name']]
                     if not subj_df.empty:
                         max_h = subj_df['hours'].max()
-                        scale_max = max(5.0, max_h) # Force axis to show at least up to 5 hours
-                        tick_values = [i * 0.5 for i in range(int(scale_max * 2) + 2)]
+                        tick_values = [i * 0.5 for i in range(int(max_h * 2) + 2)]
                         
                         # Horizontal bar chart for daily breakdown
                         bar_chart = alt.Chart(subj_df).mark_bar(cornerRadiusEnd=4).encode(
-                            x=alt.X('hours:Q', title='讀書時長 (小時)', 
-                                    scale=alt.Scale(domain=[0, scale_max]),
-                                    axis=alt.Axis(values=tick_values, format='.1f')),
+                            x=alt.X('hours:Q', title='讀書時長 (小時)', axis=alt.Axis(values=tick_values, format='.1f')),
                             y=alt.Y('date:O', title='日期', sort='-x'),
                             color=alt.value(subj['color']),
                             tooltip=['date', 'hours']
                         ).properties(
-                            height=max(80, len(subj_df) * 35)
+                            height=max(120, len(subj_df) * 60)
                         ).configure_view(
                             strokeWidth=0
                         ).configure_axis(
