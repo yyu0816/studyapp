@@ -530,7 +530,7 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
             
     return slots
 
-def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
+def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] = None, reschedule_from_date: datetime.date = None) -> List[Dict[str, Any]]:
     subjects_data = plan.get("subjects", [])
     start_date_str = plan.get("start_date")
     end_date_str = plan.get("end_date")
@@ -549,19 +549,42 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
         
     total_days = (end_date - start_date).days + 1
     
+    # 0. 處理過去已排定的進度 (Partial Reschedule)
+    past_schedule_output = []
+    past_scheduled_qty = {}
+    
+    if existing_schedule and reschedule_from_date:
+        for item in existing_schedule:
+            try:
+                item_date = datetime.strptime(item["date"], "%Y-%m-%d").date()
+            except:
+                continue
+            if item_date < reschedule_from_date:
+                past_schedule_output.append(item)
+                if "科目" in item and item["科目"] != "總複習 (自由安排)" and "教材" in item:
+                    subj = item["科目"]
+                    mat = item["教材"]
+                    import re
+                    match = re.search(r'^(\d+)', item.get("目標進度", ""))
+                    if match:
+                        qty = int(match.group(1))
+                        past_scheduled_qty[(subj, mat)] = past_scheduled_qty.get((subj, mat), 0) + qty
+
     # 1. 取得每天可用 Session
     daily_sessions = {}
     total_sessions = 0
-    current_date = start_date
-    for _ in range(total_days):
+    scheduling_start_date = max(start_date, reschedule_from_date) if reschedule_from_date else start_date
+    current_date = scheduling_start_date
+    
+    while current_date <= end_date:
         slots = get_daily_free_slots(current_date, plan)
         s = len(slots)
         daily_sessions[current_date] = {"sessions": s, "slots": slots, "scheduled": []}
         total_sessions += s
         current_date += timedelta(days=1)
         
-    if total_sessions == 0:
-        return []
+    if total_sessions == 0 and not past_schedule_output:
+        return past_schedule_output
 
     UNIT_MAP = {"課本": "頁", "教材": "頁", "筆記": "頁", "練習題": "回", "模擬考": "回", "教學影片": "小時"}
     week_map = {"星期一": 0, "星期二": 1, "星期三": 2, "星期四": 3, "星期五": 4, "星期六": 5, "星期日": 6,
@@ -639,13 +662,16 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             qty = int(mat.get("quantity", 0))
             unit = UNIT_MAP.get(mat_type, "項")
             if qty > 0:
+                past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
+                remaining_qty = max(0, qty - past_qty)
+                
                 subject_schedules.append({
                     "subject": subj_name,
                     "color": subject.get("color", "#4f84ff"),
                     "material": mat_name,
                     "unit": unit,
                     "target_dates": list(target_dates),
-                    "remaining_qty": qty,
+                    "remaining_qty": remaining_qty,
                     "assigned_count": 0
                 })
                 
@@ -662,7 +688,7 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             sp["assigned_count"] = 0
 
     # 4. 分數優先級貪婪排程 (Score-based Slot Allocator)
-    curr_d = start_date
+    curr_d = scheduling_start_date
     last_scheduled_subject = None
     
     while curr_d <= end_date:
@@ -722,10 +748,11 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             sp["progress_array"] = []
 
     # 6. 產生最終排程
-    schedule = []
-    curr_d = start_date
-    day_idx = 0
+    schedule = list(past_schedule_output)
+    curr_d = scheduling_start_date
+    
     while curr_d <= end_date:
+        day_idx = (curr_d - start_date).days
         d_info = daily_sessions.get(curr_d)
         if not d_info:
             curr_d += timedelta(days=1)
@@ -776,7 +803,6 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                     "目標進度": "0 單位 (僅複習)"
                 })
                 
-        day_idx += 1
         curr_d += timedelta(days=1)
 
     return schedule

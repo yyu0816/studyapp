@@ -741,7 +741,16 @@ def render_setup_page() -> None:
         bath_start = render_time_picker("洗澡開始", st.session_state.get("bath_start", "21:00"), "bath_start")
         bath_end = render_time_picker("洗澡結束", st.session_state.get("bath_end", "21:30"), "bath_end")
 
-    if st.button("生成完整讀書計畫"):
+    has_existing_plan = bool(st.session_state.get("app_state", {}).get("monthly_plan"))
+    is_partial_reschedule = False
+    
+    st.divider()
+    if has_existing_plan:
+        st.info("💡 **系統偵測到您已有正在進行的計畫**。如果您中途新增了行程，建議勾選下方選項，系統會將您「還沒讀完的進度」重新均勻分配到「今天到計畫結束」的剩餘空閒時間中，並保留過去的打卡紀錄！")
+        is_partial_reschedule = st.checkbox("保留過去紀錄，僅從今日起重新排定剩餘進度", value=True)
+        
+    btn_text = "更新讀書計畫" if has_existing_plan else "生成完整讀書計畫"
+    if st.button(btn_text):
         if end_date < start_date:
             st.error("結束日期不能早於開始日期。")
             return
@@ -801,7 +810,12 @@ def render_setup_page() -> None:
         
         # 1. Generate monthly plan schedule automatically
         import logic
-        schedule_result = logic.generate_daily_schedule(plan_data)
+        if is_partial_reschedule:
+            existing_schedule = st.session_state.get("app_state", {}).get("monthly_plan")
+            schedule_result = logic.generate_daily_schedule(plan_data, existing_schedule=existing_schedule, reschedule_from_date=date.today())
+        else:
+            schedule_result = logic.generate_daily_schedule(plan_data)
+            
         st.session_state.setdefault("app_state", {})["monthly_plan"] = schedule_result
         
         st.session_state["monthly_plan"] = build_monthly_plan(plan_data)
