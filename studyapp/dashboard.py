@@ -285,32 +285,33 @@ def render_dashboard():
             st.markdown("---")
             
             # List of subjects with expanders
-            for subj in subject_totals:
-                if subj["total_hours"] == 0: continue
-                
-                with st.expander(f"**{subj['name']}**：{subj['total_hours']} 小時"):
-                    subj_df = df_daily[df_daily['subject'] == subj['name']]
-                    if not subj_df.empty:
-                        max_h = subj_df['hours'].max()
-                        tick_values = [i * 0.5 for i in range(int(max_h * 2) + 2)]
-                        
-                        # Horizontal bar chart for daily breakdown
-                        bar_chart = alt.Chart(subj_df).mark_bar(cornerRadiusEnd=4).encode(
-                            x=alt.X('hours:Q', title='讀書時長 (小時)', axis=alt.Axis(values=tick_values, format='.1f')),
-                            y=alt.Y('date:O', title='日期', sort='-x'),
-                            color=alt.value(subj['color']),
-                            tooltip=['date', 'hours']
-                        ).properties(
-                            width=350,
-                            height=alt.Step(30)
-                        ).configure_view(
-                            strokeWidth=0
-                        ).configure_axis(
-                            grid=False
-                        )
-                        st.altair_chart(bar_chart, use_container_width=False)
-                    else:
-                        st.write("無每日詳細資料。")
+            expander_col, _ = st.columns([1, 1])
+            with expander_col:
+                for subj in subject_totals:
+                    if subj["total_hours"] == 0: continue
+                    
+                    with st.expander(f"**{subj['name']}**：{subj['total_hours']} 小時"):
+                        subj_df = df_daily[df_daily['subject'] == subj['name']]
+                        if not subj_df.empty:
+                            max_h = subj_df['hours'].max()
+                            tick_values = [i * 0.5 for i in range(int(max_h * 2) + 2)]
+                            
+                            # Horizontal bar chart for daily breakdown
+                            bar_chart = alt.Chart(subj_df).mark_bar(cornerRadiusEnd=4).encode(
+                                x=alt.X('hours:Q', title='讀書時長 (小時)', axis=alt.Axis(values=tick_values, format='.1f')),
+                                y=alt.Y('date:O', title='日期', sort='-x'),
+                                color=alt.value(subj['color']),
+                                tooltip=['date', 'hours']
+                            ).properties(
+                                height=alt.Step(30)
+                            ).configure_view(
+                                strokeWidth=0
+                            ).configure_axis(
+                                grid=False
+                            )
+                            st.altair_chart(bar_chart, use_container_width=True)
+                        else:
+                            st.write("無每日詳細資料。")
 
         # --- Right Bottom (2/3 height visually) ---
         
