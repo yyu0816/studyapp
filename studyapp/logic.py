@@ -602,65 +602,68 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                     "assigned_count": 0
                 })
                 
-    # 3. 裝箱排程 (Bin Packing 防碰撞機制)
-    schedule = []
-    tasks_to_schedule = []
-    for sp in subject_schedules:
-        for t_date in sp["target_dates"]:
-            tasks_to_schedule.append({
-                "preferred_date": t_date,
-                "sp": sp
-            })
-            
-    tasks_to_schedule.sort(key=lambda x: x["preferred_date"])
+    # 3. 根據總空閒時間，計算每個教材真正該分配到的節數 (確保份量極大化平攤)
+    num_materials = len(subject_schedules)
+    if num_materials > 0:
+        base_session = total_sessions // num_materials
+        remainder = total_sessions % num_materials
+        for i, sp in enumerate(subject_schedules):
+            alloc = base_session + (1 if i < remainder else 0)
+            if sp["remaining_qty"] > 0:
+                alloc = min(alloc, sp["remaining_qty"])
+            sp["remaining_sessions"] = alloc
+            sp["assigned_count"] = 0
+
+    # 4. 分數優先級貪婪排程 (Score-based Slot Allocator)
+    curr_d = start_date
+    last_scheduled_subject = None
     
-    for task in tasks_to_schedule:
-        pref_date = task["preferred_date"]
-        sp = task["sp"]
-        assigned_date = None
-        
-        # 第一階段：強迫分攤，該日不可已有此科目
-        check_date = pref_date
-        while check_date >= start_date:
-            d_info = daily_sessions.get(check_date)
-            if d_info and len(d_info["scheduled"]) < d_info["sessions"] and sp not in d_info["scheduled"]:
-                assigned_date = check_date
-                break
-            check_date -= timedelta(days=1)
+    while curr_d <= end_date:
+        d_info = daily_sessions.get(curr_d)
+        if not d_info or d_info["sessions"] == 0:
+            curr_d += timedelta(days=1)
+            continue
             
-        if not assigned_date:
-            check_date = pref_date + timedelta(days=1)
-            while check_date <= end_date:
-                d_info = daily_sessions.get(check_date)
-                if d_info and len(d_info["scheduled"]) < d_info["sessions"] and sp not in d_info["scheduled"]:
-                    assigned_date = check_date
-                    break
-                check_date += timedelta(days=1)
-                
-        # 第二階段：如果真的所有日子都擠滿了，才允許同一天疊加
-        if not assigned_date:
-            check_date = pref_date
-            while check_date >= start_date:
-                d_info = daily_sessions.get(check_date)
-                if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
-                    assigned_date = check_date
-                    break
-                check_date -= timedelta(days=1)
-                
-            if not assigned_date:
-                check_date = pref_date + timedelta(days=1)
-                while check_date <= end_date:
-                    d_info = daily_sessions.get(check_date)
-                    if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
-                        assigned_date = check_date
-                        break
-                    check_date += timedelta(days=1)
+        scheduled_today = []
+        for _ in range(d_info["sessions"]):
+            best_sp = None
+            best_score = -999999
+            
+            for sp in subject_schedules:
+                if sp["remaining_sessions"] <= 0:
+                    continue
                     
-        if assigned_date:
-            daily_sessions[assigned_date]["scheduled"].append(sp)
-            sp["assigned_count"] += 1
-            
-    # 計算每個科目真正被分配到的陣列 (確保所有量都被完美分攤到獲取的天數上)
+                # 基礎分數：剩餘節數越多越優先
+                score = sp["remaining_sessions"] * 10
+                
+                # 目標日加分：如果是演算法推算出來的理想讀書日
+                if curr_d in sp["target_dates"]:
+                    score += 1000
+                    
+                # 同日重複懲罰：強迫科目分散到不同天，避免一天讀 100 頁
+                count_today = scheduled_today.count(sp["subject"])
+                score -= 2000 * count_today
+                
+                # 連續懲罰：避免同一天連續讀同一科 (雖然有了同日懲罰，這作為微調)
+                if sp["subject"] == last_scheduled_subject:
+                    score -= 50
+                    
+                if score > best_score:
+                    best_score = score
+                    best_sp = sp
+                    
+            if best_sp:
+                d_info["scheduled"].append(best_sp)
+                scheduled_today.append(best_sp["subject"])
+                best_sp["remaining_sessions"] -= 1
+                best_sp["assigned_count"] += 1
+                last_scheduled_subject = best_sp["subject"]
+            else:
+                break # 所有科目都排完了
+                
+        curr_d += timedelta(days=1)
+
+    # 5. 計算每個科目真正被分配到的陣列 (確保所有量都被完美分攤到獲取的天數上)
     for sp in subject_schedules:
         qty = sp["remaining_qty"]
         allocated = sp["assigned_count"]
@@ -671,7 +674,8 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
         else:
             sp["progress_array"] = []
 
-    # 4. 產生最終排程
+    # 6. 產生最終排程
+    schedule = []
     curr_d = start_date
     day_idx = 0
     while curr_d <= end_date:
