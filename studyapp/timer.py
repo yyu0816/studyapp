@@ -5,9 +5,8 @@ import logic
 from timeline_utils import render_timeline
 
 def render_timer_page():
-    st.markdown("## ⏱️ 計時器")
-    
-    now = datetime.datetime.now()
+    # Use UTC+8 for Taiwan local time
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
     weekday_map = {0: "一", 1: "二", 2: "三", 3: "四", 4: "五", 5: "六", 6: "日"}
     today_str = now.strftime("%Y/%m/%d")
     time_str = now.strftime("%H:%M")
@@ -86,16 +85,27 @@ def render_timer_page():
     with col_left:
         st.markdown("### ⏳ 計時器")
         
-        # 選擇當前進度項目
-        task_options = [f"{s.get('科目', '')} - {s.get('教材', '')}" for s in today_sessions]
+        st.markdown("#### 選擇計時進度")
+        
+        # 取得所有有安排進度的日期
+        all_dates = sorted(list(set(s.get("date") for s in monthly_plan if s.get("date"))))
+        if not all_dates:
+            all_dates = [now.strftime("%Y-%m-%d")]
+            
+        default_date_idx = all_dates.index(now.strftime("%Y-%m-%d")) if now.strftime("%Y-%m-%d") in all_dates else 0
+        selected_date = st.selectbox("選擇日期", all_dates, index=default_date_idx)
+        
+        sessions_for_selected_date = [s for s in monthly_plan if s.get("date") == selected_date]
+        task_options = [f"{s.get('科目', '')} - {s.get('教材', '')}" for s in sessions_for_selected_date]
+        
         if not task_options:
             task_options = ["無任務"]
             
-        default_index = 0
-        if current_idx != -1 and current_idx < len(task_options):
-            default_index = current_idx
+        default_task_idx = 0
+        if selected_date == now.strftime("%Y-%m-%d") and current_idx != -1 and current_idx < len(task_options):
+            default_task_idx = current_idx
             
-        selected_task = st.selectbox("選擇當前進度項目", task_options, index=default_index)
+        selected_task = st.selectbox("選擇項目", task_options, index=default_task_idx)
         
         # 計時器狀態
         if "timer_start_time" not in st.session_state:
@@ -148,21 +158,25 @@ def render_timer_page():
                 st.rerun()
                 
             # 即時更新的計時器 (使用 JavaScript)
-            start_ts = st.session_state.timer_start_time
+            # 避免 Server 與 Browser 時鐘不同步，直接傳遞「已經過秒數」
+            elapsed_sec = time.time() - st.session_state.timer_start_time
             html_code = f"""
             <div id="live-timer" style="font-size: 64px; font-weight: bold; font-family: monospace; text-align: center; margin: 20px 0; padding: 20px; background-color: #e8f0fe; border-radius: 12px; color: #1a73e8;">
                 00:00
             </div>
             <script>
-                const startTs = {start_ts} * 1000; // JS uses ms
+                // 網頁載入時的基準時間
+                const initialElapsedMs = {elapsed_sec} * 1000;
+                const renderTimeMs = Date.now();
                 const timerEl = document.getElementById("live-timer");
                 
                 setInterval(() => {{
                     const now = Date.now();
-                    const diffMs = now - startTs;
+                    const diffMs = (now - renderTimeMs) + initialElapsedMs;
                     let diffSec = Math.floor(diffMs / 1000);
                     
                     // Cap at 179:59 (10799 seconds)
+                    if (diffSec < 0) diffSec = 0;
                     if (diffSec > 10799) diffSec = 10799; 
                     
                     const min = Math.floor(diffSec / 60);
