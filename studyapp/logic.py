@@ -520,6 +520,10 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
     week_map = {"星期一": 0, "星期二": 1, "星期三": 2, "星期四": 3, "星期五": 4, "星期六": 5, "星期日": 6,
                 "週一": 0, "週二": 1, "週三": 2, "週四": 3, "週五": 4, "週六": 5, "週日": 6}
 
+    # 計算有效天數與緩衝天數 (八二法則)
+    effective_days = math.floor(total_days * 0.8)
+    effective_end_date = start_date + timedelta(days=max(0, effective_days - 1))
+
     # 2. 為每個科目安排日期 (逆向推算)
     subject_schedules = []
     for subject in subjects_data:
@@ -556,18 +560,20 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             should_schedule = False
             
             if days_to_exam <= 7:
-                # 考前一週：每2天排一次
+                # 考前一週：每2天排一次 (衝刺期不受緩衝日限制)
                 if days_since_last_scheduled >= 2 or len(target_dates) == 0:
                     should_schedule = True
             else:
-                if prefs_idx:
-                    # 依據偏好
-                    if curr_d.weekday() in prefs_idx:
-                        should_schedule = True
-                else:
-                    # 無偏好：每2天排一次
-                    if days_since_last_scheduled >= 2:
-                        should_schedule = True
+                # 長期備戰期：必須在 effective_end_date 之前才排程，保留後面的全域緩衝日
+                if curr_d <= effective_end_date:
+                    if prefs_idx:
+                        # 依據偏好
+                        if curr_d.weekday() in prefs_idx:
+                            should_schedule = True
+                    else:
+                        # 無偏好：每2天排一次
+                        if days_since_last_scheduled >= 2:
+                            should_schedule = True
                         
             if should_schedule:
                 target_dates.append(curr_d)
@@ -587,7 +593,13 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             unit = UNIT_MAP.get(mat_type, "項")
             if qty > 0:
                 allocated_sessions = len(target_dates)
-                progress_per_session = qty / allocated_sessions if allocated_sessions > 0 else 0
+                if allocated_sessions > 0:
+                    base_prog = qty // allocated_sessions
+                    rem_prog = qty % allocated_sessions
+                    # 將餘數均勻打散到前幾個 session 中，確保進度平攤
+                    prog_array = [base_prog + 1 if i < rem_prog else base_prog for i in range(allocated_sessions)]
+                else:
+                    prog_array = []
                 
                 subject_schedules.append({
                     "subject": subj_name,
@@ -595,7 +607,7 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
                     "material": mat_name,
                     "unit": unit,
                     "target_dates": list(target_dates),
-                    "progress_per_session": progress_per_session,
+                    "progress_array": prog_array,
                     "remaining_qty": qty
                 })
                 
@@ -659,15 +671,12 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             if session_idx - 1 < len(scheduled_items):
                 sp = scheduled_items[session_idx - 1]
                 
-                raw_progress = sp["progress_per_session"]
-                progress_val = math.ceil(raw_progress) if raw_progress > 0 else 0
-                progress_val = min(progress_val, sp["remaining_qty"])
-                
-                if progress_val == int(progress_val):
-                    progress_str = f"{int(progress_val)} {sp['unit']}"
+                if sp["progress_array"]:
+                    progress_val = sp["progress_array"].pop(0)
                 else:
-                    progress_str = f"{progress_val:.1f} {sp['unit']}"
-                    
+                    progress_val = 0
+                
+                progress_str = f"{progress_val} {sp['unit']}"
                 sp["remaining_qty"] -= progress_val
 
                 schedule.append({
