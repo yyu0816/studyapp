@@ -289,7 +289,14 @@ def render_dashboard():
                         ]
                     )
                     
-                    text_chart = base_chart.mark_text(radius=50, size=14, fontWeight="bold").encode(
+                    text_chart = base_chart.mark_text(
+                        radius=60, 
+                        size=14, 
+                        fontWeight="bold", 
+                        fill="#222", 
+                        stroke="white", 
+                        strokeWidth=1.5
+                    ).encode(
                         text="label:N"
                     )
                     
