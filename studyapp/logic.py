@@ -509,6 +509,23 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
                     else:
                         blocking_intervals.append((0, 1440))
                         
+    # 5. Daily Override Events (Calendar Events)
+    daily_overrides = plan.get("daily_override_events", {}).get(current_date.strftime("%Y-%m-%d"), [])
+    for ev in daily_overrides:
+        if not ev.get("concurrent_with_study", False):
+            if ev.get("is_all_day"):
+                blocking_intervals.append((0, 1440))
+            else:
+                sm = get_minutes(ev.get("start", "00:00"))
+                em = get_minutes(ev.get("end", "23:59"))
+                if em == 1439:
+                    em = 1440
+                if sm < em:
+                    blocking_intervals.append((sm, em))
+                elif sm > em:
+                    blocking_intervals.append((sm, 1440))
+                    blocking_intervals.append((0, em))
+                    
     blocking_intervals = merge_intervals(blocking_intervals)
     
     # Extract 60-minute slots with 10-minute breaks

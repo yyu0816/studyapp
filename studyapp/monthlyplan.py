@@ -58,7 +58,15 @@ def _format_date_list(date_strs: list[str]) -> str:
     
     return ", ".join(formatted_ranges)
 
-
+def _trigger_reschedule_if_needed():
+    plan_data = st.session_state.get("plan")
+    existing_schedule = st.session_state.get("app_state", {}).get("monthly_plan")
+    if plan_data and existing_schedule:
+        plan_data["daily_override_events"] = st.session_state.get("daily_override_events", {})
+        import logic
+        new_schedule = logic.generate_daily_schedule(plan_data, existing_schedule=existing_schedule, reschedule_from_date=date.today())
+        st.session_state.setdefault("app_state", {})["monthly_plan"] = new_schedule
+    st.rerun()
 
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
@@ -142,8 +150,7 @@ def add_event_dialog(day_str: str):
                 "concurrent_with_study": concurrent_with_study,
             })
             cur += timedelta(days=1)
-        st.rerun()
-
+        _trigger_reschedule_if_needed()
 
 @st.dialog("編輯行程")
 def edit_event_dialog(date_str: str, ev_idx: int):
@@ -268,7 +275,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
             st.session_state.pop("edit_dlg_cp", None)
-            st.rerun()
+            _trigger_reschedule_if_needed()
     with col_del:
         if st.button("刪除", use_container_width=True, type="secondary"):
             for d_str in matching_dates:
@@ -281,7 +288,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
             st.session_state.pop("edit_dlg_cp", None)
-            st.rerun()
+            _trigger_reschedule_if_needed()
 
 def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
     """Build a pure HTML table for the calendar month with clickable dates."""
