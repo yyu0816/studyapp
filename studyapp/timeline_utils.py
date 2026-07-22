@@ -31,38 +31,53 @@ def render_timeline(events: list[dict], title: str = "### 🕒 時間軸") -> No
         except Exception:
             return 0, HOUR_PX
 
-    # Assign column index for overlapping events (simple greedy)
+    # Assign column index for overlapping events (group by overlap)
     def assign_columns(events_to_assign):
-        slots: list[list] = []     # each slot is a list of (top, bottom, event_idx)
-        result = {}                # event_idx -> (col, n_cols_in_group)
-        for i, ev in enumerate(events_to_assign):
-            top, bottom = event_to_px(ev.get("start", "00:00"), ev.get("end", "01:00"))
-            placed = False
-            for col_idx, slot in enumerate(slots):
-                last_top, last_bottom, _ = slot[-1]
-                if top >= last_bottom:
-                    slot.append((top, bottom, i))
-                    result[i] = col_idx
-                    placed = True
-                    break
-            if not placed:
-                slots.append([(top, bottom, i)])
-                result[i] = len(slots) - 1
-
-        # Determine how many columns each event needs to share
+        if not events_to_assign:
+            return {}
+            
         final = {}
+        groups = []
+        current_group = []
+        current_group_end = -1
+        
         for i, ev in enumerate(events_to_assign):
             top, bottom = event_to_px(ev.get("start", "00:00"), ev.get("end", "01:00"))
-            concurrent = sum(
-                1 for j, ev2 in enumerate(events_to_assign)
-                if j != i and event_to_px(ev2.get("start", "00:00"), ev2.get("end", "01:00"))[0] < bottom
-                and event_to_px(ev2.get("start", "00:00"), ev2.get("end", "01:00"))[1] > top
-            )
-            final[i] = (result[i], concurrent + 1)
+            if top >= current_group_end and current_group:
+                groups.append(current_group)
+                current_group = [(i, top, bottom)]
+                current_group_end = bottom
+            else:
+                current_group.append((i, top, bottom))
+                current_group_end = max(current_group_end, bottom)
+        if current_group:
+            groups.append(current_group)
+            
+        for group in groups:
+            slots = [] # stores the end time of the last event in each column
+            for (i, top, bottom) in group:
+                placed = False
+                for col_idx, slot_end in enumerate(slots):
+                    if top >= slot_end:
+                        slots[col_idx] = bottom
+                        final[i] = col_idx
+                        placed = True
+                        break
+                if not placed:
+                    slots.append(bottom)
+                    final[i] = len(slots) - 1
+            
+            n_cols = len(slots)
+            for (i, top, bottom) in group:
+                final[i] = (final[i], n_cols)
+                
         return final
 
     # Only events that actually appear on the timeline (not all-day)
     timeline_events = [e for e in events if not e.get("is_all_day")]
+    # Sort events by start time so column assignment works correctly
+    timeline_events.sort(key=lambda e: event_to_px(e.get("start", "00:00"), e.get("end", "01:00"))[0])
+    
     event_layout = assign_columns(timeline_events)
 
     if title:
