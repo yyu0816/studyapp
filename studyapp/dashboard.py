@@ -5,14 +5,13 @@ import random
 from datetime import date, timedelta
 
 def get_mock_weekly_study_duration(week_offset=0):
-    """Generate actual weekly study duration from daily_task_checks."""
+    """Generate actual weekly study duration from timer records."""
     today = date.today()
     target_date = today + timedelta(days=week_offset * 7)
     start_of_week = target_date - timedelta(days=target_date.weekday())
     end_of_week = start_of_week + timedelta(days=6)
     
-    monthly_plan = st.session_state.get("app_state", {}).get("monthly_plan", [])
-    daily_task_checks = st.session_state.get("daily_task_checks", {})
+    timer_records = st.session_state.get("timer_records", {})
     
     data = []
     for i in range(7):
@@ -20,17 +19,9 @@ def get_mock_weekly_study_duration(week_offset=0):
         day_str = day.strftime("%Y-%m-%d")
         duration = 0.0
         
-        checks = daily_task_checks.get(day_str, {})
-        day_slots = [s for s in monthly_plan if s.get("date") == day_str]
-        
-        for s in day_slots:
-            subj = s.get("科目", "")
-            mat = s.get("教材", "")
-            prefix = f"{subj} - {mat}："
-            for task_str, is_checked in checks.items():
-                if is_checked and task_str.startswith(prefix):
-                    duration += 1.0
-                    break
+        records = timer_records.get(day_str, [])
+        for r in records:
+            duration += r.get("duration_seconds", 0) / 3600.0
         
         h = int(duration)
         m = int((duration - h) * 60)
@@ -45,14 +36,13 @@ def get_mock_weekly_study_duration(week_offset=0):
     return pd.DataFrame(data), start_of_week, end_of_week
 
 def get_subject_study_analysis() -> tuple[list[dict], pd.DataFrame]:
-    """Get actual subject study time from daily_task_checks."""
+    """Get actual subject study time from timer records."""
     plan = st.session_state.get("plan", {})
     subjects = plan.get("subjects", [])
     if not subjects:
         return [], pd.DataFrame()
         
-    daily_task_checks = st.session_state.get("daily_task_checks", {})
-    monthly_plan = st.session_state.get("app_state", {}).get("monthly_plan", [])
+    timer_records = st.session_state.get("timer_records", {})
     
     subject_totals_map = {}
     daily_data = []
@@ -62,27 +52,26 @@ def get_subject_study_analysis() -> tuple[list[dict], pd.DataFrame]:
         color = subj.get("color", "#4f84ff")
         subject_totals_map[name] = {"name": name, "color": color, "total_hours": 0.0}
         
-    for day_str, checks in daily_task_checks.items():
-        day_slots = [s for s in monthly_plan if s.get("date") == day_str]
-        for subj in subjects:
-            name = subj.get("name", "未命名科目")
-            daily_hours = 0.0
+    for day_str, records in timer_records.items():
+        daily_subj_hours = {subj.get("name", "未命名科目"): 0.0 for subj in subjects}
+        
+        for r in records:
+            title = r.get("title", "")
+            duration_hrs = r.get("duration_seconds", 0) / 3600.0
             
-            for s in day_slots:
-                if s.get("科目") == name:
-                    mat = s.get("教材", "")
-                    prefix = f"{name} - {mat}："
-                    for task_str, is_checked in checks.items():
-                        if is_checked and task_str.startswith(prefix):
-                            daily_hours += 1.0
-                            break
-            
-            if daily_hours > 0:
-                subject_totals_map[name]["total_hours"] += daily_hours
+            for subj in subjects:
+                name = subj.get("name", "未命名科目")
+                if title == name or title.startswith(name + " - "):
+                    daily_subj_hours[name] += duration_hrs
+                    subject_totals_map[name]["total_hours"] += duration_hrs
+                    break
+                    
+        for name, hours in daily_subj_hours.items():
+            if hours > 0:
                 daily_data.append({
                     "date": day_str,
                     "subject": name,
-                    "hours": daily_hours
+                    "hours": hours
                 })
                 
     subject_totals = list(subject_totals_map.values())
