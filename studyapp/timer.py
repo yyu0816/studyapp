@@ -17,13 +17,13 @@ def render_timer_page():
     with col_left:
         st.markdown(f"### {today_str}(星期{weekday_map[now.weekday()]}) {time_str}")
     
-    # 取得當前進度與預設進度
-    app_state = st.session_state.get("app_state", {})
-    monthly_plan = app_state.get("monthly_plan") or []
-    today_sessions = [s for s in monthly_plan if s.get("date") == now.strftime("%Y-%m-%d")]
-    
-    daily_checks = st.session_state.get("daily_task_checks", {}).get(now.strftime("%Y-%m-%d"), {})
-    
+        # 取得當前進度與預設進度
+        app_state = st.session_state.get("app_state", {})
+        monthly_plan = app_state.get("monthly_plan") or []
+        today_sessions = [s for s in monthly_plan if s.get("date") == now.strftime("%Y-%m-%d")]
+        
+        daily_checks = st.session_state.get("daily_task_checks", {}).get(now.strftime("%Y-%m-%d"), {})
+        
         # 格式化科目名稱
         def format_task(s):
             subj = s.get('科目', '')
@@ -31,7 +31,7 @@ def render_timer_page():
             if not mat or mat == '-' or subj == mat:
                 return subj
             return f"{subj} - {mat}"
-
+    
         # 判斷該 session 是否在打卡中已完成
         def is_session_done(s):
             subj_mat_prefix = f"{s.get('科目', '')} - {s.get('教材', '')}："
@@ -39,7 +39,7 @@ def render_timer_page():
                 if task_name.startswith(subj_mat_prefix) and checked:
                     return True
             return False
-
+    
         # 計算現在進度 (第一個未完成的)
         current_progress = "無"
         current_idx = -1
@@ -69,10 +69,10 @@ def render_timer_page():
                     # 這是下一個即將開始的進度
                     default_progress = format_task(s)
                     default_idx = i
-
+    
         st.markdown(f"**現在進度:** {current_progress}")
         st.markdown(f"**預設進度:** {default_progress}")
-    
+        
         # 計算狀態
         status_msg = "無排定進度"
         status_color = "#999"
@@ -89,7 +89,7 @@ def render_timer_page():
         elif current_idx == len(today_sessions) and today_sessions:
             status_msg = "進度提前"
             status_color = "#3498db"
-
+    
         st.markdown(f"""
         <div style="border: 2px solid {status_color}; padding: 10px; border-radius: 8px; width: fit-content; margin-top: 10px; margin-bottom: 20px;">
             <span style="color: {status_color}; font-weight: bold; font-size: 18px;">{status_msg}</span>
