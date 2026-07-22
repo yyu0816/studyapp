@@ -530,8 +530,24 @@ def render_setup_page() -> None:
                 with cols[3]:
                     st.button("刪除教材", key=f"delete_material_{idx}_{mid}", on_click=_del_material, args=(idx, mid))
             st.button("新增教材／材料", key=f"add_material_{idx}", on_click=_add_material, args=(idx,))
-            weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
-            st.session_state["subjects"][idx]["weekdays"] = weekdays_value
+            
+            ec1, ec2 = st.columns(2)
+            with ec1:
+                default_exam = subject.get("exam_date")
+                if isinstance(default_exam, str):
+                    try:
+                        default_exam = datetime.strptime(default_exam, "%Y-%m-%d").date()
+                    except:
+                        default_exam = end_date
+                if not default_exam:
+                    default_exam = end_date
+                
+                exam_date_val = st.date_input("考試日期 (排程基準日)", value=default_exam, key=f"subject_{idx}_exam_date")
+                st.session_state["subjects"][idx]["exam_date"] = exam_date_val.strftime("%Y-%m-%d")
+                
+            with ec2:
+                weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
+                st.session_state["subjects"][idx]["weekdays"] = weekdays_value
             if len(st.session_state["subjects"]) > 1:
                 st.button("刪除科目", key=f"delete_subject_{idx}", on_click=_del_subject, args=(idx,))
         st.divider()
@@ -929,4 +945,4 @@ def render_home_page() -> None:
 if __name__ == "__main__":
     render_home_page()
 
-# Trigger refresh 13
+# Trigger refresh 14
