@@ -314,15 +314,25 @@ def render_dashboard():
                 for subj in subject_totals:
                     if subj["total_hours"] == 0: continue
                     
-                    with st.expander(f"**{subj['name']}**：{subj['total_hours']} 小時"):
+                    total_h = subj['total_hours']
+                    if total_h < 0.5:
+                        total_m = int(round(total_h * 60))
+                        title = f"**{subj['name']}**：{total_m} 分鐘"
+                    else:
+                        title = f"**{subj['name']}**：{total_h:.1f} 小時"
+                        
+                    with st.expander(title):
                         subj_df = df_daily[df_daily['subject'] == subj['name']]
                         if not subj_df.empty:
-                            max_h = subj_df['hours'].max()
+                            max_h = max(subj_df['hours'].max(), 0.5)
                             tick_values = [i * 0.5 for i in range(int(max_h * 2) + 2)]
                             
                             # Horizontal bar chart for daily breakdown
                             bar_chart = alt.Chart(subj_df).mark_bar(cornerRadiusEnd=4).encode(
-                                x=alt.X('hours:Q', title='讀書時長 (小時)', axis=alt.Axis(values=tick_values, format='.1f')),
+                                x=alt.X('hours:Q', 
+                                        title='讀書時長 (小時)', 
+                                        axis=alt.Axis(values=tick_values, format='.1f'),
+                                        scale=alt.Scale(domain=[0, tick_values[-1]])),
                                 y=alt.Y('date:O', title='日期', sort='-x'),
                                 color=alt.value(subj['color']),
                                 tooltip=['date', 'hours']
