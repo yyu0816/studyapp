@@ -290,14 +290,12 @@ def render_dashboard():
                     )
                     
                     text_chart = base_chart.mark_text(
-                        radius=60, 
+                        radius=55, 
                         size=14, 
-                        fontWeight="bold", 
-                        fill="#222", 
-                        stroke="white", 
-                        strokeWidth=1.5
+                        fontWeight="bold"
                     ).encode(
-                        text="label:N"
+                        text="label:N",
+                        color=alt.value("#222222")
                     )
                     
                     final_chart = (pie_chart + text_chart).properties(
