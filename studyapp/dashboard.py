@@ -54,11 +54,9 @@ def get_subject_ranking() -> list[dict]:
 
 def get_mock_mood_history(month_offset=0):
     """Generate 30 days of mock mood data with state persistence."""
-    if 'dashboard_mood_data' not in st.session_state:
-        st.session_state.dashboard_mood_data = {}
-        
-    if month_offset not in st.session_state.dashboard_mood_data:
-        st.session_state.dashboard_mood_data[month_offset] = [0 for _ in range(30)]
+    # Temporarily hardcode to 0 (no record) to wipe out any cached random data in session state
+    st.session_state.dashboard_mood_data = {}
+    st.session_state.dashboard_mood_data[month_offset] = [0 for _ in range(30)]
         
     today = date.today()
     month = today.month + month_offset - 1
