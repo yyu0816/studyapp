@@ -21,6 +21,7 @@ from monthlyplan import render_monthly_plan_page
 from dailycheck import render_daily_checkin_page, get_adjustment_message
 from datetime import date, datetime, timedelta
 from timeline_utils import render_timeline
+from timer import render_timer_page
 
 MATERIAL_TYPES = ["課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
 MATERIAL_UNIT_MAP = {
@@ -860,7 +861,7 @@ def render_home_page() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調"]
+    page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調", "計時器"]
     
     if "main_page" not in st.session_state:
         st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
@@ -1051,6 +1052,12 @@ def render_home_page() -> None:
                 render_monthly_plan_page()
         else:
             render_monthly_plan_page()
+    elif page == "計時器":
+        if col_main:
+            with col_main:
+                render_timer_page()
+        else:
+            render_timer_page()
     else:
         render_daily_checkin_page()
 
@@ -1058,4 +1065,4 @@ def render_home_page() -> None:
 if __name__ == "__main__":
     render_home_page()
 
-# Trigger refresh 30
+# Trigger refresh 35
