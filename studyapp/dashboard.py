@@ -15,8 +15,8 @@ def get_mock_weekly_study_duration(week_offset=0):
     data = []
     for i in range(7):
         day = start_of_week + timedelta(days=i)
-        # Random duration between 1.0 and 8.0 hours
-        duration = round(random.uniform(1.0, 8.0), 1)
+        # Always show 0 since real data integration is not fully parsed yet
+        duration = 0.0
         
         # Convert to HH:MM format
         h = int(duration)
@@ -37,12 +37,7 @@ def get_subject_ranking() -> list[dict]:
     subjects = plan.get("subjects", [])
     
     if not subjects:
-        # Mock subjects if none exist
-        return [
-            {"name": "國文", "progress": 85, "color": "#ff7675"},
-            {"name": "英文", "progress": 72, "color": "#74b9ff"},
-            {"name": "數學", "progress": 45, "color": "#55efc4"},
-        ]
+        return []
     
     # Process real subjects, generate mock progress
     ranking = []
@@ -50,7 +45,7 @@ def get_subject_ranking() -> list[dict]:
         name = subj.get("name", "未命名科目")
         color = subj.get("color", "#4f84ff")
         # Mock a random progress percentage for now
-        progress = random.randint(10, 95)
+        progress = 0
         ranking.append({"name": name, "progress": progress, "color": color})
         
     # Sort by progress descending
@@ -63,7 +58,7 @@ def get_mock_mood_history(month_offset=0):
         st.session_state.dashboard_mood_data = {}
         
     if month_offset not in st.session_state.dashboard_mood_data:
-        st.session_state.dashboard_mood_data[month_offset] = [random.choice([0, 1, 2, 3, 4, 5]) for _ in range(30)]
+        st.session_state.dashboard_mood_data[month_offset] = [0 for _ in range(30)]
         
     today = date.today()
     month = today.month + month_offset - 1
@@ -122,8 +117,8 @@ def render_dashboard():
         st.markdown("#### 🎯 總體進度")
         
         left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; max-width: 364px; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
-    {get_html_progress_bar("當月完成度", 68, "#ff9a9e", "#fecfef", margin_bottom="20px")}
-    {get_html_progress_bar("打卡天數", 42, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
+    {get_html_progress_bar("當月完成度", 0, "#ff9a9e", "#fecfef", margin_bottom="20px")}
+    {get_html_progress_bar("打卡天數", 0, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
 </div>"""
         st.markdown(left_html, unsafe_allow_html=True)
         
