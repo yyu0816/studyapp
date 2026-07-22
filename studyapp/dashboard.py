@@ -259,31 +259,30 @@ def render_dashboard():
         if not subject_totals or all(s["total_hours"] == 0 for s in subject_totals):
             st.info("目前尚無讀書時間資料。請到「每日計畫與微調」打卡！")
         else:
-            with st.container(border=True):
-                # Format data for Pie Chart
-                pie_data = pd.DataFrame([
-                    {"subject": s["name"], "hours": s["total_hours"], "color": s["color"]}
-                    for s in subject_totals if s["total_hours"] > 0
-                ])
-                
-                # Create Pie Chart using Altair
-                pie_chart = alt.Chart(pie_data).mark_arc(innerRadius=50, stroke="#fff", strokeWidth=2).encode(
-                    theta=alt.Theta(field="hours", type="quantitative"),
-                    color=alt.Color(field="subject", type="nominal", 
-                                  scale=alt.Scale(domain=pie_data['subject'].tolist(), 
-                                                  range=pie_data['color'].tolist()),
-                                  legend=alt.Legend(title="科目", orient="right")),
-                    tooltip=["subject", "hours"]
-                ).properties(
-                    height=200
-                )
-                
-                # Make pie chart take 1/3 of the width
-                pie_col, _ = st.columns([1, 2])
-                with pie_col:
+            # Make pie chart take 1/3 of the width, and border matches its size
+            pie_col, _ = st.columns([1, 2])
+            with pie_col:
+                with st.container(border=True):
+                    # Format data for Pie Chart
+                    pie_data = pd.DataFrame([
+                        {"subject": s["name"], "hours": s["total_hours"], "color": s["color"]}
+                        for s in subject_totals if s["total_hours"] > 0
+                    ])
+                    
+                    # Create Pie Chart using Altair
+                    pie_chart = alt.Chart(pie_data).mark_arc(innerRadius=50, stroke="#fff", strokeWidth=2).encode(
+                        theta=alt.Theta(field="hours", type="quantitative"),
+                        color=alt.Color(field="subject", type="nominal", 
+                                      scale=alt.Scale(domain=pie_data['subject'].tolist(), 
+                                                      range=pie_data['color'].tolist()),
+                                      legend=alt.Legend(title="科目", orient="bottom")),
+                        tooltip=["subject", "hours"]
+                    ).properties(
+                        height=200
+                    )
                     st.altair_chart(pie_chart, use_container_width=True)
-                
-                st.markdown("---")
+            
+            st.markdown("---")
                 
                 # List of subjects with expanders
                 for subj in subject_totals:
@@ -292,9 +291,12 @@ def render_dashboard():
                     with st.expander(f"**{subj['name']}**：{subj['total_hours']} 小時"):
                         subj_df = df_daily[df_daily['subject'] == subj['name']]
                         if not subj_df.empty:
+                            max_h = subj_df['hours'].max()
+                            tick_values = [i * 0.5 for i in range(int(max_h * 2) + 2)]
+                            
                             # Horizontal bar chart for daily breakdown
                             bar_chart = alt.Chart(subj_df).mark_bar(cornerRadiusEnd=4).encode(
-                                x=alt.X('hours:Q', title='讀書時長 (小時)'),
+                                x=alt.X('hours:Q', title='讀書時長 (小時)', axis=alt.Axis(values=tick_values, format='.1f')),
                                 y=alt.Y('date:O', title='日期', sort='-x'),
                                 color=alt.value(subj['color']),
                                 tooltip=['date', 'hours']
