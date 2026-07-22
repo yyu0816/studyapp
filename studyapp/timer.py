@@ -22,6 +22,13 @@ def render_timer_page():
         monthly_plan = app_state.get("monthly_plan") or []
         today_sessions = [s for s in monthly_plan if s.get("date") == now.strftime("%Y-%m-%d")]
         
+        # 依照開始時間排序
+        def get_sort_time(s):
+            if "start_time" in s:
+                return logic.get_minutes(s["start_time"])
+            return 9999
+        today_sessions.sort(key=get_sort_time)
+        
         daily_checks = st.session_state.get("daily_task_checks", {}).get(now.strftime("%Y-%m-%d"), {})
         
         # 格式化科目名稱
@@ -123,8 +130,8 @@ def render_timer_page():
             task_options = ["無任務"]
             
         default_task_idx = 0
-        if selected_date == now.strftime("%Y-%m-%d") and current_idx != -1 and current_idx < len(task_options):
-            default_task_idx = current_idx
+        if selected_date == now.strftime("%Y-%m-%d") and current_progress in task_options:
+            default_task_idx = task_options.index(current_progress)
             
         selected_task = st.selectbox("選擇項目", task_options, index=default_task_idx)
         
