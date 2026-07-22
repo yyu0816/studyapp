@@ -166,7 +166,7 @@ def get_html_progress_bar(title: str, percentage: int, color_start: str, color_e
 def render_dashboard():
     """Main render function for the dashboard page."""
     
-    st.markdown("## 📊 儀表板 (Dashboard)")
+    # st.markdown("## 📊 儀表板 (Dashboard)") # Removed per user request
     
     st.markdown("""
     <span id="dashboard-marker"></span>
@@ -268,19 +268,35 @@ def render_dashboard():
                         {"subject": s["name"], "hours": s["total_hours"], "color": s["color"]}
                         for s in subject_totals if s["total_hours"] > 0
                     ])
+                    total_h = pie_data["hours"].sum()
+                    pie_data["percentage"] = (pie_data["hours"] / total_h * 100).round(1)
+                    pie_data["label"] = pie_data["percentage"].astype(str) + "%"
                     
-                    # Create Pie Chart using Altair
-                    pie_chart = alt.Chart(pie_data).mark_arc(innerRadius=50, stroke="#fff", strokeWidth=2).encode(
-                        theta=alt.Theta(field="hours", type="quantitative"),
+                    # Create Pie Chart base
+                    base_chart = alt.Chart(pie_data).encode(
+                        theta=alt.Theta(field="hours", type="quantitative", stack=True),
                         color=alt.Color(field="subject", type="nominal", 
                                       scale=alt.Scale(domain=pie_data['subject'].tolist(), 
                                                       range=pie_data['color'].tolist()),
-                                      legend=alt.Legend(title="科目", orient="bottom")),
-                        tooltip=["subject", "hours"]
-                    ).properties(
+                                      legend=alt.Legend(title="科目", orient="bottom"))
+                    )
+                    
+                    pie_chart = base_chart.mark_arc(stroke="#fff", strokeWidth=2).encode(
+                        tooltip=[
+                            alt.Tooltip("subject", title="科目"),
+                            alt.Tooltip("hours", title="時數"),
+                            alt.Tooltip("label", title="佔比")
+                        ]
+                    )
+                    
+                    text_chart = base_chart.mark_text(radius=50, size=14, fontWeight="bold").encode(
+                        text="label:N"
+                    )
+                    
+                    final_chart = (pie_chart + text_chart).properties(
                         height=200
                     )
-                    st.altair_chart(pie_chart, use_container_width=True)
+                    st.altair_chart(final_chart, use_container_width=True)
             
             st.markdown("---")
             
