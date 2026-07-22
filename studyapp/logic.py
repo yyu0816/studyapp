@@ -433,6 +433,9 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
     sleep_m = get_minutes(sleep_time)
     
     blocking_intervals = []
+    yesterday = current_date - timedelta(days=1)
+    weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
+    yesterday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][yesterday.weekday()]
     
     # 1. Sleep
     if sleep_m <= wake_m:
@@ -441,7 +444,7 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
         blocking_intervals.append((0, wake_m))
         blocking_intervals.append((sleep_m, 1440))
         
-    # 2. Routines
+    # 2. Routines (Cross-night handling)
     routines = plan.get("routines", {})
     for r_name, r_data in routines.items():
         if r_data.get("start") and r_data.get("end"):
@@ -449,19 +452,63 @@ def get_daily_free_slots(current_date, plan) -> list[tuple[int, int]]:
             em = get_minutes(r_data["end"])
             if sm < em:
                 blocking_intervals.append((sm, em))
+            elif sm > em:
+                blocking_intervals.append((sm, 1440))
+                blocking_intervals.append((0, em))
                 
-    # 3. Non-parallel fixed events
-    weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][current_date.weekday()]
+    # 3. Non-parallel fixed events (Cross-night handling)
     fixed_events = plan.get("fixed_events", [])
     
     for ev in fixed_events:
-        if weekday_str in ev.get("weekdays", []):
+        if not ev.get("concurrent_with_study", False):
             sm = get_minutes(ev.get("start", "00:00"))
             em = get_minutes(ev.get("end", "00:00"))
-            if sm < em:
-                if not ev.get("concurrent_with_study", False):
+            
+            # Today's start
+            if weekday_str in ev.get("weekdays", []):
+                if sm < em:
                     blocking_intervals.append((sm, em))
+                elif sm > em:
+                    blocking_intervals.append((sm, 1440))
                     
+            # Yesterday's spillover
+            if yesterday_str in ev.get("weekdays", []):
+                if sm > em:
+                    blocking_intervals.append((0, em))
+
+    # 4. Specific Date Events (One-off cross-date handling)
+    specific_events = plan.get("specific_events", [])
+    for ev in specific_events:
+        if not ev.get("concurrent_with_study", False):
+            try:
+                ev_start_date = datetime.strptime(ev.get("start_date", ""), "%Y-%m-%d").date()
+                ev_end_date = datetime.strptime(ev.get("end_date", ""), "%Y-%m-%d").date()
+            except:
+                continue
+                
+            if ev_start_date <= current_date <= ev_end_date:
+                sm = get_minutes(ev.get("start_time", "00:00"))
+                em = get_minutes(ev.get("end_time", "23:59"))
+                if em == 1439: # Handle 23:59 as full block
+                    em = 1440
+                    
+                if ev_start_date == ev_end_date:
+                    # Single day event
+                    if current_date == ev_start_date:
+                        if sm < em:
+                            blocking_intervals.append((sm, em))
+                        elif sm > em:
+                            blocking_intervals.append((sm, 1440))
+                            blocking_intervals.append((0, em))
+                else:
+                    # Multi-day event
+                    if current_date == ev_start_date:
+                        blocking_intervals.append((sm, 1440))
+                    elif current_date == ev_end_date:
+                        blocking_intervals.append((0, em))
+                    else:
+                        blocking_intervals.append((0, 1440))
+                        
     blocking_intervals = merge_intervals(blocking_intervals)
     
     # Extract 60-minute slots with 10-minute breaks

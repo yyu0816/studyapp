@@ -254,6 +254,7 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
                     "color": str(event.get("color", display_color) or display_color or "#4f84ff"),
                     "display_color": display_color or str(event.get("color", "") or "#4f84ff"),
                     "show_on_calendar": bool(event.get("show_on_calendar", True)),
+                    "concurrent_with_study": bool(event.get("concurrent_with_study", False)),
                 }
             )
     else:
@@ -266,9 +267,31 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
                 "color": event_colors[index] if index < len(event_colors) else "#4f84ff",
                 "display_color": event_colors[index] if index < len(event_colors) else "#4f84ff",
                 "show_on_calendar": True,
+                "concurrent_with_study": False,
             }
             for index in range(max(len(event_titles), len(event_days), len(event_starts), len(event_ends), len(event_colors)))
         ]
+        
+    specific_events = []
+    if isinstance(form_data, dict) and isinstance(form_data.get("specific_events"), list):
+        for event in form_data["specific_events"]:
+            if not isinstance(event, dict):
+                continue
+            display_color = event.get("display_color") or event.get("color") or ""
+            specific_events.append(
+                {
+                    "title": str(event.get("title", "") or ""),
+                    "start_date": str(event.get("start_date", "") or ""),
+                    "end_date": str(event.get("end_date", "") or ""),
+                    "start_time": str(event.get("start_time", "") or ""),
+                    "end_time": str(event.get("end_time", "") or ""),
+                    "emoji": str(event.get("emoji", "🏖️") or "🏖️"),
+                    "color": str(event.get("color", display_color) or display_color or "#ff9f43"),
+                    "display_color": display_color or str(event.get("color", "") or "#ff9f43"),
+                    "show_on_calendar": bool(event.get("show_on_calendar", True)),
+                    "concurrent_with_study": bool(event.get("concurrent_with_study", False)),
+                }
+            )
 
     plan_data: dict[str, Any] = {
         "plan_name": _get_field(form_data, "plan_name"),
@@ -284,6 +307,7 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
         "preferred_subject_count": int(str(_get_field(form_data, "preferred_subject_count") or "0").strip() or 0),
         "subjects": parse_subject_entries(form_data),
         "fixed_events": fixed_events,
+        "specific_events": specific_events,
         "weekday_wake": _get_field(form_data, "weekday_wake"),
         "weekday_sleep": _get_field(form_data, "weekday_sleep"),
         "weekend_wake": _get_field(form_data, "weekend_wake"),
@@ -391,6 +415,8 @@ def _initialize_session_state() -> None:
         st.session_state["subjects"] = [{"name": "", "color": "#4f84ff", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}]
     if "fixed_events" not in st.session_state:
         st.session_state["fixed_events"] = [{"title": "", "weekdays": [], "start": "", "end": "", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}]
+    if "specific_events" not in st.session_state:
+        st.session_state["specific_events"] = []
     if "plan_name" not in st.session_state:
         st.session_state["plan_name"] = ""
     if "plan_goal" not in st.session_state:
@@ -424,6 +450,12 @@ def _add_event():
 
 def _del_event(idx):
     st.session_state["fixed_events"].pop(idx)
+
+def _add_specific_event():
+    st.session_state["specific_events"].append({"title": "", "start_date": "", "end_date": "", "start_time": "08:00", "end_time": "17:00", "emoji": "🏖️", "color": "#ff9f43", "display_color": "#ff9f43", "show_on_calendar": True, "custom_color": False, "concurrent_with_study": False})
+
+def _del_specific_event(idx):
+    st.session_state["specific_events"].pop(idx)
 
 def _parse_time_str(t_str: str, default="08:00"):
     try:
@@ -617,6 +649,72 @@ def render_setup_page() -> None:
 
     st.button("新增行程", on_click=_add_event)
 
+    st.subheader("例外/特定日期行程")
+    st.caption("新增單次、跨日期的行程（如：校外教學、段考、畢旅），系統將自動為您空出這些日子的讀書時間。")
+    
+    for idx, event in enumerate(st.session_state["specific_events"]):
+        with st.container():
+            title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"specific_event_title_{idx}")
+            
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                try:
+                    default_start_date = datetime.strptime(event.get("start_date", ""), "%Y-%m-%d").date()
+                except:
+                    default_start_date = date.today()
+                start_date_value = st.date_input("開始日期", value=default_start_date, key=f"specific_event_start_date_{idx}")
+            with d_col2:
+                try:
+                    default_end_date = datetime.strptime(event.get("end_date", ""), "%Y-%m-%d").date()
+                except:
+                    default_end_date = start_date_value
+                end_date_value = st.date_input("結束日期", value=default_end_date, key=f"specific_event_end_date_{idx}")
+                
+            t_col1, t_col2 = st.columns(2)
+            with t_col1:
+                start_time_value = render_time_picker("開始時間", event.get("start_time", "08:00"), f"specific_event_start_time_{idx}")
+            with t_col2:
+                end_time_value = render_time_picker("結束時間", event.get("end_time", "17:00"), f"specific_event_end_time_{idx}")
+                
+            color_option = st.selectbox(
+                "顏色",
+                options=COLOR_OPTIONS,
+                format_func=lambda option: option["name"] if isinstance(option, dict) else option,
+                index=next((index for index, option in enumerate(COLOR_OPTIONS) if isinstance(option, dict) and (option["value"] == event.get("display_color") or option["value"] == event.get("color"))), 4),
+                key=f"specific_event_color_{idx}",
+            )
+            if isinstance(color_option, dict):
+                st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{color_option['value']};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
+            
+            emoji_option = st.selectbox(
+                "表情符號",
+                options=EMOJI_OPTIONS,
+                index=EMOJI_OPTIONS.index(event.get("emoji", "🏖️")) if event.get("emoji") in EMOJI_OPTIONS else 0,
+                key=f"specific_event_emoji_{idx}",
+            )
+            
+            show_on_calendar = st.checkbox("顯示在月曆", value=bool(event.get("show_on_calendar", True)), key=f"specific_event_show_{idx}")
+            concurrent_with_study = st.checkbox("是否能和讀書計畫並行？", value=bool(event.get("concurrent_with_study", False)), key=f"specific_event_concurrent_{idx}")
+            
+            st.button("刪除此行程", key=f"delete_specific_event_{idx}", on_click=_del_specific_event, args=(idx,))
+            
+            st.session_state["specific_events"][idx] = {
+                "title": title_value,
+                "start_date": start_date_value.strftime("%Y-%m-%d"),
+                "end_date": end_date_value.strftime("%Y-%m-%d"),
+                "start_time": start_time_value,
+                "end_time": end_time_value,
+                "emoji": emoji_option,
+                "color": color_option["value"] if isinstance(color_option, dict) else color_option,
+                "display_color": color_option["value"] if isinstance(color_option, dict) else color_option,
+                "show_on_calendar": show_on_calendar,
+                "concurrent_with_study": concurrent_with_study,
+                "custom_color": False,
+            }
+        st.divider()
+
+    st.button("新增特定日期行程", on_click=_add_specific_event)
+
     st.subheader("每日作息")
     c1, c2 = st.columns(2)
     with c1:
@@ -686,6 +784,7 @@ def render_setup_page() -> None:
             "preferred_subject_count": preferred_subject_count,
             "subjects": st.session_state["subjects"],
             "fixed_events": st.session_state["fixed_events"],
+            "specific_events": st.session_state["specific_events"],
             "weekday_wake": weekday_wake,
             "weekday_sleep": weekday_sleep,
             "weekend_wake": weekend_wake,
