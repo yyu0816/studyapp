@@ -20,13 +20,28 @@ def render_timer_page():
     
     daily_checks = st.session_state.get("daily_task_checks", {}).get(now.strftime("%Y-%m-%d"), {})
     
+    # 格式化科目名稱
+    def format_task(s):
+        subj = s.get('科目', '')
+        mat = s.get('教材', '')
+        if not mat or mat == '-' or subj == mat:
+            return subj
+        return f"{subj} - {mat}"
+
+    # 判斷該 session 是否在打卡中已完成
+    def is_session_done(s):
+        subj_mat_prefix = f"{s.get('科目', '')} - {s.get('教材', '')}："
+        for task_name, checked in daily_checks.items():
+            if task_name.startswith(subj_mat_prefix) and checked:
+                return True
+        return False
+
     # 計算現在進度 (第一個未完成的)
     current_progress = "無"
     current_idx = -1
     for i, s in enumerate(today_sessions):
-        task_id = f"task_{i}"
-        if not daily_checks.get(task_id, False):
-            current_progress = f"{s.get('科目', '')} - {s.get('教材', '')}"
+        if not is_session_done(s):
+            current_progress = format_task(s)
             current_idx = i
             break
             
@@ -43,12 +58,12 @@ def render_timer_page():
             sm = logic.get_minutes(s["start_time"])
             em = logic.get_minutes(s["end_time"])
             if sm <= now_minutes <= em:
-                default_progress = f"{s.get('科目', '')} - {s.get('教材', '')}"
+                default_progress = format_task(s)
                 default_idx = i
                 break
             elif now_minutes < sm and default_idx == -1:
                 # 這是下一個即將開始的進度
-                default_progress = f"{s.get('科目', '')} - {s.get('教材', '')}"
+                default_progress = format_task(s)
                 default_idx = i
 
     st.markdown(f"**現在進度:** {current_progress}")
@@ -96,7 +111,15 @@ def render_timer_page():
         selected_date = st.selectbox("選擇日期", all_dates, index=default_date_idx)
         
         sessions_for_selected_date = [s for s in monthly_plan if s.get("date") == selected_date]
-        task_options = [f"{s.get('科目', '')} - {s.get('教材', '')}" for s in sessions_for_selected_date]
+        
+        # 去除重複的選項 (但保留順序)
+        seen = set()
+        task_options = []
+        for s in sessions_for_selected_date:
+            name = format_task(s)
+            if name not in seen:
+                seen.add(name)
+                task_options.append(name)
         
         if not task_options:
             task_options = ["無任務"]
@@ -130,18 +153,18 @@ def render_timer_page():
                 end_time = time.time()
                 elapsed = end_time - st.session_state.timer_start_time
                 
-                # 紀錄起來
+                # 紀錄起來，確保時間是本地時間
                 today_key = now.strftime("%Y-%m-%d")
                 if today_key not in st.session_state.timer_records:
                     st.session_state.timer_records[today_key] = []
                     
-                start_dt = datetime.datetime.fromtimestamp(st.session_state.timer_start_time)
-                end_dt = datetime.datetime.fromtimestamp(end_time)
+                end_dt = now
+                start_dt = end_dt - datetime.timedelta(seconds=elapsed)
                 
                 # 找對應的 session 來取得顏色，或預設顏色
                 task_color = "#4f84ff"
                 for s in today_sessions:
-                    if f"{s.get('科目', '')} - {s.get('教材', '')}" == st.session_state.timer_selected_task:
+                    if format_task(s) == st.session_state.timer_selected_task:
                         task_color = s.get("color", "#4f84ff")
                         break
                 
@@ -199,7 +222,7 @@ def render_timer_page():
             for s in today_sessions:
                 if "start_time" in s and "end_time" in s:
                     expected_events.append({
-                        "title": f"{s.get('科目', '')} ({s.get('教材', '')})",
+                        "title": format_task(s),
                         "start": s["start_time"],
                         "end": s["end_time"],
                         "color": s.get("color", "#4f84ff"),
