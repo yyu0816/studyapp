@@ -5,26 +5,39 @@ import random
 from datetime import date, timedelta
 
 def get_mock_weekly_study_duration(week_offset=0):
-    """Generate mock weekly study duration for the line chart."""
+    """Generate actual weekly study duration from daily_task_checks."""
     today = date.today()
     target_date = today + timedelta(days=week_offset * 7)
-    # Get Monday of the target week
     start_of_week = target_date - timedelta(days=target_date.weekday())
     end_of_week = start_of_week + timedelta(days=6)
+    
+    monthly_plan = st.session_state.get("app_state", {}).get("monthly_plan", [])
+    daily_task_checks = st.session_state.get("daily_task_checks", {})
     
     data = []
     for i in range(7):
         day = start_of_week + timedelta(days=i)
-        # Always show 0 since real data integration is not fully parsed yet
+        day_str = day.strftime("%Y-%m-%d")
         duration = 0.0
         
-        # Convert to HH:MM format
+        checks = daily_task_checks.get(day_str, {})
+        day_slots = [s for s in monthly_plan if s.get("date") == day_str]
+        
+        for s in day_slots:
+            subj = s.get("科目", "")
+            mat = s.get("教材", "")
+            prefix = f"{subj} - {mat}："
+            for task_str, is_checked in checks.items():
+                if is_checked and task_str.startswith(prefix):
+                    duration += 1.0
+                    break
+        
         h = int(duration)
         m = int((duration - h) * 60)
         duration_str = f"{h:02d}h {m:02d}m"
         
         data.append({
-            "date": day.strftime("%Y-%m-%d"),
+            "date": day_str,
             "date_label": day.strftime("%m/%d"),
             "duration": duration,
             "duration_str": duration_str
@@ -32,39 +45,101 @@ def get_mock_weekly_study_duration(week_offset=0):
     return pd.DataFrame(data), start_of_week, end_of_week
 
 def get_subject_ranking() -> list[dict]:
-    """Get subject completion rankings. Uses real subjects if available, else mock."""
+    """Get actual subject completion rankings from daily_task_checks."""
     plan = st.session_state.get("plan", {})
     subjects = plan.get("subjects", [])
-    
     if not subjects:
         return []
+        
+    daily_task_checks = st.session_state.get("daily_task_checks", {})
     
-    # Process real subjects, generate mock progress
     ranking = []
     for subj in subjects:
         name = subj.get("name", "未命名科目")
         color = subj.get("color", "#4f84ff")
-        # Mock a random progress percentage for now
-        progress = 0
+        
+        total_qty = 0.0
+        for mat in subj.get("materials", []):
+            try: total_qty += float(mat.get("quantity", 0))
+            except: pass
+            
+        completed_qty = 0.0
+        for day_str, checks in daily_task_checks.items():
+            for task_str, is_checked in checks.items():
+                if is_checked and task_str.startswith(f"{name} - "):
+                    try:
+                        qty_str = task_str.split("：")[1].strip()
+                        qty = float(qty_str.split(" ")[0])
+                        completed_qty += qty
+                    except:
+                        pass
+                        
+        progress = int((completed_qty / total_qty * 100)) if total_qty > 0 else 0
+        progress = min(100, progress)
         ranking.append({"name": name, "progress": progress, "color": color})
         
-    # Sort by progress descending
     ranking.sort(key=lambda x: x["progress"], reverse=True)
     return ranking[:3] # Max 3 items
 
 def get_mock_mood_history(month_offset=0):
-    """Generate 30 days of mock mood data with state persistence."""
-    # Temporarily hardcode to 0 (no record) to wipe out any cached random data in session state
-    st.session_state.dashboard_mood_data = {}
-    st.session_state.dashboard_mood_data[month_offset] = [0 for _ in range(30)]
-        
+    """Generate actual mood data for 30 days starting from the target month's 1st day."""
     today = date.today()
-    month = today.month + month_offset - 1
-    year = today.year + month // 12
-    month = month % 12 + 1
+    month_target = today.month + month_offset - 1
+    year = today.year + month_target // 12
+    month = month_target % 12 + 1
     month_str = f"{year}年{month}月"
     
-    return st.session_state.dashboard_mood_data[month_offset], month_str
+    start_date = date(year, month, 1)
+    daily_moods = st.session_state.get("daily_moods", {})
+    
+    data = []
+    for i in range(30):
+        day = start_date + timedelta(days=i)
+        day_str = day.strftime("%Y-%m-%d")
+        
+        mood_data = daily_moods.get(day_str, {})
+        if mood_data.get("submitted"):
+            data.append(mood_data.get("mood", 0))
+        else:
+            data.append(0)
+            
+    return data, month_str
+
+def get_overall_progress():
+    """Calculate overall completion rate and check-in days."""
+    daily_task_checks = st.session_state.get("daily_task_checks", {})
+    monthly_plan = st.session_state.get("app_state", {}).get("monthly_plan", [])
+    from datetime import datetime
+    
+    today = date.today()
+    
+    checkin_days = 0
+    for day_str, checks in daily_task_checks.items():
+        if any(checks.values()):
+            checkin_days += 1
+            
+    total_slots_this_month = 0
+    completed_slots_this_month = 0
+    
+    for s in monthly_plan:
+        d_str = s.get("date")
+        if not d_str: continue
+        try:
+            d_obj = datetime.strptime(d_str, "%Y-%m-%d").date()
+            if d_obj.month == today.month and d_obj.year == today.year:
+                total_slots_this_month += 1
+                subj = s.get("科目", "")
+                mat = s.get("教材", "")
+                prefix = f"{subj} - {mat}："
+                checks = daily_task_checks.get(d_str, {})
+                for task_str, is_checked in checks.items():
+                    if is_checked and task_str.startswith(prefix):
+                        completed_slots_this_month += 1
+                        break
+        except: pass
+        
+    completion_rate = int((completed_slots_this_month / total_slots_this_month * 100)) if total_slots_this_month > 0 else 0
+    return completion_rate, checkin_days
 
 def get_html_progress_bar(title: str, percentage: int, color_start: str, color_end: str, margin_bottom="20px"):
     """Render a vibrant custom progress bar."""
@@ -101,10 +176,11 @@ def render_dashboard():
     if 'dashboard_month_offset' not in st.session_state:
         st.session_state.dashboard_month_offset = 0
         
-    # Generate mock data
+    # Generate real data
     df_weekly, start_week, end_week = get_mock_weekly_study_duration(st.session_state.dashboard_week_offset)
     subject_rankings = get_subject_ranking()
     mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
+    completion_rate, checkin_days = get_overall_progress()
     
     # Main Layout: Left 1/3, Right 2/3
     col_left, col_right = st.columns([1, 2], gap="large")
@@ -115,8 +191,8 @@ def render_dashboard():
         st.markdown("#### 🎯 總體進度")
         
         left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; max-width: 364px; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
-    {get_html_progress_bar("當月完成度", 0, "#ff9a9e", "#fecfef", margin_bottom="20px")}
-    {get_html_progress_bar("打卡天數", 0, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
+    {get_html_progress_bar("當月完成度", completion_rate, "#ff9a9e", "#fecfef", margin_bottom="20px")}
+    {get_html_progress_bar("打卡天數", checkin_days, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
 </div>"""
         st.markdown(left_html, unsafe_allow_html=True)
         

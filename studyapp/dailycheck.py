@@ -135,11 +135,17 @@ def render_daily_checkin_page() -> None:
         st.session_state["daily_modified_fixed"] = {}
     modified_fixed = st.session_state["daily_modified_fixed"].get(today_str, {})
 
-    # Persist mood & motivation so they survive Streamlit reruns
-    if "saved_motivation" not in st.session_state:
-        st.session_state["saved_motivation"] = 3
-    if "saved_mood" not in st.session_state:
-        st.session_state["saved_mood"] = 3
+    # Persist mood & motivation so they survive Streamlit reruns, keyed by date
+    if "daily_moods" not in st.session_state:
+        st.session_state["daily_moods"] = {}
+    
+    if "daily_task_checks" not in st.session_state:
+        st.session_state["daily_task_checks"] = {}
+        
+    if "daily_feedback" not in st.session_state:
+        st.session_state["daily_feedback"] = {}
+        
+    today_mood = st.session_state["daily_moods"].get(today_str, {"motivation": 3, "mood": 3, "submitted": False, "pending": False})
 
     # Build today_events
     today_events = []
@@ -343,27 +349,27 @@ def render_daily_checkin_page() -> None:
             # ── 心情反饋 ──────────────────────────────────────────────────────
             st.markdown("#### 🎭 心情反饋")
             with st.container(border=True):
-                is_mood_submitted = st.session_state.get("mood_submitted", False)
+                is_mood_submitted = today_mood.get("submitted", False)
 
                 if not is_mood_submitted:
                     motivation = st.radio(
                         "動力 (1: 低下 - 5: 充滿動力)", [1, 2, 3, 4, 5],
-                        index=st.session_state["saved_motivation"] - 1,
+                        index=today_mood["motivation"] - 1,
                         horizontal=True, key="daily_motivation")
                     mood = st.radio(
                         "心情 (1: 低落 - 5: 心情極佳)", [1, 2, 3, 4, 5],
-                        index=st.session_state["saved_mood"] - 1,
+                        index=today_mood["mood"] - 1,
                         horizontal=True, key="daily_mood_score")
                     
                     # Save immediately as user changes
-                    st.session_state["saved_motivation"] = motivation
-                    st.session_state["saved_mood"] = mood
+                    st.session_state["daily_moods"].setdefault(today_str, {})["motivation"] = motivation
+                    st.session_state["daily_moods"].setdefault(today_str, {})["mood"] = mood
 
                     if st.button("確認送出", key="btn_submit_mood"):
-                        st.session_state["mood_pending_confirm"] = True
+                        st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = True
                         st.rerun()
 
-                    if st.session_state.get("mood_pending_confirm"):
+                    if today_mood.get("pending", False):
                         st.warning(
                             f"⚠️ 請確認填入數值是否正確：\n\n"
                             f"**動力**：{motivation}　**心情**：{mood}\n\n"
@@ -372,20 +378,20 @@ def render_daily_checkin_page() -> None:
                         c_yes, c_no = st.columns(2)
                         with c_yes:
                             if st.button("✅ 確認", key="btn_mood_yes"):
-                                st.session_state["mood_submitted"] = True
-                                st.session_state["mood_pending_confirm"] = False
+                                st.session_state["daily_moods"].setdefault(today_str, {})["submitted"] = True
+                                st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
                                 st.rerun()
                         with c_no:
                             if st.button("❌ 取消", key="btn_mood_no"):
-                                st.session_state["mood_pending_confirm"] = False
+                                st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
                                 st.rerun()
                 else:
                     # Show locked values from saved state
                     st.radio("動力", [1, 2, 3, 4, 5],
-                        index=st.session_state["saved_motivation"] - 1,
+                        index=today_mood["motivation"] - 1,
                         horizontal=True, key="daily_motivation_locked", disabled=True)
                     st.radio("心情", [1, 2, 3, 4, 5],
-                        index=st.session_state["saved_mood"] - 1,
+                        index=today_mood["mood"] - 1,
                         horizontal=True, key="daily_mood_score_locked", disabled=True)
                     st.success("已送出心情與動力紀錄！")
 
@@ -417,8 +423,14 @@ def render_daily_checkin_page() -> None:
                 tasks.extend(daily_tasks_overrides)
 
                 if tasks:
+                    today_checks = st.session_state["daily_task_checks"].setdefault(today_str, {})
                     for task in tasks:
-                        st.checkbox(task, key=f"task_check_{task}")
+                        checked = st.checkbox(
+                            task, 
+                            value=today_checks.get(task, False),
+                            key=f"task_check_{today_str}_{task}"
+                        )
+                        today_checks[task] = checked
                 else:
                     st.markdown("今日無指定讀書內容")
 
@@ -438,17 +450,19 @@ def render_daily_checkin_page() -> None:
                             st.session_state["daily_override_tasks"].setdefault(today_str, []).append(task_text)
                             st.rerun()
 
-            # ── 進度安排反饋 ──────────────────────────────────────────────────
             st.markdown("#### ⚖️ 進度安排反饋")
             with st.container(border=True):
+                today_feedback = st.session_state["daily_feedback"].setdefault(today_str, {"amount": 3, "pacing": 3})
                 amount_feedback = st.radio(
                     "分量回饋 (1: 分量太少；5: 分量太多)",
-                    [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_amount"
+                    [1, 2, 3, 4, 5], index=today_feedback["amount"] - 1, horizontal=True, key="daily_amount"
                 )
                 pacing_feedback = st.radio(
                     "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
-                    [1, 2, 3, 4, 5], index=2, horizontal=True, key="daily_pacing_score"
+                    [1, 2, 3, 4, 5], index=today_feedback["pacing"] - 1, horizontal=True, key="daily_pacing_score"
                 )
+                today_feedback["amount"] = amount_feedback
+                today_feedback["pacing"] = pacing_feedback
 
                 if "show_time_loss" not in st.session_state:
                     st.session_state["show_time_loss"] = False
