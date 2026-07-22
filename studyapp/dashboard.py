@@ -275,9 +275,13 @@ def render_dashboard():
                                   legend=alt.Legend(title="科目", orient="right")),
                     tooltip=["subject", "hours"]
                 ).properties(
-                    height=250
+                    height=200
                 )
-                st.altair_chart(pie_chart, use_container_width=True)
+                
+                # Make pie chart take 1/3 of the width
+                pie_col, _ = st.columns([1, 2])
+                with pie_col:
+                    st.altair_chart(pie_chart, use_container_width=True)
                 
                 st.markdown("---")
                 
@@ -295,7 +299,7 @@ def render_dashboard():
                                 color=alt.value(subj['color']),
                                 tooltip=['date', 'hours']
                             ).properties(
-                                height=max(100, len(subj_df) * 30)
+                                height=max(120, len(subj_df) * 60)
                             ).configure_view(
                                 strokeWidth=0
                             ).configure_axis(
