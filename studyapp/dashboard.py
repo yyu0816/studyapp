@@ -301,7 +301,7 @@ def render_dashboard():
                             color=alt.value(subj['color']),
                             tooltip=['date', 'hours']
                         ).properties(
-                            height=max(120, len(subj_df) * 60)
+                            height=max(80, len(subj_df) * 35)
                         ).configure_view(
                             strokeWidth=0
                         ).configure_axis(
