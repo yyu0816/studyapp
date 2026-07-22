@@ -301,13 +301,14 @@ def render_dashboard():
                             color=alt.value(subj['color']),
                             tooltip=['date', 'hours']
                         ).properties(
+                            width=350,
                             height=alt.Step(30)
                         ).configure_view(
                             strokeWidth=0
                         ).configure_axis(
                             grid=False
                         )
-                        st.altair_chart(bar_chart, use_container_width=True)
+                        st.altair_chart(bar_chart, use_container_width=False)
                     else:
                         st.write("無每日詳細資料。")
 
