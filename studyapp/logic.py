@@ -592,23 +592,14 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
             qty = int(mat.get("quantity", 0))
             unit = UNIT_MAP.get(mat_type, "項")
             if qty > 0:
-                allocated_sessions = len(target_dates)
-                if allocated_sessions > 0:
-                    base_prog = qty // allocated_sessions
-                    rem_prog = qty % allocated_sessions
-                    # 將餘數均勻打散到前幾個 session 中，確保進度平攤
-                    prog_array = [base_prog + 1 if i < rem_prog else base_prog for i in range(allocated_sessions)]
-                else:
-                    prog_array = []
-                
                 subject_schedules.append({
                     "subject": subj_name,
                     "color": subject.get("color", "#4f84ff"),
                     "material": mat_name,
                     "unit": unit,
                     "target_dates": list(target_dates),
-                    "progress_array": prog_array,
-                    "remaining_qty": qty
+                    "remaining_qty": qty,
+                    "assigned_count": 0
                 })
                 
     # 3. 裝箱排程 (Bin Packing 防碰撞機制)
@@ -628,27 +619,57 @@ def generate_daily_schedule(plan: dict) -> List[Dict[str, Any]]:
         sp = task["sp"]
         assigned_date = None
         
-        # 先往前推 (往 start_date 找空檔)
+        # 第一階段：強迫分攤，該日不可已有此科目
         check_date = pref_date
         while check_date >= start_date:
             d_info = daily_sessions.get(check_date)
-            if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
+            if d_info and len(d_info["scheduled"]) < d_info["sessions"] and sp not in d_info["scheduled"]:
                 assigned_date = check_date
                 break
             check_date -= timedelta(days=1)
             
         if not assigned_date:
-            # 找不到，改往後推 (往 end_date 找空檔)
             check_date = pref_date + timedelta(days=1)
             while check_date <= end_date:
                 d_info = daily_sessions.get(check_date)
-                if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
+                if d_info and len(d_info["scheduled"]) < d_info["sessions"] and sp not in d_info["scheduled"]:
                     assigned_date = check_date
                     break
                 check_date += timedelta(days=1)
                 
+        # 第二階段：如果真的所有日子都擠滿了，才允許同一天疊加
+        if not assigned_date:
+            check_date = pref_date
+            while check_date >= start_date:
+                d_info = daily_sessions.get(check_date)
+                if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
+                    assigned_date = check_date
+                    break
+                check_date -= timedelta(days=1)
+                
+            if not assigned_date:
+                check_date = pref_date + timedelta(days=1)
+                while check_date <= end_date:
+                    d_info = daily_sessions.get(check_date)
+                    if d_info and len(d_info["scheduled"]) < d_info["sessions"]:
+                        assigned_date = check_date
+                        break
+                    check_date += timedelta(days=1)
+                    
         if assigned_date:
             daily_sessions[assigned_date]["scheduled"].append(sp)
+            sp["assigned_count"] += 1
+            
+    # 計算每個科目真正被分配到的陣列 (確保所有量都被完美分攤到獲取的天數上)
+    for sp in subject_schedules:
+        qty = sp["remaining_qty"]
+        allocated = sp["assigned_count"]
+        if allocated > 0:
+            base_prog = qty // allocated
+            rem_prog = qty % allocated
+            sp["progress_array"] = [base_prog + 1 if i < rem_prog else base_prog for i in range(allocated)]
+        else:
+            sp["progress_array"] = []
 
     # 4. 產生最終排程
     curr_d = start_date
