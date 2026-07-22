@@ -272,6 +272,20 @@ def render_dashboard():
                     pie_data["percentage"] = (pie_data["hours"] / total_h * 100).round(1)
                     pie_data["label"] = pie_data["percentage"].astype(str) + "%"
                     
+                    def get_contrast_color(hex_color: str) -> str:
+                        hex_color = str(hex_color).lstrip('#')
+                        if len(hex_color) == 6:
+                            try:
+                                r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                            except:
+                                r, g, b = 255, 255, 255
+                        else:
+                            r, g, b = 255, 255, 255
+                        # Use standard luminance threshold
+                        return "#111111" if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else "#ffffff"
+                        
+                    pie_data["text_color"] = pie_data["color"].apply(get_contrast_color)
+                    
                     # Create Pie Chart base
                     base_chart = alt.Chart(pie_data).encode(
                         theta=alt.Theta(field="hours", type="quantitative", stack=True),
@@ -295,7 +309,7 @@ def render_dashboard():
                         fontWeight="bold"
                     ).encode(
                         text="label:N",
-                        color=alt.value("#222222")
+                        color=alt.Color("text_color:N", scale=None)
                     )
                     
                     final_chart = (pie_chart + text_chart).properties(
