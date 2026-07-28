@@ -5,14 +5,24 @@ from typing import Any
 import streamlit as st
 import dashboard
 
-# 【關鍵修改】確保在任何程式碼執行前，session_state 已經準備好了
-if "app_state" not in st.session_state:
-    st.session_state["app_state"] = {
-        "plan": None,
-        "daily_log": None,
-        "monthly_plan": None,
-    }
-app_state = st.session_state["app_state"]
+import storage
+
+# 確保基礎 state 準備好
+if "current_plan_id" not in st.session_state:
+    st.session_state["current_plan_id"] = None
+    
+# 如果在 app 內（已選定計畫），但 app_state 遺失，嘗試補回
+if st.session_state["current_plan_id"] and "app_state" not in st.session_state:
+    plan_data = storage.load_plan(st.session_state["current_plan_id"])
+    if plan_data:
+        st.session_state["app_state"] = plan_data.get("app_state", {"plan": None, "daily_log": None, "monthly_plan": None})
+    else:
+        st.session_state["app_state"] = {"plan": None, "daily_log": None, "monthly_plan": None}
+elif "app_state" not in st.session_state:
+    st.session_state["app_state"] = {"plan": None, "daily_log": None, "monthly_plan": None}
+
+app_state = st.session_state.get("app_state", {})
+
 
 st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
@@ -823,6 +833,11 @@ def render_setup_page() -> None:
         
         st.session_state["monthly_plan"] = build_monthly_plan(plan_data)
         st.session_state["main_page"] = "月計畫"
+        
+        # Save to storage
+        import storage
+        storage.save_current_state()
+        
         st.success("初始設定已完成，月計畫已建立。")
 
 
@@ -869,6 +884,13 @@ def render_home_page() -> None:
         st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
 
     st.sidebar.markdown("### 主選單")
+    
+    if st.sidebar.button("🏠 回到計畫列表", use_container_width=True):
+        st.session_state["current_plan_id"] = None
+        st.rerun()
+        
+    st.sidebar.markdown("---")
+    
     for i, opt in enumerate(page_options):
         with st.sidebar:
             st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
@@ -1063,8 +1085,75 @@ def render_home_page() -> None:
     else:
         render_daily_checkin_page()
 
+def render_start_page():
+    st.title("📚 我的讀書計畫")
+    st.markdown("歡迎回來！請選擇要繼續進行的計畫，或是建立一個全新的計畫。")
+    st.markdown("---")
+    
+    plans = storage.load_all_plans()
+    
+    # 建立新計畫按鈕
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("➕ 建立新計畫", use_container_width=True, type="primary"):
+            new_id = storage.create_new_plan()
+            st.session_state["current_plan_id"] = new_id
+            st.session_state["main_page"] = "計劃頁面"
+            # 載入空白狀態
+            new_plan = storage.load_plan(new_id)
+            for k, v in new_plan.items():
+                if k != "id":
+                    st.session_state[k] = v
+            st.rerun()
+            
+    st.markdown("---")
+    
+    if not plans:
+        st.info("目前還沒有任何讀書計畫。請點擊上方按鈕建立您的第一個計畫！")
+        return
+        
+    # 顯示現有計畫
+    cols = st.columns(3)
+    for idx, (plan_id, plan_data) in enumerate(plans.items()):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"### {plan_data.get('name', '未命名計畫')}")
+                goal = plan_data.get('goal', '')
+                if goal:
+                    st.caption(f"🎯 {goal[:20]}{'...' if len(goal)>20 else ''}")
+                else:
+                    st.caption("無設定目標")
+                    
+                # 可以加上日期等資訊
+                plan_state = plan_data.get("plan", {})
+                if plan_state and plan_state.get("start_date"):
+                    st.markdown(f"🗓️ {plan_state.get('start_date')} ~ {plan_state.get('end_date')}")
+                else:
+                    st.markdown("🗓️ 尚未設定排程")
+                
+                st.markdown("<br/>", unsafe_allow_html=True)
+                
+                col_enter, col_del = st.columns([3, 1])
+                with col_enter:
+                    if st.button("進入計畫", key=f"enter_{plan_id}", use_container_width=True):
+                        st.session_state["current_plan_id"] = plan_id
+                        for k, v in plan_data.items():
+                            if k != "id":
+                                st.session_state[k] = v
+                        st.session_state["main_page"] = "dashboard" if st.session_state.get("plan") else "計劃頁面"
+                        st.rerun()
+                with col_del:
+                    if st.button("🗑️", key=f"del_{plan_id}", help="刪除計畫", use_container_width=True):
+                        storage.delete_plan(plan_id)
+                        st.rerun()
+
 
 if __name__ == "__main__":
-    render_home_page()
+    if not st.session_state.get("current_plan_id"):
+        render_start_page()
+    else:
+        render_home_page()
+        import storage
+        storage.save_current_state()
 
-# Trigger refresh 46
+# Trigger refresh 47

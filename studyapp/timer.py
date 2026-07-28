@@ -208,6 +208,8 @@ def render_timer_page():
                     st.session_state.timer_state = "stopped"
                     st.session_state.timer_start_time = None
                     st.session_state.timer_accumulated_sec = 0.0
+                    import storage
+                    storage.save_current_state()
                     st.rerun()
                     
             # 即時更新的計時器 (使用 JavaScript)
