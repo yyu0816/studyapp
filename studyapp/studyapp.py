@@ -916,6 +916,7 @@ def render_home_page() -> None:
         st.session_state["cal_view_date"] = qp_view
 
     page = st.session_state["main_page"]
+    cal_view_date = st.session_state.get("cal_view_date")
 
     if page != "計劃頁面" and st.session_state.get("plan_name"):
         st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
