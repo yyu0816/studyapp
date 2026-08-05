@@ -52,6 +52,8 @@ def create_new_plan(name="未命名計畫", goal=""):
         "plan_name": name,
         "plan_goal": goal,
         "subjects": [{"name": "", "color": "#4f84ff", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []}],
+        "fixed_events": [{"title": "", "weekdays": [], "start": "", "end": "", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}],
+        "specific_events": [],
         "daily_override_events": {},
         "daily_modified_fixed": {}
     }
@@ -79,7 +81,8 @@ def save_current_state():
     # Update plan data from session_state
     keys_to_save = [
         "app_state", "daily_task_checks", "timer_records", "mood_records",
-        "plan_name", "plan_goal", "subjects", "daily_override_events", "daily_modified_fixed", "plan"
+        "plan_name", "plan_goal", "subjects", "daily_override_events", "daily_modified_fixed", "plan",
+        "fixed_events", "specific_events"
     ]
     for key in keys_to_save:
         if key in st.session_state:
