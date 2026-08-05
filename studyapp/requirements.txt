@@ -1,4 +1,5 @@
 streamlit>=1.35.0
 pandas
 altair
+starlette>=0.40.0,<0.46.0
 
