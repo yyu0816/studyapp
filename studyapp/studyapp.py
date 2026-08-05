@@ -866,14 +866,64 @@ def render_dashboard_page() -> None:
     dashboard.render_dashboard()
 
 
+def apply_custom_theme() -> None:
+    theme = st.session_state.get("custom_theme") or {}
+    bg_color = theme.get("bg_color", "#ffffff")
+    button_color = theme.get("button_color", "#4f84ff")
+    navbar_bg_color = theme.get("navbar_bg_color", "#f8f9fa")
+
+    css = f"""
+    <style>
+    .stApp {{
+        background-color: {bg_color} !important;
+    }}
+    .top-navbar-container {{
+        background-color: {navbar_bg_color} !important;
+        padding: 8px 12px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        border: 1px solid #e2e8f0;
+    }}
+    button[kind="primary"] {{
+        background-color: {button_color} !important;
+        border-color: {button_color} !important;
+        color: #ffffff !important;
+    }}
+    button[kind="primary"]:hover {{
+        opacity: 0.9 !important;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+
 def render_home_page() -> None:
-    page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調", "計時器", "設定"]
-    
-    if "main_page" not in st.session_state:
-        st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
+    apply_custom_theme()
+
+    enabled = st.session_state.get("enabled_pages", {})
+    if not isinstance(enabled, dict):
+        enabled = {"dashboard": True, "月計畫": True, "每日打卡與微調": True, "計時器": True}
+
+    # "計畫頁面" is mandatory (per request: "不含計畫頁面")
+    page_options = ["計劃頁面"]
+    optional_pages = [
+        ("dashboard", "dashboard"),
+        ("月計畫", "月計畫"),
+        ("每日打卡與微調", "每日打卡與微調"),
+        ("計時器", "計時器")
+    ]
+    for key, opt in optional_pages:
+        if enabled.get(key, True):
+            page_options.append(opt)
+    page_options.append("設定")
+
+    if "main_page" not in st.session_state or st.session_state["main_page"] not in page_options:
+        st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else page_options[min(1, len(page_options)-1)]
 
     # ── 頂部橫向主選單 (Horizontal Navbar at the top) ──────────────────────────
-    nav_cols = st.columns([1, 1, 1, 1, 1.3, 1, 1], gap="small")
+    st.markdown('<div class="top-navbar-container">', unsafe_allow_html=True)
+    cols_count = len(page_options) + 1
+    nav_cols = st.columns(cols_count, gap="small")
     with nav_cols[0]:
         if st.button("🏠 計畫列表", key="top_nav_home", use_container_width=True):
             st.session_state["current_plan_id"] = None
@@ -887,7 +937,7 @@ def render_home_page() -> None:
                 st.session_state["main_page"] = opt
                 st.rerun()
 
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Handle view_date query param from HTML calendar links
     qp_view = st.query_params.get("view_date")

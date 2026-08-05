@@ -69,7 +69,9 @@ def create_new_plan(name="未命名計畫", goal=""):
         "fixed_events": [{"title": "", "weekdays": [], "start": "", "end": "", "emoji": "📚", "color": "#4f84ff", "display_color": "#4f84ff", "show_on_calendar": True, "custom_color": False}],
         "specific_events": [],
         "daily_override_events": {},
-        "daily_modified_fixed": {}
+        "daily_modified_fixed": {},
+        "enabled_pages": {"dashboard": True, "月計畫": True, "每日打卡與微調": True, "計時器": True},
+        "custom_theme": {"bg_color": "#ffffff", "button_color": "#4f84ff", "navbar_bg_color": "#f8f9fa"}
     }
     save_plan(plan_id, new_plan)
     return plan_id
@@ -96,7 +98,7 @@ def save_current_state():
     keys_to_save = [
         "app_state", "daily_task_checks", "timer_records", "mood_records",
         "plan_name", "plan_goal", "subjects", "daily_override_events", "daily_modified_fixed", "plan",
-        "fixed_events", "specific_events"
+        "fixed_events", "specific_events", "enabled_pages", "custom_theme"
     ]
     for key in keys_to_save:
         if key in st.session_state:
