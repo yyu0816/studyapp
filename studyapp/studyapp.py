@@ -917,182 +917,41 @@ def render_home_page() -> None:
 
     page = st.session_state["main_page"]
 
-    cal_view_date = st.session_state.get("cal_view_date")
-    col_main = None
+    if page != "計劃頁面" and st.session_state.get("plan_name"):
+        st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
+        if st.session_state.get("plan_goal"):
+            st.markdown(f"<p style='font-size: 16px; color: #555;'>🎯 <b>目標：</b>{st.session_state['plan_goal']}</p>", unsafe_allow_html=True)
+    elif page == "計劃頁面":
+        st.title("讀書計畫安排助手")
+        st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
 
-    if page == "月計畫":
-        if cal_view_date:
-            col_progress, col_main = st.columns([1.5, 3], gap="small")
-        else:
-            col_progress, col_main = None, None
-        
-        if col_progress:
-            with col_progress:
-                st.markdown(f"### 📅 {cal_view_date}")
-                schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
-                if not schedule_data:
-                    st.info("尚未生成排程計畫")
-                else:
-                    daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
-                    
+    if page == "月計畫" and cal_view_date:
+        with st.container(border=True):
+            st.markdown(f"### 📅 {cal_view_date} 詳細行程與進度")
+            schedule_data = st.session_state.get("app_state", {}).get("monthly_plan")
+            if schedule_data:
+                daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
+                if daily_schedule:
                     st.markdown("#### 📚 當日讀書進度")
-                    if not daily_schedule:
-                        st.write("今日無排定讀書進度")
-                    else:
-                        grouped_progress = {}
-                        for item in daily_schedule:
-                            subj = item.get("科目", "")
-                            mat = item.get("教材", "")
-                            target = item.get("目標進度", "")
-                            color = item.get("color", "#4f84ff")
-                            
-                            key = f"{subj} - {mat}"
-                            if key not in grouped_progress:
-                                grouped_progress[key] = {"subj": subj, "mat": mat, "color": color, "qty": 0.0, "unit": ""}
-                                
-                            try:
-                                qty = float(target.split(" ")[0])
-                                unit = target.split(" ")[1] if " " in target else ""
-                                grouped_progress[key]["qty"] += qty
-                                grouped_progress[key]["unit"] = unit
-                            except:
-                                pass
-                                
-                        # Render grouped progress
-                        subj_render = {}
-                        for key, data in grouped_progress.items():
-                            subj = data["subj"]
-                            mat = data["mat"]
-                            color = data["color"]
-                            qty = data["qty"]
-                            unit = data["unit"]
-                            qty_str = f"{int(qty)}" if qty.is_integer() else f"{qty:.1f}"
-                            display_text = f"{mat}：{qty_str} {unit}" if mat and mat != "-" else f"{qty_str} {unit}"
-                            
-                            if subj not in subj_render:
-                                subj_render[subj] = {"color": color, "items": []}
-                            subj_render[subj]["items"].append(display_text)
-                            
-                        for subj, data in subj_render.items():
-                            color = data["color"]
-                            items_html = "<br/>".join([f"• {text}" for text in data["items"]])
-                            st.markdown(f"<div style='border-left:3px solid {color}; padding:4px 8px; margin-bottom:6px; font-size:13px;'><b>{subj}</b><br/>{items_html}</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("---")
-                    
-                    plan = st.session_state.get("plan", {})
-                    fixed_events = plan.get("fixed_events", [])
-                    overrides = st.session_state.get("daily_override_events", {}).get(cal_view_date, [])
-                    modified_fixed = st.session_state.get("daily_modified_fixed", {}).get(cal_view_date, {})
-                    
-                    try:
-                        cal_date_obj = datetime.strptime(cal_view_date, "%Y-%m-%d").date()
-                        weekday_str = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"][cal_date_obj.weekday()]
-                    except Exception:
-                        weekday_str = ""
-                    
-                    today_events = []
-                    
-                    # 1. Fixed events
-                    for f_idx, e in enumerate(fixed_events):
-                        if weekday_str in e.get("weekdays", []):
-                            if f_idx in modified_fixed:
-                                if not modified_fixed[f_idx].get("deleted"):
-                                    m_event = modified_fixed[f_idx].copy()
-                                    m_event["_is_fixed"] = True
-                                    today_events.append(m_event)
-                            else:
-                                e_copy = e.copy()
-                                e_copy["_is_fixed"] = True
-                                today_events.append(e_copy)
-                                
-                    # 2. Overrides
-                    for o_idx, e in enumerate(overrides):
-                        e_copy = e.copy()
-                        e_copy["_is_override"] = True
-                        today_events.append(e_copy)
-                        
-                    # 3. Study Sessions
                     for item in daily_schedule:
-                        attr = item.get("屬性", "")
-                        block = item.get("學習區塊", "")
                         subj = item.get("科目", "")
                         mat = item.get("教材", "")
                         target = item.get("目標進度", "")
-                        
-                        start_time = item.get("start_time", "08:00")
-                        end_time = item.get("end_time", "09:00")
-                        
-                        if mat and mat != "-":
-                            display_text = f"{mat}：{target}"
-                        else:
-                            display_text = f"{target}"
-                            
-                        subj_color = item.get("color", "#4f84ff")
-                        if attr != "學習日":
-                            subj_color = "#ff9f43" # buffer day color
-                            
-                        today_events.append({
-                            "title": subj,
-                            "subtitle": display_text,
-                            "start": start_time,
-                            "end": end_time,
-                            "color": subj_color,
-                            "emoji": "📖",
-                            "is_all_day": False
-                        })
-                        
-                    if not today_events:
-                        st.write("這天沒有排定進度或行程。")
-                    else:
-                        render_timeline(today_events, title="")
-                        
-                if st.button("✕ 關閉", key="close_daily_view", use_container_width=True):
-                    st.session_state["cal_view_date"] = None
-                    st.rerun()
-        
-        if col_main:
-            with col_main:
-                if page != "計劃頁面" and st.session_state.get("plan_name"):
-                    st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
-                    if st.session_state.get("plan_goal"):
-                        st.markdown(f"<p style='font-size: 16px; color: #555;'>🎯 <b>目標：</b>{st.session_state['plan_goal']}</p>", unsafe_allow_html=True)
-                elif page == "計劃頁面":
-                    st.title("讀書計畫安排助手")
-                    st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
-        else:
-            if page != "計劃頁面" and st.session_state.get("plan_name"):
-                st.markdown(f"<h2>{st.session_state['plan_name']}</h2>", unsafe_allow_html=True)
-                if st.session_state.get("plan_goal"):
-                    st.markdown(f"<p style='font-size: 16px; color: #555;'>🎯 <b>目標：</b>{st.session_state['plan_goal']}</p>", unsafe_allow_html=True)
-            elif page == "計劃頁面":
-                st.title("讀書計畫安排助手")
-                st.caption("先完成初始設定，生成完整計畫後，再根據每日情況進行打卡與微調。")
+                        color = item.get("color", "#4f84ff")
+                        st.markdown(f"- **{subj}** ({mat})：{target}")
+            
+            if st.button("✕ 關閉每日詳細視圖", key="close_daily_view", use_container_width=True):
+                st.session_state["cal_view_date"] = None
+                st.rerun()
 
     if page == "計劃頁面":
-        if col_main:
-            with col_main:
-                render_setup_page()
-        else:
-            render_setup_page()
+        render_setup_page()
     elif page == "dashboard":
-        if col_main:
-            with col_main:
-                render_dashboard_page()
-        else:
-            render_dashboard_page()
+        render_dashboard_page()
     elif page == "月計畫":
-        if col_main:
-            with col_main:
-                render_monthly_plan_page()
-        else:
-            render_monthly_plan_page()
+        render_monthly_plan_page()
     elif page == "計時器":
-        if col_main:
-            with col_main:
-                render_timer_page()
-        else:
-            render_timer_page()
+        render_timer_page()
     else:
         render_daily_checkin_page()
 

@@ -198,153 +198,129 @@ def render_daily_checkin_page() -> None:
 
     # ── Main Area ─────────────────────────────────────────────────────────────
     with col_main:
-        row1_col1, row1_col2 = st.columns(2)
-
         # ── 今日行程 ─────────────────────────────────────────────────────────
-        with row1_col1:
-            st.markdown("#### 📝 今日行程")
-            with st.container(border=True):
-                editable_events = [e for e in today_events if not e.get("_is_study_session")]
-                if editable_events:
-                    for i, event in enumerate(today_events):
-                        if event.get("_is_study_session"):
-                            continue
-                        emoji = event.get("emoji", "📌")
-                        title = event.get("title", "未命名行程")
-                        start = event.get("start", "")
-                        end   = event.get("end", "")
+        st.markdown("#### 📝 今日行程")
+        with st.container(border=True):
+            editable_events = [e for e in today_events if not e.get("_is_study_session")]
+            if editable_events:
+                for i, event in enumerate(today_events):
+                    if event.get("_is_study_session"):
+                        continue
+                    emoji = event.get("emoji", "📌")
+                    title = event.get("title", "未命名行程")
+                    start = event.get("start", "")
+                    end   = event.get("end", "")
 
-                        with st.expander(f"{emoji} **{title}** ({start}–{end})", expanded=False):
-                            new_t = st.text_input("行程標題", value=title, key=f"edit_title_{i}")
-                            ec1, ec2 = st.columns(2)
-                            with ec1:
-                                st.markdown("開始時間")
-                                eh1, em1 = st.columns(2)
-                                with eh1:
-                                    e_sh = st.selectbox("時", [f"{h:02d}" for h in range(24)],
-                                        index=int(start.split(":")[0]) if start else 8,
-                                        key=f"edit_sh_{i}")
-                                with em1:
-                                    e_sm = st.selectbox("分", [f"{m:02d}" for m in range(60)],
-                                        index=int(start.split(":")[1]) if start and ":" in start else 0,
-                                        key=f"edit_sm_{i}")
-                            with ec2:
-                                st.markdown("結束時間")
-                                eh2, em2 = st.columns(2)
-                                with eh2:
-                                    e_eh = st.selectbox("時", [f"{h:02d}" for h in range(24)],
-                                        index=int(end.split(":")[0]) if end else 9,
-                                        key=f"edit_eh_{i}")
-                                with em2:
-                                    e_em = st.selectbox("分", [f"{m:02d}" for m in range(60)],
-                                        index=int(end.split(":")[1]) if end and ":" in end else 0,
-                                        key=f"edit_em_{i}")
-                            
-                            st.info(f"⏱ 預覽：{e_sh}:{e_sm} → {e_eh}:{e_em}")
-                            
-                            new_emoji_e = st.selectbox("表符", EMOJI_OPTIONS,
-                                index=EMOJI_OPTIONS.index(emoji) if emoji in EMOJI_OPTIONS else 0,
-                                key=f"edit_emoji_{i}")
-                            
-                            new_concurrent = st.checkbox("是否能和讀書計畫並行？", 
-                                value=bool(event.get("concurrent_with_study", False)), 
-                                key=f"edit_concurrent_{i}")
-
-                            c_save, c_del = st.columns(2)
-                            with c_save:
-                                if st.button("💾 儲存修改", key=f"save_edit_{i}"):
-                                    updated_event = {
-                                        "title": new_t.strip(),
-                                        "start": f"{e_sh}:{e_sm}",
-                                        "end":   f"{e_eh}:{e_em}",
-                                        "emoji": new_emoji_e,
-                                        "color": event.get("color"),
-                                        "display_color": event.get("display_color"),
-                                        "concurrent_with_study": new_concurrent,
-                                        "show_on_calendar": True
-                                    }
-                                    if event.get("_is_fixed"):
-                                        st.session_state["daily_modified_fixed"].setdefault(today_str, {})[event["_fixed_idx"]] = updated_event
-                                    else:
-                                        st.session_state["daily_override_events"][today_str][event["_override_idx"]].update(updated_event)
-                                    st.rerun()
-                            with c_del:
-                                if st.button("🗑️ 刪除此行程", key=f"del_override_{i}"):
-                                    if event.get("_is_fixed"):
-                                        st.session_state["daily_modified_fixed"].setdefault(today_str, {})[event["_fixed_idx"]] = {"deleted": True}
-                                    else:
-                                        st.session_state["daily_override_events"][today_str].pop(event["_override_idx"])
-                                    st.rerun()
-                else:
-                    st.markdown("今日無行程")
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                with st.expander("➕ 新增當日行程"):
-                    new_title = st.text_input("行程標題", key="new_daily_title")
-
-                    c_start, c_end = st.columns(2)
-                    with c_start:
+                    with st.expander(f"{emoji} **{title}** ({start}–{end})", expanded=False):
+                        new_t = st.text_input("行程標題", value=title, key=f"edit_title_{i}")
                         st.markdown("**開始時間**")
-                        s_h_col, s_m_col = st.columns(2)
-                        with s_h_col:
-                            new_start_h = st.selectbox(
-                                "開始-時", [f"{i:02d}" for i in range(24)],
-                                index=8, key="new_start_h")
-                        with s_m_col:
-                            new_start_m = st.selectbox(
-                                "開始-分", [f"{i:02d}" for i in range(60)],
-                                index=0, key="new_start_m")
-                    with c_end:
+                        e_sh = st.selectbox("開始-時", [f"{h:02d}" for h in range(24)],
+                            index=int(start.split(":")[0]) if start and ":" in start else 8,
+                            key=f"edit_sh_{i}")
+                        e_sm = st.selectbox("開始-分", [f"{m:02d}" for m in range(60)],
+                            index=int(start.split(":")[1]) if start and ":" in start else 0,
+                            key=f"edit_sm_{i}")
                         st.markdown("**結束時間**")
-                        e_h_col, e_m_col = st.columns(2)
-                        with e_h_col:
-                            new_end_h = st.selectbox(
-                                "結束-時", [f"{i:02d}" for i in range(24)],
-                                index=9, key="new_end_h")
-                        with e_m_col:
-                            new_end_m = st.selectbox(
-                                "結束-分", [f"{i:02d}" for i in range(60)],
-                                index=0, key="new_end_m")
+                        e_eh = st.selectbox("結束-時", [f"{h:02d}" for h in range(24)],
+                            index=int(end.split(":")[0]) if end and ":" in end else 9,
+                            key=f"edit_eh_{i}")
+                        e_em = st.selectbox("結束-分", [f"{m:02d}" for m in range(60)],
+                            index=int(end.split(":")[1]) if end and ":" in end else 0,
+                            key=f"edit_em_{i}")
+                        
+                        st.info(f"⏱ 預覽：{e_sh}:{e_sm} → {e_eh}:{e_em}")
+                        
+                        new_emoji_e = st.selectbox("表符", EMOJI_OPTIONS,
+                            index=EMOJI_OPTIONS.index(emoji) if emoji in EMOJI_OPTIONS else 0,
+                            key=f"edit_emoji_{i}")
+                        
+                        new_concurrent = st.checkbox("是否能和讀書計畫並行？", 
+                            value=bool(event.get("concurrent_with_study", False)), 
+                            key=f"edit_concurrent_{i}")
 
-                    st.info(f"⏱ 預覽：{new_start_h}:{new_start_m} → {new_end_h}:{new_end_m}")
-
-                    new_emoji = st.selectbox("表符", EMOJI_OPTIONS, index=0, key="new_emoji")
-
-                    # Color picker with preview
-                    new_color_option = st.selectbox(
-                        "背景色", options=COLOR_OPTIONS,
-                        format_func=lambda o: o["name"],
-                        index=0, key="new_event_color",
-                    )
-                    new_color_value = new_color_option["value"]
-                    st.markdown(
-                        f"<div style='display:inline-block;width:22px;height:14px;"
-                        f"border-radius:3px;background:{new_color_value};"
-                        f"vertical-align:middle;margin-right:6px;'></div>"
-                        f"<span style='font-size:13px;color:#555;'>{new_color_option['name']}</span>",
-                        unsafe_allow_html=True,
-                    )
-                    use_custom_new = st.checkbox("使用自訂顏色", key="new_event_use_custom_color")
-                    if use_custom_new:
-                        new_color_value = st.color_picker(
-                            "自訂顏色", value=new_color_value, key="new_event_custom_color"
-                        )
-
-                    concurrent_new = st.checkbox("是否能和讀書計畫並行？", key="new_event_concurrent")
-
-                    if st.button("確認新增", key="btn_add_event"):
-                        if new_title.strip():
-                            st.session_state["daily_override_events"].setdefault(today_str, []).append({
-                                "title":   new_title.strip(),
-                                "start":   f"{new_start_h}:{new_start_m}",
-                                "end":     f"{new_end_h}:{new_end_m}",
-                                "emoji":   new_emoji,
-                                "color":   new_color_value,
-                                "display_color": new_color_value,
-                                "show_on_calendar": True,
-                                "concurrent_with_study": concurrent_new,
-                            })
+                        if st.button("💾 儲存修改", key=f"save_edit_{i}"):
+                            updated_event = {
+                                "title": new_t.strip(),
+                                "start": f"{e_sh}:{e_sm}",
+                                "end":   f"{e_eh}:{e_em}",
+                                "emoji": new_emoji_e,
+                                "color": event.get("color"),
+                                "display_color": event.get("display_color"),
+                                "concurrent_with_study": new_concurrent,
+                                "show_on_calendar": True
+                            }
+                            if event.get("_is_fixed"):
+                                st.session_state["daily_modified_fixed"].setdefault(today_str, {})[event["_fixed_idx"]] = updated_event
+                            else:
+                                st.session_state["daily_override_events"][today_str][event["_override_idx"]].update(updated_event)
                             st.rerun()
+                        if st.button("🗑️ 刪除此行程", key=f"del_override_{i}"):
+                            if event.get("_is_fixed"):
+                                st.session_state["daily_modified_fixed"].setdefault(today_str, {})[event["_fixed_idx"]] = {"deleted": True}
+                            else:
+                                st.session_state["daily_override_events"][today_str].pop(event["_override_idx"])
+                            st.rerun()
+            else:
+                st.markdown("今日無行程")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("➕ 新增當日行程"):
+                new_title = st.text_input("行程標題", key="new_daily_title")
+
+                st.markdown("**開始時間**")
+                new_start_h = st.selectbox(
+                    "開始-時", [f"{i:02d}" for i in range(24)],
+                    index=8, key="new_start_h")
+                new_start_m = st.selectbox(
+                    "開始-分", [f"{i:02d}" for i in range(60)],
+                    index=0, key="new_start_m")
+                st.markdown("**結束時間**")
+                new_end_h = st.selectbox(
+                    "結束-時", [f"{i:02d}" for i in range(24)],
+                    index=9, key="new_end_h")
+                new_end_m = st.selectbox(
+                    "結束-分", [f"{i:02d}" for i in range(60)],
+                    index=0, key="new_end_m")
+
+                st.info(f"⏱ 預覽：{new_start_h}:{new_start_m} → {new_end_h}:{new_end_m}")
+
+                new_emoji = st.selectbox("表符", EMOJI_OPTIONS, index=0, key="new_emoji")
+
+                # Color picker with preview
+                new_color_option = st.selectbox(
+                    "背景色", options=COLOR_OPTIONS,
+                    format_func=lambda o: o["name"],
+                    index=0, key="new_event_color",
+                )
+                new_color_value = new_color_option["value"]
+                st.markdown(
+                    f"<div style='display:inline-block;width:22px;height:14px;"
+                    f"border-radius:3px;background:{new_color_value};"
+                    f"vertical-align:middle;margin-right:6px;'></div>"
+                    f"<span style='font-size:13px;color:#555;'>{new_color_option['name']}</span>",
+                    unsafe_allow_html=True,
+                )
+                use_custom_new = st.checkbox("使用自訂顏色", key="new_event_use_custom_color")
+                if use_custom_new:
+                    new_color_value = st.color_picker(
+                        "自訂顏色", value=new_color_value, key="new_event_custom_color"
+                    )
+
+                concurrent_new = st.checkbox("是否能和讀書計畫並行？", key="new_event_concurrent")
+
+                if st.button("確認新增", key="btn_add_event"):
+                    if new_title.strip():
+                        st.session_state["daily_override_events"].setdefault(today_str, []).append({
+                            "title":   new_title.strip(),
+                            "start":   f"{new_start_h}:{new_start_m}",
+                            "end":     f"{new_end_h}:{new_end_m}",
+                            "emoji":   new_emoji,
+                            "color":   new_color_value,
+                            "display_color": new_color_value,
+                            "show_on_calendar": True,
+                            "concurrent_with_study": concurrent_new,
+                        })
+                        st.rerun()
 
             # ── 心情反饋 ──────────────────────────────────────────────────────
             st.markdown("#### 🎭 心情反饋")
@@ -375,16 +351,13 @@ def render_daily_checkin_page() -> None:
                             f"**動力**：{motivation}　**心情**：{mood}\n\n"
                             "確認後將無法修改。"
                         )
-                        c_yes, c_no = st.columns(2)
-                        with c_yes:
-                            if st.button("✅ 確認", key="btn_mood_yes"):
-                                st.session_state["daily_moods"].setdefault(today_str, {})["submitted"] = True
-                                st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
-                                st.rerun()
-                        with c_no:
-                            if st.button("❌ 取消", key="btn_mood_no"):
-                                st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
-                                st.rerun()
+                        if st.button("✅ 確認", key="btn_mood_yes"):
+                            st.session_state["daily_moods"].setdefault(today_str, {})["submitted"] = True
+                            st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
+                            st.rerun()
+                        if st.button("❌ 取消", key="btn_mood_no"):
+                            st.session_state["daily_moods"].setdefault(today_str, {})["pending"] = False
+                            st.rerun()
                 else:
                     # Show locked values from saved state
                     st.radio("動力", [1, 2, 3, 4, 5],
@@ -396,120 +369,106 @@ def render_daily_checkin_page() -> None:
                     st.success("已送出心情與動力紀錄！")
 
         # ── 今日讀書進度 ──────────────────────────────────────────────────────
-        with row1_col2:
-            st.markdown("#### 📖 今日讀書進度")
-            with st.container(border=True):
-                # Group tasks by Subject and Material
-                grouped_tasks = {}
-                for s in today_study_sessions:
-                    subj = s.get("科目", "")
-                    mat = s.get("教材", "")
-                    prog_str = s.get("目標進度", "0")
-                    key = f"{subj} - {mat}"
-                    
-                    try:
-                        qty = float(prog_str.split(" ")[0])
-                        unit = prog_str.split(" ")[1] if " " in prog_str else ""
-                        grouped_tasks.setdefault(key, {"qty": 0.0, "unit": unit})
-                        grouped_tasks[key]["qty"] += qty
-                    except:
-                        pass
+        st.markdown("#### 📖 今日讀書進度")
+        with st.container(border=True):
+            # Group tasks by Subject and Material
+            grouped_tasks = {}
+            for s in today_study_sessions:
+                subj = s.get("科目", "")
+                mat = s.get("教材", "")
+                prog_str = s.get("目標進度", "0")
+                key = f"{subj} - {mat}"
                 
-                tasks: list[str] = []
-                for k, v in grouped_tasks.items():
-                    qty_str = f"{int(v['qty'])}" if v["qty"].is_integer() else f"{v['qty']:.1f}"
-                    tasks.append(f"{k}：{qty_str} {v['unit']}")
-                    
-                tasks.extend(daily_tasks_overrides)
+                try:
+                    qty = float(prog_str.split(" ")[0])
+                    unit = prog_str.split(" ")[1] if " " in prog_str else ""
+                    grouped_tasks.setdefault(key, {"qty": 0.0, "unit": unit})
+                    grouped_tasks[key]["qty"] += qty
+                except:
+                    pass
+            
+            tasks: list[str] = []
+            for k, v in grouped_tasks.items():
+                qty_str = f"{int(v['qty'])}" if v["qty"].is_integer() else f"{v['qty']:.1f}"
+                tasks.append(f"{k}：{qty_str} {v['unit']}")
+                
+            tasks.extend(daily_tasks_overrides)
 
-                if tasks:
-                    today_checks = st.session_state["daily_task_checks"].setdefault(today_str, {})
-                    for task in tasks:
-                        checked = st.checkbox(
-                            task, 
-                            value=today_checks.get(task, False),
-                            key=f"task_check_{today_str}_{task}"
-                        )
-                        today_checks[task] = checked
-                else:
-                    st.markdown("今日無指定讀書內容")
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                with st.expander("➕ 新增當日進度"):
-                    new_subject    = st.text_input("科目", key="new_task_subject")
-                    new_task_title = st.text_input(
-                        "內容標題 (例: 小組作業、心得報告...)", key="new_task_title"
+            if tasks:
+                today_checks = st.session_state["daily_task_checks"].setdefault(today_str, {})
+                for task in tasks:
+                    checked = st.checkbox(
+                        task, 
+                        value=today_checks.get(task, False),
+                        key=f"task_check_{today_str}_{task}"
                     )
-                    if st.button("確認新增", key="btn_add_task"):
-                        if new_task_title.strip():
-                            task_text = (
-                                f"{new_subject.strip()}：{new_task_title.strip()}"
-                                if new_subject.strip()
-                                else new_task_title.strip()
-                            )
-                            st.session_state["daily_override_tasks"].setdefault(today_str, []).append(task_text)
-                            st.rerun()
+                    today_checks[task] = checked
+            else:
+                st.markdown("今日無指定讀書內容")
 
-            st.markdown("#### ⚖️ 進度安排反饋")
-            with st.container(border=True):
-                today_feedback = st.session_state["daily_feedback"].setdefault(today_str, {"amount": 3, "pacing": 3})
-                amount_feedback = st.radio(
-                    "分量回饋 (1: 分量太少；5: 分量太多)",
-                    [1, 2, 3, 4, 5], index=today_feedback["amount"] - 1, horizontal=True, key="daily_amount"
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("➕ 新增當日進度"):
+                new_subject    = st.text_input("科目", key="new_task_subject")
+                new_task_title = st.text_input(
+                    "內容標題 (例: 小組作業、心得報告...)", key="new_task_title"
                 )
-                pacing_feedback = st.radio(
-                    "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
-                    [1, 2, 3, 4, 5], index=today_feedback["pacing"] - 1, horizontal=True, key="daily_pacing_score"
-                )
-                today_feedback["amount"] = amount_feedback
-                today_feedback["pacing"] = pacing_feedback
-
-                if "show_time_loss" not in st.session_state:
-                    st.session_state["show_time_loss"] = False
-
-                if st.button("新增意外損失時間", key="btn_show_time_loss"):
-                    st.session_state["show_time_loss"] = True
-
-                if st.session_state["show_time_loss"]:
-                    st.markdown("**新增一筆意外損失**")
-                    fl_c1, fl_c2 = st.columns(2)
-                    with fl_c1:
-                        st.markdown("開始時間")
-                        lsh_col, lsm_col = st.columns(2)
-                        with lsh_col:
-                            loss_start_h = st.selectbox(
-                                "開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
-                        with lsm_col:
-                            loss_start_m = st.selectbox(
-                                "開始分", [f"{m:02d}" for m in range(60)], key="loss_s_m")
-                    with fl_c2:
-                        st.markdown("結束時間")
-                        leh_col, lem_col = st.columns(2)
-                        with leh_col:
-                            loss_end_h = st.selectbox(
-                                "結束時", [f"{h:02d}" for h in range(24)], key="loss_e_h")
-                        with lem_col:
-                            loss_end_m = st.selectbox(
-                                "結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
-                    
-                    st.info(f"⏱ 預覽：{loss_start_h}:{loss_start_m} → {loss_end_h}:{loss_end_m}")
-                    loss_reason = st.text_input("原因（選填）", key="loss_reason")
-
-                    if st.button("新增這筆"):
-                        start_mins = _time_to_minutes(loss_start_h, loss_start_m)
-                        end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
-                        diff_mins  = end_mins - start_mins
-                        if diff_mins <= 0:
-                            diff_mins += 24 * 60
-                        st.session_state["time_loss_records"].setdefault(today_str, []).append({
-                            "start":   f"{loss_start_h}:{loss_start_m}",
-                            "end":     f"{loss_end_h}:{loss_end_m}",
-                            "minutes": diff_mins,
-                            "reason":  loss_reason.strip(),
-                        })
-                        if "loss_reason" in st.session_state:
-                            del st.session_state["loss_reason"]
+                if st.button("確認新增", key="btn_add_task"):
+                    if new_task_title.strip():
+                        task_text = (
+                            f"{new_subject.strip()}：{new_task_title.strip()}"
+                            if new_subject.strip()
+                            else new_task_title.strip()
+                        )
+                        st.session_state["daily_override_tasks"].setdefault(today_str, []).append(task_text)
                         st.rerun()
+
+        st.markdown("#### ⚖️ 進度安排反饋")
+        with st.container(border=True):
+            today_feedback = st.session_state["daily_feedback"].setdefault(today_str, {"amount": 3, "pacing": 3})
+            amount_feedback = st.radio(
+                "分量回饋 (1: 分量太少；5: 分量太多)",
+                [1, 2, 3, 4, 5], index=today_feedback["amount"] - 1, horizontal=True, key="daily_amount"
+            )
+            pacing_feedback = st.radio(
+                "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
+                [1, 2, 3, 4, 5], index=today_feedback["pacing"] - 1, horizontal=True, key="daily_pacing_score"
+            )
+            today_feedback["amount"] = amount_feedback
+            today_feedback["pacing"] = pacing_feedback
+
+            if "show_time_loss" not in st.session_state:
+                st.session_state["show_time_loss"] = False
+
+            if st.button("新增意外損失時間", key="btn_show_time_loss"):
+                st.session_state["show_time_loss"] = True
+
+            if st.session_state["show_time_loss"]:
+                st.markdown("**新增一筆意外損失**")
+                st.markdown("開始時間")
+                loss_start_h = st.selectbox("開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
+                loss_start_m = st.selectbox("開始分", [f"{m:02d}" for m in range(60)], key="loss_s_m")
+                st.markdown("結束時間")
+                loss_end_h = st.selectbox("結束時", [f"{h:02d}" for h in range(24)], key="loss_e_h")
+                loss_end_m = st.selectbox("結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
+                    
+                st.info(f"⏱ 預覽：{loss_start_h}:{loss_start_m} → {loss_end_h}:{loss_end_m}")
+                loss_reason = st.text_input("原因（選填）", key="loss_reason")
+
+                if st.button("新增這筆"):
+                    start_mins = _time_to_minutes(loss_start_h, loss_start_m)
+                    end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
+                    diff_mins  = end_mins - start_mins
+                    if diff_mins <= 0:
+                        diff_mins += 24 * 60
+                    st.session_state["time_loss_records"].setdefault(today_str, []).append({
+                        "start":   f"{loss_start_h}:{loss_start_m}",
+                        "end":     f"{loss_end_h}:{loss_end_m}",
+                        "minutes": diff_mins,
+                        "reason":  loss_reason.strip(),
+                    })
+                    if "loss_reason" in st.session_state:
+                        del st.session_state["loss_reason"]
+                    st.rerun()
 
                 time_loss_records = st.session_state["time_loss_records"].get(today_str, [])
                 if time_loss_records:
