@@ -866,48 +866,27 @@ def render_dashboard_page() -> None:
 
 
 def render_home_page() -> None:
-    
-    st.markdown("""
-    <style>
-    .menu-btn > button {
-        width: 100%;
-        border-radius: 8px;
-        transition: all 0.3s;
-        border: 1px solid #ddd;
-        background: transparent;
-        margin-bottom: 8px;
-    }
-    .menu-btn > button:hover {
-        background-color: #4f84ff;
-        color: white;
-        border-color: #4f84ff;
-    }
-    /* Reduce spacing between sidebar and main content/timeline */
-    .block-container {
-        padding-left: 2rem !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     page_options = ["計劃頁面", "dashboard", "月計畫", "每日打卡與微調", "計時器"]
     
     if "main_page" not in st.session_state:
         st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else "dashboard"
 
-    st.sidebar.markdown("### 主選單")
-    
-    if st.sidebar.button("🏠 回到計畫列表", use_container_width=True):
-        st.session_state["current_plan_id"] = None
-        st.rerun()
-        
-    st.sidebar.markdown("---")
-    
+    # ── 頂部橫向主選單 (Horizontal Navbar at the top) ──────────────────────────
+    nav_cols = st.columns([1.2, 1, 1, 1, 1.4, 1], gap="small")
+    with nav_cols[0]:
+        if st.button("🏠 計畫列表", key="top_nav_home", use_container_width=True):
+            st.session_state["current_plan_id"] = None
+            st.rerun()
+            
     for i, opt in enumerate(page_options):
-        with st.sidebar:
-            st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
-            if st.button(opt, use_container_width=True, key=f"sidebar_main_menu_{i}_{opt}"):
+        with nav_cols[i + 1]:
+            is_active = (st.session_state["main_page"] == opt)
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(opt, key=f"top_nav_{opt}", type=btn_type, use_container_width=True):
                 st.session_state["main_page"] = opt
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.rerun()
+
+    st.markdown("---")
 
     # Handle view_date query param from HTML calendar links
     qp_view = st.query_params.get("view_date")
