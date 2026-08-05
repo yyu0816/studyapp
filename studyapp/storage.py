@@ -2,7 +2,21 @@ import json
 import os
 import uuid
 
-DATA_FILE = "plans.json"
+# Streamlit Cloud 的 app 目錄是唯讀的，需改寫至 /tmp
+# 本機開發時 /tmp 也可用，但為了方便偵錯，本機用當前目錄
+def _get_data_file():
+    # 若當前目錄可寫（本機），就用當前目錄
+    test_path = os.path.join(os.getcwd(), "plans.json")
+    try:
+        # 試著測試寫入權限
+        with open(test_path, "a") as f:
+            pass
+        return test_path
+    except (PermissionError, OSError):
+        # Streamlit Cloud: 使用 /tmp 目錄
+        return "/tmp/plans.json"
+
+DATA_FILE = _get_data_file()
 
 def load_all_plans():
     """Load all plans from the JSON file."""
