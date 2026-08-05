@@ -967,10 +967,11 @@ def render_start_page():
     for idx, (plan_id, plan_data) in enumerate(plans.items()):
         with cols[idx % 3]:
             with st.container(border=True):
-                st.markdown(f"### {plan_data.get('name', '未命名計畫')}")
-                goal = plan_data.get('goal', '')
-                if goal:
-                    st.caption(f"🎯 {goal[:20]}{'...' if len(goal)>20 else ''}")
+                plan_name_disp = plan_data.get("plan_name") or plan_data.get("name") or "未命名計畫"
+                plan_goal_disp = plan_data.get("plan_goal") or plan_data.get("goal") or ""
+                st.markdown(f"### {plan_name_disp}")
+                if plan_goal_disp:
+                    st.caption(f"🎯 {plan_goal_disp[:20]}{'...' if len(plan_goal_disp)>20 else ''}")
                 else:
                     st.caption("無設定目標")
                     

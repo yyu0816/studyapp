@@ -102,5 +102,10 @@ def save_current_state():
         if key in st.session_state:
             plan[key] = st.session_state[key]
             
+    if "plan_name" in st.session_state and st.session_state["plan_name"]:
+        plan["name"] = st.session_state["plan_name"]
+    if "plan_goal" in st.session_state:
+        plan["goal"] = st.session_state["plan_goal"]
+            
     save_plan(plan_id, plan)
 
