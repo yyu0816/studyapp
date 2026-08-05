@@ -10,16 +10,16 @@ DEFAULT_THEME = {
     "navbar_bg_color": "#f8f9fa"
 }
 
-DEFAULT_ENABLED_PAGES = {
-    "dashboard": True,
-    "月計畫": True,
-    "每日打卡與微調": True,
-    "計時器": True
+DEFAULT_ENABLED_FEATURES = {
+    "page_dashboard": True, "dash_study_progress": True, "dash_weekly_chart": True, "dash_mood_pacing": True,
+    "page_monthly": True, "monthly_calendar": True, "monthly_schedule": True, "monthly_events": True,
+    "page_daily": True, "daily_timeline": True, "daily_checklist": True, "daily_mood": True, "daily_timeloss": True,
+    "page_timer": True, "timer_clock": True, "timer_history": True
 }
 
 def render_settings_page() -> None:
     st.title("⚙️ 設定")
-    st.markdown("您可以自由自訂顯示的功能頁面與外觀色彩風格。")
+    st.markdown("您可以自由選擇頁面與子功能，並自訂頂部選單與畫面視覺色彩。")
     st.markdown("---")
 
     plan_id = st.session_state.get("current_plan_id")
@@ -28,8 +28,8 @@ def render_settings_page() -> None:
         return
 
     # 初始化 state
-    if "enabled_pages" not in st.session_state or not isinstance(st.session_state["enabled_pages"], dict):
-        st.session_state["enabled_pages"] = DEFAULT_ENABLED_PAGES.copy()
+    if "enabled_features" not in st.session_state or not isinstance(st.session_state["enabled_features"], dict):
+        st.session_state["enabled_features"] = DEFAULT_ENABLED_FEATURES.copy()
     if "custom_theme" not in st.session_state or not isinstance(st.session_state["custom_theme"], dict):
         st.session_state["custom_theme"] = DEFAULT_THEME.copy()
 
@@ -37,38 +37,90 @@ def render_settings_page() -> None:
 
     # ── 1. 功能選擇 ─────────────────────────────────────────────────────────────
     with tab_features:
-        st.subheader("🎛️ 頁面功能顯示管理")
+        st.subheader("🎛️ 頁面與子功能開關控制")
         st.markdown(
-            "請勾選要在畫面上方選單中顯示的功能頁面。\n\n"
-            "*(註：「計畫頁面」與「設定」為系統基礎核心，將保持固定顯示)*"
+            "您可以選擇開啟/關閉整個功能頁面，或是進一步勾選控制頁面內的特定子功能。\n\n"
+            "*(註：「計畫頁面」與「設定」為系統基礎核心，始終固定顯示)*"
         )
         st.markdown("<br>", unsafe_allow_html=True)
 
-        enabled = st.session_state["enabled_pages"]
+        ef = st.session_state["enabled_features"]
 
-        with st.container(border=True):
-            st.markdown("#### 可選功能頁面")
-            show_dashboard = st.checkbox("📊 儀表板 (Dashboard)", value=enabled.get("dashboard", True), key="toggle_dashboard")
-            show_monthly = st.checkbox("📅 月計畫 (月度排程與行事曆)", value=enabled.get("月計畫", True), key="toggle_monthly")
-            show_daily = st.checkbox("📝 每日打卡與微調", value=enabled.get("每日打卡與微調", True), key="toggle_daily")
-            show_timer = st.checkbox("⏱️ 讀書計時器", value=enabled.get("計時器", True), key="toggle_timer")
+        # --- 1. Dashboard ---
+        with st.expander("📊 儀表板 (Dashboard) 功能設定", expanded=True):
+            page_dash = st.checkbox("啟用「儀表板」整體頁面", value=ef.get("page_dashboard", True), key="chk_page_dashboard")
+            st.markdown("---")
+            st.markdown("**頁面內部子功能：**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                sub_dash_progress = st.checkbox("累積學習進度與圓餅圖", value=ef.get("dash_study_progress", True), key="chk_dash_progress", disabled=not page_dash)
+            with c2:
+                sub_dash_weekly = st.checkbox("每週讀書時數圖表", value=ef.get("dash_weekly_chart", True), key="chk_dash_weekly", disabled=not page_dash)
+            with c3:
+                sub_dash_mood = st.checkbox("心情與節奏步調趨勢", value=ef.get("dash_mood_pacing", True), key="chk_dash_mood", disabled=not page_dash)
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("💾 儲存功能顯示設定", type="primary", key="btn_save_enabled_pages"):
-                st.session_state["enabled_pages"] = {
-                    "dashboard": show_dashboard,
-                    "月計畫": show_monthly,
-                    "每日打卡與微調": show_daily,
-                    "計時器": show_timer
+        # --- 2. Monthly Plan ---
+        with st.expander("📅 月計畫 (Monthly Plan) 功能設定", expanded=True):
+            page_monthly = st.checkbox("啟用「月計畫」整體頁面", value=ef.get("page_monthly", True), key="chk_page_monthly")
+            st.markdown("---")
+            st.markdown("**頁面內部子功能：**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                sub_monthly_cal = st.checkbox("月度互動行事曆", value=ef.get("monthly_calendar", True), key="chk_monthly_cal", disabled=not page_monthly)
+            with c2:
+                sub_monthly_sch = st.checkbox("排程進度總覽表", value=ef.get("monthly_schedule", True), key="chk_monthly_sch", disabled=not page_monthly)
+            with c3:
+                sub_monthly_evt = st.checkbox("固定與特定日期行程", value=ef.get("monthly_events", True), key="chk_monthly_evt", disabled=not page_monthly)
+
+        # --- 3. Daily Check-in ---
+        with st.expander("📝 每日打卡與微調 功能設定", expanded=True):
+            page_daily = st.checkbox("啟用「每日打卡與微調」整體頁面", value=ef.get("page_daily", True), key="chk_page_daily")
+            st.markdown("---")
+            st.markdown("**頁面內部子功能：**")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                sub_daily_time = st.checkbox("當日動態時間軸", value=ef.get("daily_timeline", True), key="chk_daily_time", disabled=not page_daily)
+            with c2:
+                sub_daily_check = st.checkbox("今日讀書進度打卡", value=ef.get("daily_checklist", True), key="chk_daily_check", disabled=not page_daily)
+            with c3:
+                sub_daily_mood = st.checkbox("心情與動力反饋", value=ef.get("daily_mood", True), key="chk_daily_mood", disabled=not page_daily)
+            with c4:
+                sub_daily_loss = st.checkbox("意外損失時間記錄", value=ef.get("daily_timeloss", True), key="chk_daily_loss", disabled=not page_daily)
+
+        # --- 4. Timer ---
+        with st.expander("⏱️ 讀書計時器 (Timer) 功能設定", expanded=True):
+            page_timer = st.checkbox("啟用「讀書計時器」整體頁面", value=ef.get("page_timer", True), key="chk_page_timer")
+            st.markdown("---")
+            st.markdown("**頁面內部子功能：**")
+            c1, c2 = st.columns(2)
+            with c1:
+                sub_timer_clock = st.checkbox("計時器與番茄鐘", value=ef.get("timer_clock", True), key="chk_timer_clock", disabled=not page_timer)
+            with c2:
+                sub_timer_hist = st.checkbox("歷史讀書計時紀錄", value=ef.get("timer_history", True), key="chk_timer_hist", disabled=not page_timer)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn_save, col_btn_all = st.columns([2, 1])
+        with col_btn_save:
+            if st.button("💾 儲存功能選擇設定", type="primary", key="btn_save_features"):
+                st.session_state["enabled_features"] = {
+                    "page_dashboard": page_dash, "dash_study_progress": sub_dash_progress, "dash_weekly_chart": sub_dash_weekly, "dash_mood_pacing": sub_dash_mood,
+                    "page_monthly": page_monthly, "monthly_calendar": sub_monthly_cal, "monthly_schedule": sub_monthly_sch, "monthly_events": sub_monthly_evt,
+                    "page_daily": page_daily, "daily_timeline": sub_daily_time, "daily_checklist": sub_daily_check, "daily_mood": sub_daily_mood, "daily_timeloss": sub_daily_loss,
+                    "page_timer": page_timer, "timer_clock": sub_timer_clock, "timer_history": sub_timer_hist
                 }
                 storage.save_current_state()
-                st.success("✅ 功能頁面顯示設定已更新！")
+                st.success("✅ 功能頁面與子功能設定已更新！")
+                st.rerun()
+        with col_btn_all:
+            if st.button("全選所有功能", key="btn_select_all_features"):
+                st.session_state["enabled_features"] = DEFAULT_ENABLED_FEATURES.copy()
+                storage.save_current_state()
                 st.rerun()
 
     # ── 2. 自定義色彩 ─────────────────────────────────────────────────────────────
     with tab_colors:
         st.subheader("🎨 外觀與色彩自訂")
-        st.markdown("您可以自由調整畫面背景、按鈕與主選單的色彩風格。")
+        st.markdown("您可以自由調整畫面背景、按鈕與主選單欄位的色彩風格。")
         st.markdown("<br>", unsafe_allow_html=True)
 
         theme = st.session_state["custom_theme"]
@@ -90,7 +142,7 @@ def render_settings_page() -> None:
 
             with col_nav:
                 new_nav = st.color_picker("主選單背景色", value=curr_nav, key="cp_nav_bg_color")
-                st.caption("頂部橫向選單列的背景顏色")
+                st.caption("頂部橫向選單列整體背景顏色")
 
             st.markdown("---")
             st.markdown("#### 預設主題風格")

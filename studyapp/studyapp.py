@@ -877,20 +877,33 @@ def apply_custom_theme() -> None:
     .stApp {{
         background-color: {bg_color} !important;
     }}
-    .top-navbar-container {{
+    /* 精確覆蓋頂部主選單欄位區塊背景色 */
+    div[data-testid="stHorizontalBlock"]:has(button[key^="top_nav_"]) {{
         background-color: {navbar_bg_color} !important;
-        padding: 8px 12px;
-        border-radius: 10px;
-        margin-bottom: 12px;
-        border: 1px solid #e2e8f0;
+        padding: 12px 16px !important;
+        border-radius: 12px !important;
+        margin-bottom: 20px !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
-    button[kind="primary"] {{
+    div[data-testid="stHorizontalBlock"]:has(button[key^="top_nav_"]) div[data-testid="column"] {{
+        background-color: transparent !important;
+    }}
+    button[key^="top_nav_"][kind="primary"], button[kind="primary"] {{
         background-color: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
+        font-weight: 600 !important;
     }}
-    button[kind="primary"]:hover {{
-        opacity: 0.9 !important;
+    button[key^="top_nav_"][kind="secondary"] {{
+        background-color: #ffffff !important;
+        color: #333333 !important;
+        border: 1px solid #d1d5db !important;
+    }}
+    button[key^="top_nav_"][kind="secondary"]:hover {{
+        background-color: #f3f4f6 !important;
+        border-color: {button_color} !important;
+        color: {button_color} !important;
     }}
     </style>
     """
@@ -900,28 +913,31 @@ def apply_custom_theme() -> None:
 def render_home_page() -> None:
     apply_custom_theme()
 
-    enabled = st.session_state.get("enabled_pages", {})
-    if not isinstance(enabled, dict):
-        enabled = {"dashboard": True, "月計畫": True, "每日打卡與微調": True, "計時器": True}
+    features = st.session_state.get("enabled_features")
+    if not isinstance(features, dict):
+        features = {
+            "page_dashboard": True, "dash_study_progress": True, "dash_weekly_chart": True, "dash_mood_pacing": True,
+            "page_monthly": True, "monthly_calendar": True, "monthly_schedule": True, "monthly_events": True,
+            "page_daily": True, "daily_timeline": True, "daily_checklist": True, "daily_mood": True, "daily_timeloss": True,
+            "page_timer": True, "timer_clock": True, "timer_history": True
+        }
 
-    # "計畫頁面" is mandatory (per request: "不含計畫頁面")
+    # "計畫頁面" and "設定" are fixed
     page_options = ["計劃頁面"]
-    optional_pages = [
-        ("dashboard", "dashboard"),
-        ("月計畫", "月計畫"),
-        ("每日打卡與微調", "每日打卡與微調"),
-        ("計時器", "計時器")
-    ]
-    for key, opt in optional_pages:
-        if enabled.get(key, True):
-            page_options.append(opt)
+    if features.get("page_dashboard", True):
+        page_options.append("dashboard")
+    if features.get("page_monthly", True):
+        page_options.append("月計畫")
+    if features.get("page_daily", True):
+        page_options.append("每日打卡與微調")
+    if features.get("page_timer", True):
+        page_options.append("計時器")
     page_options.append("設定")
 
     if "main_page" not in st.session_state or st.session_state["main_page"] not in page_options:
         st.session_state["main_page"] = "計劃頁面" if not st.session_state.get("plan") else page_options[min(1, len(page_options)-1)]
 
     # ── 頂部橫向主選單 (Horizontal Navbar at the top) ──────────────────────────
-    st.markdown('<div class="top-navbar-container">', unsafe_allow_html=True)
     cols_count = len(page_options) + 1
     nav_cols = st.columns(cols_count, gap="small")
     with nav_cols[0]:
@@ -936,8 +952,6 @@ def render_home_page() -> None:
             if st.button(opt, key=f"top_nav_{opt}", type=btn_type, use_container_width=True):
                 st.session_state["main_page"] = opt
                 st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # Handle view_date query param from HTML calendar links
     qp_view = st.query_params.get("view_date")

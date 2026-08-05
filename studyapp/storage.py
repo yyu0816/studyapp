@@ -71,6 +71,12 @@ def create_new_plan(name="未命名計畫", goal=""):
         "daily_override_events": {},
         "daily_modified_fixed": {},
         "enabled_pages": {"dashboard": True, "月計畫": True, "每日打卡與微調": True, "計時器": True},
+        "enabled_features": {
+            "page_dashboard": True, "dash_study_progress": True, "dash_weekly_chart": True, "dash_mood_pacing": True,
+            "page_monthly": True, "monthly_calendar": True, "monthly_schedule": True, "monthly_events": True,
+            "page_daily": True, "daily_timeline": True, "daily_checklist": True, "daily_mood": True, "daily_timeloss": True,
+            "page_timer": True, "timer_clock": True, "timer_history": True
+        },
         "custom_theme": {"bg_color": "#ffffff", "button_color": "#4f84ff", "navbar_bg_color": "#f8f9fa"}
     }
     save_plan(plan_id, new_plan)
@@ -98,7 +104,7 @@ def save_current_state():
     keys_to_save = [
         "app_state", "daily_task_checks", "timer_records", "mood_records",
         "plan_name", "plan_goal", "subjects", "daily_override_events", "daily_modified_fixed", "plan",
-        "fixed_events", "specific_events", "enabled_pages", "custom_theme"
+        "fixed_events", "specific_events", "enabled_pages", "enabled_features", "custom_theme"
     ]
     for key in keys_to_save:
         if key in st.session_state:
