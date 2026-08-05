@@ -144,10 +144,10 @@ def get_html_progress_bar(title: str, percentage: int, color_start: str, color_e
     """Render a vibrant custom progress bar."""
     return f"""<div style="margin-bottom: {margin_bottom};">
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-        <span style="font-weight: 600; font-size: 14px; color: #444;">{title}</span>
+        <span style="font-weight: 600; font-size: 14px;">{title}</span>
         <span style="font-weight: bold; font-size: 14px; color: {color_end};">{percentage}%</span>
     </div>
-    <div style="width: 100%; background-color: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden;">
+    <div style="width: 100%; background-color: rgba(128, 128, 128, 0.2); border-radius: 8px; height: 12px; overflow: hidden;">
         <div style="width: {percentage}%; height: 100%; background: linear-gradient(90deg, {color_start} 0%, {color_end} 100%); border-radius: 8px; transition: width 0.5s ease-in-out;"></div>
     </div>
 </div>"""
@@ -188,12 +188,9 @@ def render_dashboard():
     with col_left:
         # --- Left Top (1/3 height visually) ---
         st.markdown("#### 🎯 總體進度")
-        
-        left_html = f"""<div style="border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; padding: 1rem; max-width: 364px; width: 100%; height: 166px; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 16px;">
-    {get_html_progress_bar("當月完成度", completion_rate, "#ff9a9e", "#fecfef", margin_bottom="20px")}
-    {get_html_progress_bar("打卡天數", checkin_days, "#a1c4fd", "#c2e9fb", margin_bottom="0px")}
-</div>"""
-        st.markdown(left_html, unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(get_html_progress_bar("當月完成度", completion_rate, "#ff9a9e", "#fecfef", margin_bottom="16px"), unsafe_allow_html=True)
+            st.markdown(get_html_progress_bar("打卡天數", checkin_days, "#a1c4fd", "#c2e9fb", margin_bottom="8px"), unsafe_allow_html=True)
         
         # --- Left Bottom (2/3 height visually) ---
         # Wrap in a nested column so it matches the exact vertical padding of the right column's col_mood

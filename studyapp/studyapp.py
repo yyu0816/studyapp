@@ -913,13 +913,17 @@ def apply_custom_theme() -> None:
     
     /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 背景與邊框設定 */
     div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stVerticalBlockBorderWrapper"] > div,
     details[data-testid="stExpander"],
     div[data-testid="stForm"],
     div[data-testid="stExpander"] {{
         background-color: {card_bg} !important;
+        border-color: {border_color} !important;
+        color: {card_text} !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
-        color: {card_text} !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
     }}
     
