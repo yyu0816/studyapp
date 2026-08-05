@@ -877,8 +877,8 @@ def apply_custom_theme() -> None:
     .stApp {{
         background-color: {bg_color} !important;
     }}
-    /* 精確覆蓋頂部主選單欄位區塊背景色 */
-    div[data-testid="stHorizontalBlock"]:has(button[key^="top_nav_"]) {{
+    /* 精確覆蓋頂部第一列主選單塊的背景色 (navbar_bg_color) */
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
         background-color: {navbar_bg_color} !important;
         padding: 12px 16px !important;
         border-radius: 12px !important;
@@ -886,21 +886,24 @@ def apply_custom_theme() -> None:
         border: 1px solid rgba(0, 0, 0, 0.08) !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
-    div[data-testid="stHorizontalBlock"]:has(button[key^="top_nav_"]) div[data-testid="column"] {{
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"] {{
         background-color: transparent !important;
     }}
-    button[key^="top_nav_"][kind="primary"], button[kind="primary"] {{
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
+        background-color: transparent !important;
+    }}
+    button[kind="primary"] {{
         background-color: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
     }}
-    button[key^="top_nav_"][kind="secondary"] {{
+    button[kind="secondary"] {{
         background-color: #ffffff !important;
         color: #333333 !important;
         border: 1px solid #d1d5db !important;
     }}
-    button[key^="top_nav_"][kind="secondary"]:hover {{
+    button[kind="secondary"]:hover {{
         background-color: #f3f4f6 !important;
         border-color: {button_color} !important;
         color: {button_color} !important;
