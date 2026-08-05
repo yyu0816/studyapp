@@ -7,15 +7,19 @@ import dashboard
 
 import storage
 
-# 修復 Windows 終端機執行 Streamlit 遇到 emoji 造成 UnicodeEncodeError 的崩潰問題
-import click
-original_secho = click.secho
-def safe_secho(*args, **kwargs):
-    try:
-        original_secho(*args, **kwargs)
-    except UnicodeEncodeError:
-        pass
-click.secho = safe_secho
+try:
+    import click
+    original_secho = click.secho
+    def safe_secho(*args, **kwargs):
+        try:
+            original_secho(*args, **kwargs)
+        except UnicodeEncodeError:
+            pass
+    click.secho = safe_secho
+except Exception:
+    pass
+
+st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
 # 確保基礎 state 準備好
 if "current_plan_id" not in st.session_state:
@@ -32,9 +36,6 @@ elif "app_state" not in st.session_state:
     st.session_state["app_state"] = {"plan": None, "daily_log": None, "monthly_plan": None}
 
 app_state = st.session_state.get("app_state", {})
-
-
-st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
 # 3. 再來才是 import 你的頁面函式
 from monthlyplan import render_monthly_plan_page
