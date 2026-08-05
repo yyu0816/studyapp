@@ -7,6 +7,16 @@ import dashboard
 
 import storage
 
+# 修復 Windows 終端機執行 Streamlit 遇到 emoji 造成 UnicodeEncodeError 的崩潰問題
+import click
+original_secho = click.secho
+def safe_secho(*args, **kwargs):
+    try:
+        original_secho(*args, **kwargs)
+    except UnicodeEncodeError:
+        pass
+click.secho = safe_secho
+
 # 確保基礎 state 準備好
 if "current_plan_id" not in st.session_state:
     st.session_state["current_plan_id"] = None
