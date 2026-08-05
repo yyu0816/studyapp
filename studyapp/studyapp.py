@@ -866,24 +866,88 @@ def render_dashboard_page() -> None:
     dashboard.render_dashboard()
 
 
+def is_dark_color(hex_color: str) -> bool:
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) == 3:
+        hex_color = ''.join([c*2 for c in hex_color])
+    try:
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        return luminance < 128
+    except Exception:
+        return False
+
+
 def apply_custom_theme() -> None:
     theme = st.session_state.get("custom_theme") or {}
     bg_color = theme.get("bg_color", "#ffffff")
     button_color = theme.get("button_color", "#4f84ff")
     navbar_bg_color = theme.get("navbar_bg_color", "#f8f9fa")
 
+    dark_mode = is_dark_color(bg_color)
+    
+    if dark_mode:
+        card_bg = "#1e1e2e"
+        card_text = "#f3f4f6"
+        border_color = "rgba(255, 255, 255, 0.15)"
+        input_bg = "#27273a"
+        input_text = "#ffffff"
+        sec_btn_bg = "#27273a"
+        sec_btn_text = "#e5e7eb"
+    else:
+        card_bg = "#ffffff"
+        card_text = "#1f2937"
+        border_color = "rgba(0, 0, 0, 0.1)"
+        input_bg = "#ffffff"
+        input_text = "#1f2937"
+        sec_btn_bg = "#ffffff"
+        sec_btn_text = "#374151"
+
     css = f"""
     <style>
+    /* 1. 主體背景與預設文字顏色 */
     .stApp {{
         background-color: {bg_color} !important;
+        color: {card_text} !important;
     }}
-    /* 精確覆蓋頂部第一列主選單塊的背景色 (navbar_bg_color) */
+    
+    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 背景與邊框設定 */
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    details[data-testid="stExpander"],
+    div[data-testid="stForm"],
+    div[data-testid="stExpander"] {{
+        background-color: {card_bg} !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 12px !important;
+        color: {card_text} !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    }}
+    
+    summary[data-testid="stExpanderSummary"] {{
+        background-color: {card_bg} !important;
+        color: {card_text} !important;
+        border-radius: 12px !important;
+    }}
+    
+    /* 3. 輸入框與選項元件背景色與文字色 */
+    div[data-baseweb="input"],
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="textarea"] {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
+        border-color: {border_color} !important;
+    }}
+    input, textarea {{
+        color: {input_text} !important;
+    }}
+
+    /* 4. 精確覆蓋頂部第一列主選單塊的背景色 (navbar_bg_color) */
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
         background-color: {navbar_bg_color} !important;
         padding: 12px 16px !important;
         border-radius: 12px !important;
         margin-bottom: 20px !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border: 1px solid {border_color} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"] {{
@@ -892,6 +956,8 @@ def apply_custom_theme() -> None:
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
         background-color: transparent !important;
     }}
+    
+    /* 5. 按鈕顏色 */
     button[kind="primary"] {{
         background-color: {button_color} !important;
         border-color: {button_color} !important;
@@ -899,12 +965,11 @@ def apply_custom_theme() -> None:
         font-weight: 600 !important;
     }}
     button[kind="secondary"] {{
-        background-color: #ffffff !important;
-        color: #333333 !important;
-        border: 1px solid #d1d5db !important;
+        background-color: {sec_btn_bg} !important;
+        color: {sec_btn_text} !important;
+        border: 1px solid {border_color} !important;
     }}
     button[kind="secondary"]:hover {{
-        background-color: #f3f4f6 !important;
         border-color: {button_color} !important;
         color: {button_color} !important;
     }}
