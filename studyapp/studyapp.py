@@ -1146,23 +1146,28 @@ def render_start_page():
                     login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
                 with c3:
                     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    if st.button("🔑 確定登入", key="btn_login_submit", use_container_width=True, type="primary"):
-                        clean_user = login_username.strip()
-                        if not clean_user:
-                            st.error("請輸入帳號名稱！")
-                        elif not login_password:
-                            st.error("請輸入密碼！")
-                        elif not storage.is_alphanumeric(login_password):
-                            st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
+                    login_clicked = st.button("🔑 確定登入", key="btn_login_submit", use_container_width=True, type="primary")
+
+                if login_password and not storage.is_alphanumeric(login_password):
+                    st.warning("⚠️ **密碼格式提醒**：檢測到英文與數字以外的符號！密碼僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)，請移除中文、空格或特殊符號。")
+
+                if login_clicked:
+                    clean_user = login_username.strip()
+                    if not clean_user:
+                        st.error("請輸入帳號名稱！")
+                    elif not login_password:
+                        st.error("請輸入密碼！")
+                    elif not storage.is_alphanumeric(login_password):
+                        st.error("⛔ **登入失敗**：密碼包含英文與數字以外的非法符號，請修正後重新輸入！")
+                    else:
+                        ok, msg = storage.verify_user_credentials(clean_user, login_password)
+                        if ok:
+                            st.session_state["user_name"] = clean_user
+                            st.query_params["user"] = clean_user
+                            st.success(f"✅ {msg}")
+                            st.rerun()
                         else:
-                            ok, msg = storage.verify_user_credentials(clean_user, login_password)
-                            if ok:
-                                st.session_state["user_name"] = clean_user
-                                st.query_params["user"] = clean_user
-                                st.success(f"✅ {msg}")
-                                st.rerun()
-                            else:
-                                st.error(f"❌ 登入失敗：{msg}")
+                            st.error(f"❌ 登入失敗：{msg}")
             
             # --- Tab 2: 註冊新帳號 ---
             with tab_register:
@@ -1176,25 +1181,30 @@ def render_start_page():
                     new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
                 with cr4:
                     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    if st.button("✨ 註冊帳號", key="btn_register_new", use_container_width=True, type="primary"):
-                        clean_reg = new_reg_name.strip()
-                        if not clean_reg:
-                            st.error("帳號名字不能為空！")
-                        elif not new_reg_pass:
-                            st.error("請設定密碼！")
-                        elif not storage.is_alphanumeric(new_reg_pass):
-                            st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
-                        elif new_reg_pass != new_reg_pass2:
-                            st.error("❌ 兩次輸入的密碼不一致！")
+                    reg_clicked = st.button("✨ 註冊帳號", key="btn_register_new", use_container_width=True, type="primary")
+
+                if (new_reg_pass and not storage.is_alphanumeric(new_reg_pass)) or (new_reg_pass2 and not storage.is_alphanumeric(new_reg_pass2)):
+                    st.warning("⚠️ **密碼格式提醒**：檢測到英文與數字以外的符號！密碼僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)，請移除中文、空格或特殊符號。")
+
+                if reg_clicked:
+                    clean_reg = new_reg_name.strip()
+                    if not clean_reg:
+                        st.error("帳號名字不能為空！")
+                    elif not new_reg_pass:
+                        st.error("請設定密碼！")
+                    elif not storage.is_alphanumeric(new_reg_pass):
+                        st.error("⛔ **註冊失敗**：密碼包含英文與數字以外的非法符號，請修正後重新輸入！")
+                    elif new_reg_pass != new_reg_pass2:
+                        st.error("❌ 兩次輸入的密碼不一致！")
+                    else:
+                        ok, msg = storage.register_user(clean_reg, new_reg_pass)
+                        if ok:
+                            st.session_state["user_name"] = clean_reg
+                            st.query_params["user"] = clean_reg
+                            st.success(f"🎉 帳號「{clean_reg}」註冊成功！")
+                            st.rerun()
                         else:
-                            ok, msg = storage.register_user(clean_reg, new_reg_pass)
-                            if ok:
-                                st.session_state["user_name"] = clean_reg
-                                st.query_params["user"] = clean_reg
-                                st.success(f"🎉 帳號「{clean_reg}」註冊成功！")
-                                st.rerun()
-                            else:
-                                st.error(f"⛔ 註冊失敗：{msg}")
+                            st.error(f"⛔ 註冊失敗：{msg}")
 
     st.markdown("---")
     
