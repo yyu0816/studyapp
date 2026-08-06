@@ -902,9 +902,9 @@ def apply_custom_theme() -> None:
     dark_mode = is_dark_color(bg_color)
     
     if dark_mode:
-        card_bg = "#1e1e2e"
+        card_bg = "#181825"
         card_text = "#f3f4f6"
-        border_color = "rgba(255, 255, 255, 0.15)"
+        border_color = "rgba(255, 255, 255, 0.2)"
         input_bg = "#27273a"
         input_text = "#ffffff"
         sec_btn_bg = "#27273a"
@@ -912,7 +912,7 @@ def apply_custom_theme() -> None:
     else:
         card_bg = "#ffffff"
         card_text = "#1f2937"
-        border_color = "rgba(0, 0, 0, 0.1)"
+        border_color = "rgba(0, 0, 0, 0.12)"
         input_bg = "#ffffff"
         input_text = "#1f2937"
         sec_btn_bg = "#ffffff"
@@ -926,12 +926,18 @@ def apply_custom_theme() -> None:
         color: {card_text} !important;
     }}
     
-    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 背景與邊框設定 */
+    /* 2. 所有帶框容器 (st.container(border=True), st.expander, st.form) 框內強制填滿純白/純黑背景 */
     div[data-testid="stVerticalBlockBorderWrapper"],
     div[data-testid="stVerticalBlockBorderWrapper"] > div,
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="element-container"],
     details[data-testid="stExpander"],
+    details[data-testid="stExpander"] > summary,
+    details[data-testid="stExpander"] div,
     div[data-testid="stForm"],
-    div[data-testid="stExpander"] {{
+    div[data-testid="stForm"] > div {{
         background-color: {card_bg} !important;
         border-color: {border_color} !important;
         color: {card_text} !important;
@@ -939,7 +945,8 @@ def apply_custom_theme() -> None:
     div[data-testid="stVerticalBlockBorderWrapper"] {{
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+        overflow: hidden !important;
     }}
     
     summary[data-testid="stExpanderSummary"] {{
