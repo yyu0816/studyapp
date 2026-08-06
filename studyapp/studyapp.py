@@ -21,9 +21,14 @@ except Exception:
 
 st.set_page_config(page_title="讀書計畫安排助手", page_icon="📚", layout="wide")
 
-# 確保基礎 state 準備好
+# 確保基礎 state 準備好 (支援從 URL 參數恢復使用者與計畫狀態)
+if "user_name" not in st.session_state and st.query_params.get("user"):
+    st.session_state["user_name"] = st.query_params.get("user")
+
 if "current_plan_id" not in st.session_state:
-    st.session_state["current_plan_id"] = None
+    st.session_state["current_plan_id"] = st.query_params.get("plan_id") or None
+elif not st.session_state["current_plan_id"] and st.query_params.get("plan_id"):
+    st.session_state["current_plan_id"] = st.query_params.get("plan_id")
     
 # 如果在 app 內（已選定計畫），但 app_state 遺失，嘗試補回
 if st.session_state["current_plan_id"] and "app_state" not in st.session_state:
@@ -1015,6 +1020,8 @@ def render_home_page() -> None:
     with nav_cols[0]:
         if st.button("🏠 計畫列表", key="top_nav_home", use_container_width=True):
             st.session_state["current_plan_id"] = None
+            if "plan_id" in st.query_params:
+                del st.query_params["plan_id"]
             st.rerun()
             
     for i, opt in enumerate(page_options):
@@ -1076,18 +1083,54 @@ def render_home_page() -> None:
 
 def render_start_page():
     st.title("📚 我的讀書計畫")
-    st.markdown("歡迎回來！請選擇要繼續進行的計畫，或是建立一個全新的計畫。")
+    
+    # 1. 使用者名字輸入與持久化儲存區塊
+    curr_user = st.session_state.get("user_name", "")
+    with st.container(border=True):
+        st.markdown("#### 👤 個人身份與紀錄自動儲存")
+        col_input, col_save = st.columns([3, 1])
+        with col_input:
+            input_name = st.text_input("請輸入您的名字 / 帳號 (儲存後網頁將為您保留資料狀態)", value=curr_user, key="start_page_user_input", placeholder="例如：Alex、小明...")
+        with col_save:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("💾 儲存名字", key="btn_save_user_name", use_container_width=True):
+                clean_name = input_name.strip()
+                st.session_state["user_name"] = clean_name
+                if clean_name:
+                    st.query_params["user"] = clean_name
+                elif "user" in st.query_params:
+                    del st.query_params["user"]
+                st.rerun()
+
+    if st.session_state.get("user_name"):
+        st.success(f"👋 歡迎回來，**{st.session_state['user_name']}**！以下是您的專屬讀書計畫：")
+    else:
+        st.info("💡 提示：輸入名字並點擊「儲存名字」後，網頁將記錄您的個人身份，關閉瀏覽器再次開啟也能繼續保留您的資料！")
+
     st.markdown("---")
     
     plans = storage.load_all_plans()
+    user_name = st.session_state.get("user_name", "").strip()
     
+    # 依據使用者名稱過濾計畫
+    if user_name:
+        filtered_plans = {
+            pid: pdata for pid, pdata in plans.items()
+            if pdata.get("owner_name") == user_name or not pdata.get("owner_name")
+        }
+    else:
+        filtered_plans = plans
+
     # 建立新計畫按鈕
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("➕ 建立新計畫", use_container_width=True, type="primary"):
-            new_id = storage.create_new_plan()
+            new_id = storage.create_new_plan(owner_name=user_name)
             st.session_state["current_plan_id"] = new_id
             st.session_state["main_page"] = "計劃頁面"
+            st.query_params["plan_id"] = new_id
+            if user_name:
+                st.query_params["user"] = user_name
             # 載入空白狀態
             new_plan = storage.load_plan(new_id)
             for k, v in new_plan.items():
@@ -1097,13 +1140,13 @@ def render_start_page():
             
     st.markdown("---")
     
-    if not plans:
-        st.info("目前還沒有任何讀書計畫。請點擊上方按鈕建立您的第一個計畫！")
+    if not filtered_plans:
+        st.info("目前還沒有屬於您的讀書計畫。請點擊上方按鈕建立您的第一個計畫！")
         return
         
     # 顯示現有計畫
     cols = st.columns(3)
-    for idx, (plan_id, plan_data) in enumerate(plans.items()):
+    for idx, (plan_id, plan_data) in enumerate(filtered_plans.items()):
         with cols[idx % 3]:
             with st.container(border=True):
                 plan_name_disp = plan_data.get("plan_name") or plan_data.get("name") or "未命名計畫"
@@ -1113,6 +1156,10 @@ def render_start_page():
                     st.caption(f"🎯 {plan_goal_disp[:20]}{'...' if len(plan_goal_disp)>20 else ''}")
                 else:
                     st.caption("無設定目標")
+                
+                owner = plan_data.get("owner_name")
+                if owner:
+                    st.caption(f"👤 所有者：{owner}")
                     
                 # 可以加上日期等資訊
                 plan_state = plan_data.get("plan", {})
@@ -1127,6 +1174,9 @@ def render_start_page():
                 with col_enter:
                     if st.button("進入計畫", key=f"enter_{plan_id}", use_container_width=True):
                         st.session_state["current_plan_id"] = plan_id
+                        st.query_params["plan_id"] = plan_id
+                        if user_name:
+                            st.query_params["user"] = user_name
                         for k, v in plan_data.items():
                             if k != "id":
                                 st.session_state[k] = v

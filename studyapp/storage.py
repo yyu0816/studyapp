@@ -48,13 +48,14 @@ def save_plan(plan_id, data):
     plans[plan_id] = data
     save_all_plans(plans)
 
-def create_new_plan(name="未命名計畫", goal=""):
+def create_new_plan(name="未命名計畫", goal="", owner_name=""):
     """Create a new empty plan and return its ID."""
     plan_id = str(uuid.uuid4())
     new_plan = {
         "id": plan_id,
         "name": name,
         "goal": goal,
+        "owner_name": owner_name,
         "app_state": {
             "plan": None,
             "daily_log": None,
@@ -103,7 +104,7 @@ def save_current_state():
     # Update plan data from session_state
     keys_to_save = [
         "app_state", "daily_task_checks", "timer_records", "mood_records",
-        "plan_name", "plan_goal", "subjects", "daily_override_events", "daily_modified_fixed", "plan",
+        "plan_name", "plan_goal", "owner_name", "subjects", "daily_override_events", "daily_modified_fixed", "plan",
         "fixed_events", "specific_events", "enabled_pages", "enabled_features", "custom_theme"
     ]
     for key in keys_to_save:
