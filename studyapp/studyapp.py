@@ -1138,20 +1138,21 @@ def render_start_page():
             
             # --- Tab 1: 登入已有帳號 ---
             with tab_login:
-                st.markdown("請輸入您的帳號名稱與密碼（密碼限英文與數字）：")
-                c1, c2, c3 = st.columns([2, 2, 1])
-                with c1:
-                    login_username = st.text_input("帳號名稱", key="input_login_username", placeholder="請輸入您的帳號名稱...")
-                with c2:
-                    login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
-                with c3:
-                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    login_clicked = st.button("🔑 確定登入", key="btn_login_submit", use_container_width=True, type="primary")
+                with st.form(key="form_login", border=False):
+                    st.markdown("請輸入您的帳號名稱與密碼（輸入完畢按 **Enter 鍵** 或點擊按鈕即可送出）：")
+                    c1, c2, c3 = st.columns([2, 2, 1])
+                    with c1:
+                        login_username = st.text_input("帳號名稱", key="input_login_username", placeholder="請輸入您的帳號名稱...")
+                    with c2:
+                        login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
+                    with c3:
+                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                        login_submitted = st.form_submit_button("🔑 確定登入", use_container_width=True, type="primary")
 
                 if login_password and not storage.is_alphanumeric(login_password):
                     st.warning("⚠️ **密碼格式提醒**：檢測到英文與數字以外的符號！密碼僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)，請移除中文、空格或特殊符號。")
 
-                if login_clicked:
+                if login_submitted:
                     clean_user = login_username.strip()
                     if not clean_user:
                         st.error("請輸入帳號名稱！")
@@ -1171,22 +1172,23 @@ def render_start_page():
             
             # --- Tab 2: 註冊新帳號 ---
             with tab_register:
-                st.markdown("請設定您的新帳號與密碼（密碼限英文與數字）：")
-                cr1, cr2, cr3, cr4 = st.columns([2, 2, 2, 1])
-                with cr1:
-                    new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex...")
-                with cr2:
-                    new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
-                with cr3:
-                    new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
-                with cr4:
-                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    reg_clicked = st.button("✨ 註冊帳號", key="btn_register_new", use_container_width=True, type="primary")
+                with st.form(key="form_register", border=False):
+                    st.markdown("請設定您的新帳號與密碼（輸入完畢按 **Enter 鍵** 或點擊按鈕即可送出）：")
+                    cr1, cr2, cr3, cr4 = st.columns([2, 2, 2, 1])
+                    with cr1:
+                        new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex...")
+                    with cr2:
+                        new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
+                    with cr3:
+                        new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
+                    with cr4:
+                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                        reg_submitted = st.form_submit_button("✨ 註冊帳號", use_container_width=True, type="primary")
 
                 if (new_reg_pass and not storage.is_alphanumeric(new_reg_pass)) or (new_reg_pass2 and not storage.is_alphanumeric(new_reg_pass2)):
                     st.warning("⚠️ **密碼格式提醒**：檢測到英文與數字以外的符號！密碼僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)，請移除中文、空格或特殊符號。")
 
-                if reg_clicked:
+                if reg_submitted:
                     clean_reg = new_reg_name.strip()
                     if not clean_reg:
                         st.error("帳號名字不能為空！")
