@@ -1,22 +1,101 @@
 import json
 import os
 import uuid
+import hashlib
+import re
 
-# Streamlit Cloud 的 app 目錄是唯讀的，需改寫至 /tmp
-# 本機開發時 /tmp 也可用，但為了方便偵錯，本機用當前目錄
 def _get_data_file():
-    # 若當前目錄可寫（本機），就用當前目錄
     test_path = os.path.join(os.getcwd(), "plans.json")
     try:
-        # 試著測試寫入權限
         with open(test_path, "a") as f:
             pass
         return test_path
     except (PermissionError, OSError):
-        # Streamlit Cloud: 使用 /tmp 目錄
         return "/tmp/plans.json"
 
+def _get_users_file():
+    test_path = os.path.join(os.getcwd(), "users.json")
+    try:
+        with open(test_path, "a") as f:
+            pass
+        return test_path
+    except (PermissionError, OSError):
+        return "/tmp/users.json"
+
 DATA_FILE = _get_data_file()
+USERS_FILE = _get_users_file()
+
+def load_all_users() -> dict[str, dict]:
+    """Load all registered user accounts from JSON."""
+    if not os.path.exists(USERS_FILE):
+        return {}
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading users: {e}")
+        return {}
+
+def save_all_users(users_dict: dict[str, dict]) -> None:
+    """Save user credentials to JSON."""
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users_dict, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving users: {e}")
+
+def hash_password(password: str) -> str:
+    """Hash password using SHA-256."""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def is_alphanumeric(text: str) -> bool:
+    """Check if text contains ONLY English letters and numbers."""
+    return bool(re.match(r'^[a-zA-Z0-9]+$', text))
+
+def register_user(username: str, password: str) -> tuple[bool, str]:
+    """Register a new user with an alphanumeric password."""
+    username = username.strip()
+    if not username:
+        return False, "使用者名稱不能為空"
+    if not is_alphanumeric(password):
+        return False, "密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)"
+        
+    users = load_all_users()
+    if username in users:
+        return False, f"帳號「{username}」已被註冊使用"
+        
+    users[username] = {
+        "username": username,
+        "password_hash": hash_password(password)
+    }
+    save_all_users(users)
+    return True, "註冊成功"
+
+def verify_user_credentials(username: str, password: str) -> tuple[bool, str]:
+    """Verify username and password."""
+    username = username.strip()
+    if not username:
+        return False, "請輸入帳號"
+    if not password:
+        return False, "請輸入密碼"
+        
+    users = load_all_users()
+    if username not in users:
+        # Check if legacy user exists in plans
+        plans = load_all_plans()
+        legacy_exists = any(pdata.get("owner_name") == username for pdata in plans.values())
+        if legacy_exists:
+            if not is_alphanumeric(password):
+                return False, "密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)"
+            register_user(username, password)
+            return True, "舊帳號密碼設定完成"
+        return False, "帳號不存在，請先註冊新帳號"
+        
+    user_info = users[username]
+    if user_info.get("password_hash") == hash_password(password):
+        return True, "驗證成功"
+    else:
+        return False, "密碼不正確，請重新輸入"
 
 def load_all_plans():
     """Load all plans from the JSON file."""

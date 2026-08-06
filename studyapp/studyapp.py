@@ -1128,47 +1128,70 @@ def render_start_page():
             
             # --- Tab 1: 登入已有帳號 ---
             with tab_login:
-                if registered_users_list:
-                    st.markdown("請選擇您的帳號名稱進行登入：")
-                    c1, c2 = st.columns([3, 1])
+                all_users_keys = sorted(list(set(registered_users_list + list(storage.load_all_users().keys()))))
+                if all_users_keys:
+                    st.markdown("請選擇帳號並輸入密碼（密碼限英文與數字）：")
+                    c1, c2, c3 = st.columns([2, 2, 1])
                     with c1:
                         login_selected = st.selectbox(
-                            "已註冊帳號列表",
-                            options=["-- 請選擇您的帳號 --"] + registered_users_list,
+                            "帳號名稱",
+                            options=["-- 請選擇帳號 --"] + all_users_keys,
                             key="select_exist_user"
                         )
                     with c2:
+                        login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
+                    with c3:
                         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                         if st.button("🔑 確定登入", key="btn_login_select", use_container_width=True, type="primary"):
-                            if login_selected and login_selected != "-- 請選擇您的帳號 --":
-                                st.session_state["user_name"] = login_selected
-                                st.query_params["user"] = login_selected
-                                st.success(f"✅ 成功登入帳號：{login_selected}")
-                                st.rerun()
-                            else:
+                            if not login_selected or login_selected == "-- 請選擇帳號 --":
                                 st.error("請選擇有效的帳號！")
+                            elif not login_password:
+                                st.error("請輸入密碼！")
+                            elif not storage.is_alphanumeric(login_password):
+                                st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
+                            else:
+                                ok, msg = storage.verify_user_credentials(login_selected, login_password)
+                                if ok:
+                                    st.session_state["user_name"] = login_selected
+                                    st.query_params["user"] = login_selected
+                                    st.success(f"✅ {msg}")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ 登入失敗：{msg}")
                 else:
                     st.info("目前尚無任何已註冊帳號。請切換至「註冊新帳號」建立您的第一個帳號！")
             
             # --- Tab 2: 註冊新帳號 ---
             with tab_register:
-                st.markdown("請輸入您要註冊的新名字 / 帳號：")
-                cr1, cr2 = st.columns([3, 1])
+                st.markdown("請設定您的新帳號與密碼（密碼限英文與數字）：")
+                cr1, cr2, cr3, cr4 = st.columns([2, 2, 2, 1])
                 with cr1:
-                    new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex、小明...")
+                    new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex...")
                 with cr2:
+                    new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
+                with cr3:
+                    new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
+                with cr4:
                     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                     if st.button("✨ 註冊帳號", key="btn_register_new", use_container_width=True, type="primary"):
                         clean_reg = new_reg_name.strip()
                         if not clean_reg:
                             st.error("帳號名字不能為空！")
-                        elif clean_reg in registered_map:
-                            st.error(f"⛔ **註冊失敗**：帳號名字「**{clean_reg}**」已被其他使用者註冊佔用！請更換其他名字或切換至「登入已有帳號」。")
+                        elif not new_reg_pass:
+                            st.error("請設定密碼！")
+                        elif not storage.is_alphanumeric(new_reg_pass):
+                            st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
+                        elif new_reg_pass != new_reg_pass2:
+                            st.error("❌ 兩次輸入的密碼不一致！")
                         else:
-                            st.session_state["user_name"] = clean_reg
-                            st.query_params["user"] = clean_reg
-                            st.success(f"🎉 帳號「{clean_reg}」設定成功！建立並儲存計畫後將正式完成註冊。")
-                            st.rerun()
+                            ok, msg = storage.register_user(clean_reg, new_reg_pass)
+                            if ok:
+                                st.session_state["user_name"] = clean_reg
+                                st.query_params["user"] = clean_reg
+                                st.success(f"🎉 帳號「{clean_reg}」註冊成功！")
+                                st.rerun()
+                            else:
+                                st.error(f"⛔ 註冊失敗：{msg}")
 
     st.markdown("---")
     
