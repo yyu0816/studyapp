@@ -62,7 +62,7 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
         
     users = load_all_users()
     if username in users:
-        return False, f"帳號「{username}」已被註冊使用"
+        return False, f"帳號「{username}」已被註冊佔用"
         
     users[username] = {
         "username": username,
@@ -72,24 +72,16 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
     return True, "註冊成功"
 
 def verify_user_credentials(username: str, password: str) -> tuple[bool, str]:
-    """Verify username and password."""
+    """Verify username and password for existing users. STRICTLY FORBIDS auto-creating new users on login."""
     username = username.strip()
     if not username:
-        return False, "請輸入帳號"
+        return False, "請輸入帳號名稱"
     if not password:
         return False, "請輸入密碼"
         
     users = load_all_users()
     if username not in users:
-        # Check if legacy user exists in plans
-        plans = load_all_plans()
-        legacy_exists = any(pdata.get("owner_name") == username for pdata in plans.values())
-        if legacy_exists:
-            if not is_alphanumeric(password):
-                return False, "密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)"
-            register_user(username, password)
-            return True, "舊帳號密碼設定完成"
-        return False, "帳號不存在，請先註冊新帳號"
+        return False, f"帳號「{username}」尚未註冊！請切換至「註冊新帳號」頁籤進行註冊。"
         
     user_info = users[username]
     if user_info.get("password_hash") == hash_password(password):
