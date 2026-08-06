@@ -926,31 +926,32 @@ def apply_custom_theme() -> None:
         color: {card_text} !important;
     }}
     
-    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form, 邊框區塊) 內部強制作全純白/純黑填滿 */
+    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 強制填滿白/黑背景 */
     div[data-testid="stVerticalBlockBorderWrapper"],
-    div[data-testid="stVerticalBlockBorderWrapper"] *,
-    div[data-testid="stForm"],
-    div[data-testid="stForm"] *,
+    div[data-testid="stVerticalBlockBorderWrapper"] > div,
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="element-container"],
     details[data-testid="stExpander"],
-    details[data-testid="stExpander"] *,
-    [data-testid="stBorderWrapper"],
-    [data-testid="stBorderWrapper"] * {{
+    details[data-testid="stExpander"] > summary,
+    details[data-testid="stExpander"] div,
+    div[data-testid="stForm"],
+    div[data-testid="stForm"] > div {{
         background-color: {card_bg} !important;
         color: {card_text} !important;
     }}
     
-    /* 設定邊框樣式 */
+    /* 邊框樣式 */
     div[data-testid="stVerticalBlockBorderWrapper"],
     div[data-testid="stForm"],
-    details[data-testid="stExpander"],
-    [data-testid="stBorderWrapper"] {{
+    details[data-testid="stExpander"] {{
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
     
-    summary[data-testid="stExpanderSummary"],
-    summary[data-testid="stExpanderSummary"] * {{
+    summary[data-testid="stExpanderSummary"] {{
         background-color: {card_bg} !important;
         color: {card_text} !important;
     }}
@@ -967,36 +968,48 @@ def apply_custom_theme() -> None:
         color: {input_text} !important;
     }}
 
-    /* 4. 精確覆蓋頂部第一列主選單塊的背景色 (navbar_bg_color) */
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type,
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type * {{
-        background-color: {navbar_bg_color} !important;
-    }}
+    /* 4. 精確覆蓋頂部第一列主選單塊 (頂部橫向主選單) */
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
+        background-color: {navbar_bg_color} !important;
         padding: 12px 16px !important;
         border-radius: 12px !important;
         margin-bottom: 20px !important;
         border: 1px solid {border_color} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
-    
-    /* 5. 按鈕顏色獨立防護 */
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"],
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }}
+
+    /* 5. 按鈕獨立防護：確保按鈕內部文字 (p/span) 為透明，絕不產生內層灰色方框 */
     button[kind="primary"],
-    button[kind="primary"] * {{
+    button[data-testid="stBaseButton-primary"] {{
         background-color: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
     }}
     button[kind="secondary"],
-    button[kind="secondary"] * {{
+    button[data-testid="stBaseButton-secondary"] {{
         background-color: {sec_btn_bg} !important;
         color: {sec_btn_text} !important;
         border: 1px solid {border_color} !important;
     }}
-    button[kind="secondary"]:hover {{
+    button[kind="secondary"]:hover,
+    button[data-testid="stBaseButton-secondary"]:hover {{
         border-color: {button_color} !important;
         color: {button_color} !important;
+    }}
+    button *,
+    button p,
+    button div,
+    button span {{
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
     }}
     </style>
     """
