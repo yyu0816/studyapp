@@ -926,29 +926,35 @@ def apply_custom_theme() -> None:
         color: {card_text} !important;
     }}
     
-    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 強制填滿白/黑背景 */
+    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 內部全面實心填滿顏色 (白/黑)，與選單按鈕一致 */
     div[data-testid="stVerticalBlockBorderWrapper"],
-    div[data-testid="stVerticalBlockBorderWrapper"] > div,
+    div[data-testid="stVerticalBlockBorderWrapper"] div,
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"],
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"],
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="element-container"],
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"],
     details[data-testid="stExpander"],
-    details[data-testid="stExpander"] > summary,
+    details[data-testid="stExpander"] summary,
     details[data-testid="stExpander"] div,
     div[data-testid="stForm"],
-    div[data-testid="stForm"] > div {{
+    div[data-testid="stForm"] div,
+    [data-testid="stBorderWrapper"],
+    [data-testid="stBorderWrapper"] div {{
         background-color: {card_bg} !important;
         color: {card_text} !important;
     }}
     
-    /* 邊框樣式 */
+    /* 邊框與圓角樣式 */
     div[data-testid="stVerticalBlockBorderWrapper"],
     div[data-testid="stForm"],
-    details[data-testid="stExpander"] {{
+    details[data-testid="stExpander"],
+    [data-testid="stBorderWrapper"] {{
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
+        background-color: {card_bg} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+        overflow: hidden !important;
     }}
     
     summary[data-testid="stExpanderSummary"] {{
@@ -984,7 +990,7 @@ def apply_custom_theme() -> None:
         box-shadow: none !important;
     }}
 
-    /* 5. 按鈕獨立防護：確保按鈕內部文字 (p/span) 為透明，絕不產生內層灰色方框 */
+    /* 5. 按鈕顏色獨立防護：確保按鈕有自己的實心與外框樣式，內部文字透明 */
     button[kind="primary"],
     button[data-testid="stBaseButton-primary"] {{
         background-color: {button_color} !important;
