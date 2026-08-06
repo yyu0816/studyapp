@@ -1105,21 +1105,22 @@ def render_start_page():
     if st.session_state.get("user_name"):
         st.success(f"👋 歡迎回來，**{st.session_state['user_name']}**！以下是您的專屬讀書計畫：")
     else:
-        st.info("💡 提示：輸入名字並點擊「儲存名字」後，網頁將記錄您的個人身份，關閉瀏覽器再次開啟也能繼續保留您的資料！")
+        st.info("💡 提示：請先在上方輸入您的名字/帳號並點擊「儲存名字」，系統會為您載入專屬計畫與自動保存資料！")
 
     st.markdown("---")
     
-    plans = storage.load_all_plans()
     user_name = st.session_state.get("user_name", "").strip()
     
-    # 依據使用者名稱過濾計畫
-    if user_name:
-        filtered_plans = {
-            pid: pdata for pid, pdata in plans.items()
-            if pdata.get("owner_name") == user_name or not pdata.get("owner_name")
-        }
-    else:
-        filtered_plans = plans
+    # 如果名字為空白，下方不顯示任何計畫 (每個名字對應各自創立的計畫)
+    if not user_name:
+        st.warning("🔒 目前未載入使用者身份。請先在上方欄位輸入您的名字/帳號並點擊「儲存名字」，才會顯示您的個人讀書計畫。")
+        return
+
+    plans = storage.load_all_plans()
+    filtered_plans = {
+        pid: pdata for pid, pdata in plans.items()
+        if pdata.get("owner_name") == user_name
+    }
 
     # 建立新計畫按鈕
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -1129,8 +1130,7 @@ def render_start_page():
             st.session_state["current_plan_id"] = new_id
             st.session_state["main_page"] = "計劃頁面"
             st.query_params["plan_id"] = new_id
-            if user_name:
-                st.query_params["user"] = user_name
+            st.query_params["user"] = user_name
             # 載入空白狀態
             new_plan = storage.load_plan(new_id)
             for k, v in new_plan.items():
@@ -1141,7 +1141,7 @@ def render_start_page():
     st.markdown("---")
     
     if not filtered_plans:
-        st.info("目前還沒有屬於您的讀書計畫。請點擊上方按鈕建立您的第一個計畫！")
+        st.info(f"使用者「**{user_name}**」目前還沒有讀書計畫。點擊上方「➕ 建立新計畫」開始安排第一個計畫！")
         return
         
     # 顯示現有計畫
