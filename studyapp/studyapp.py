@@ -618,13 +618,23 @@ def render_setup_page() -> None:
 
     st.subheader("學習偏好")
     count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
+    raw_pref = st.session_state.get("preferred_subject_count", "無偏好")
+    if raw_pref == 0 or raw_pref == "0" or not raw_pref:
+        pref_str = "無偏好"
+    else:
+        pref_str = str(raw_pref)
+    if pref_str not in count_options:
+        pref_str = "無偏好"
+
+    pref_idx = count_options.index(pref_str)
+
     preferred_subject_count_value = st.selectbox(
         "每天偏好的總科目數量",
         count_options,
-        index=count_options.index(str(st.session_state.get("preferred_subject_count", "無偏好"))) if str(st.session_state.get("preferred_subject_count", "無偏好")) in count_options else 0,
-        key="preferred_subject_count",
+        index=pref_idx,
+        key="select_preferred_subj_count",
     )
-    preferred_subject_count = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
+    st.session_state["preferred_subject_count"] = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
 
     st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
