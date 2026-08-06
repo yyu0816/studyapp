@@ -1096,53 +1096,87 @@ def render_start_page():
     st.title("📚 我的讀書計畫")
     
     registered_map = get_registered_users_map()
-    curr_user = st.session_state.get("user_name", "")
-    
-    # 1. 使用者名字輸入與登記狀態檢查區塊
-    with st.container(border=True):
-        st.markdown("#### 👤 個人身份與帳號擁有權說明")
-        col_input, col_save = st.columns([3, 1])
-        with col_input:
-            input_name = st.text_input("請輸入您的名字 / 帳號", value=curr_user, key="start_page_user_input", placeholder="例如：Alex、小明...")
-        with col_save:
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("💾 儲存名字", key="btn_save_user_name", use_container_width=True):
-                clean_name = input_name.strip()
-                st.session_state["user_name"] = clean_name
-                if clean_name:
-                    st.query_params["user"] = clean_name
-                elif "user" in st.query_params:
-                    del st.query_params["user"]
-                st.rerun()
+    registered_users_list = sorted(list(registered_map.keys()))
+    curr_user = st.session_state.get("user_name", "").strip()
 
-        # 即時重複姓名與使用權狀態通知 (Duplicate Name Notification)
-        check_name = input_name.strip()
-        if check_name:
-            if check_name in registered_map:
-                plan_cnt = registered_map[check_name]
-                if check_name == curr_user:
-                    st.success(f"✅ 帳號驗證成功：**{check_name}** 已擁有使用權（已有 {plan_cnt} 筆儲存計畫）。")
+    # 1. 登入 / 註冊與當前狀態區塊
+    if curr_user:
+        with st.container(border=True):
+            col_info, col_logout = st.columns([3, 1])
+            with col_info:
+                st.markdown(f"#### 👤 當前登入帳號：**{curr_user}**")
+                plan_cnt = registered_map.get(curr_user, 0)
+                if plan_cnt > 0:
+                    st.caption(f"✅ 已獲得正式擁有權（包含 {plan_cnt} 筆已儲存計畫）")
                 else:
-                    st.warning(f"⚠️ **姓名重複通知**：名字「**{check_name}**」已被登記使用（已有 {plan_cnt} 筆儲存計畫）。若這是您的帳號請確認登入，否則請更換其他名字。")
-            else:
-                st.info(f"💡 名字「**{check_name}**」目前尚未被登記使用。建立並儲存第一個計畫後，您將正式獲得「{check_name}」的使用權！")
-
-    if st.session_state.get("user_name"):
-        user_name = st.session_state["user_name"].strip()
-        if user_name in registered_map:
-            st.success(f"👋 歡迎回來，**{user_name}**！以下是您的專屬讀書計畫：")
-        else:
-            st.info(f"👋 歡迎您，**{user_name}**！目前尚未建立計畫，點擊下方「➕ 建立新計畫」即可正式登記並擁有「{user_name}」的使用權。")
+                    st.caption("💡 帳號準備中：建立第一個計畫並儲存後，即可正式鎖定該帳號擁有權！")
+            with col_logout:
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("🚪 登出 / 切換帳號", key="btn_logout", use_container_width=True):
+                    st.session_state["user_name"] = ""
+                    st.session_state["current_plan_id"] = None
+                    if "user" in st.query_params:
+                        del st.query_params["user"]
+                    if "plan_id" in st.query_params:
+                        del st.query_params["plan_id"]
+                    st.rerun()
     else:
-        st.info("💡 提示：請先在上方輸入您的名字/帳號並點擊「儲存名字」，系統會為您載入專屬計畫與自動保存資料！")
+        # 未登入：提供「🔑 登入已有帳號」與「✨ 註冊新帳號」雙分頁
+        with st.container(border=True):
+            st.markdown("#### 🔐 使用者登入 / 註冊系統")
+            tab_login, tab_register = st.tabs(["🔑 登入已有帳號", "✨ 註冊新帳號"])
+            
+            # --- Tab 1: 登入已有帳號 ---
+            with tab_login:
+                if registered_users_list:
+                    st.markdown("請選擇您的帳號名稱進行登入：")
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        login_selected = st.selectbox(
+                            "已註冊帳號列表",
+                            options=["-- 請選擇您的帳號 --"] + registered_users_list,
+                            key="select_exist_user"
+                        )
+                    with c2:
+                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                        if st.button("🔑 確定登入", key="btn_login_select", use_container_width=True, type="primary"):
+                            if login_selected and login_selected != "-- 請選擇您的帳號 --":
+                                st.session_state["user_name"] = login_selected
+                                st.query_params["user"] = login_selected
+                                st.success(f"✅ 成功登入帳號：{login_selected}")
+                                st.rerun()
+                            else:
+                                st.error("請選擇有效的帳號！")
+                else:
+                    st.info("目前尚無任何已註冊帳號。請切換至「註冊新帳號」建立您的第一個帳號！")
+            
+            # --- Tab 2: 註冊新帳號 ---
+            with tab_register:
+                st.markdown("請輸入您要註冊的新名字 / 帳號：")
+                cr1, cr2 = st.columns([3, 1])
+                with cr1:
+                    new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex、小明...")
+                with cr2:
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("✨ 註冊帳號", key="btn_register_new", use_container_width=True, type="primary"):
+                        clean_reg = new_reg_name.strip()
+                        if not clean_reg:
+                            st.error("帳號名字不能為空！")
+                        elif clean_reg in registered_map:
+                            st.error(f"⛔ **註冊失敗**：帳號名字「**{clean_reg}**」已被其他使用者註冊佔用！請更換其他名字或切換至「登入已有帳號」。")
+                        else:
+                            st.session_state["user_name"] = clean_reg
+                            st.query_params["user"] = clean_reg
+                            st.success(f"🎉 帳號「{clean_reg}」設定成功！建立並儲存計畫後將正式完成註冊。")
+                            st.rerun()
 
     st.markdown("---")
     
     user_name = st.session_state.get("user_name", "").strip()
     
-    # 如果名字為空白，下方不顯示任何計畫 (每個名字對應各自創立的計畫)
+    # 如果名字為空白 (未登入)，下方不顯示任何計畫 (每個名字對應各自創立的計畫)
     if not user_name:
-        st.warning("🔒 目前未載入使用者身份。請先在上方欄位輸入您的名字/帳號並點擊「儲存名字」，才會顯示您的個人讀書計畫。")
+        st.warning("🔒 目前處於未登入狀態。請先在上方「登入已有帳號」或「註冊新帳號」，即可載入您的專屬讀書計畫。")
         return
 
     plans = storage.load_all_plans()
