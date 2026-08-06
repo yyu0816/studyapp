@@ -923,25 +923,27 @@ def apply_custom_theme() -> None:
     /* 1. 主體背景與預設文字顏色 */
     .stApp, [data-testid="stAppViewContainer"] {{
         background-color: {bg_color} !important;
+        background: {bg_color} !important;
         color: {card_text} !important;
     }}
     
-    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form) 內部全面實心填滿顏色 (白/黑)，與選單按鈕一致 */
+    /* 2. 徹底重寫所有外框容器 (st.container(border=True), st.expander, st.form, 邊框區塊) 內部填滿純白/純黑背景 */
     div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stVerticalBlockBorderWrapper"] > div,
     div[data-testid="stVerticalBlockBorderWrapper"] div,
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="element-container"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"],
-    details[data-testid="stExpander"],
-    details[data-testid="stExpander"] summary,
-    details[data-testid="stExpander"] div,
-    div[data-testid="stForm"],
-    div[data-testid="stForm"] div,
+    div[data-testid="stVerticalBlockBorderWrapper"] div[class*="st-"],
     [data-testid="stBorderWrapper"],
-    [data-testid="stBorderWrapper"] div {{
+    [data-testid="stBorderWrapper"] > div,
+    [data-testid="stBorderWrapper"] div,
+    [data-testid="stBorderWrapper"] div[class*="st-"],
+    div[data-testid="stForm"],
+    div[data-testid="stForm"] > div,
+    div[data-testid="stForm"] div,
+    details[data-testid="stExpander"],
+    details[data-testid="stExpander"] > div,
+    details[data-testid="stExpander"] summary {{
         background-color: {card_bg} !important;
+        background: {card_bg} !important;
         color: {card_text} !important;
     }}
     
@@ -953,12 +955,13 @@ def apply_custom_theme() -> None:
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
         background-color: {card_bg} !important;
+        background: {card_bg} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
-        overflow: hidden !important;
     }}
     
     summary[data-testid="stExpanderSummary"] {{
         background-color: {card_bg} !important;
+        background: {card_bg} !important;
         color: {card_text} !important;
     }}
     
@@ -967,6 +970,7 @@ def apply_custom_theme() -> None:
     div[data-baseweb="select"] > div,
     div[data-baseweb="textarea"] {{
         background-color: {input_bg} !important;
+        background: {input_bg} !important;
         color: {input_text} !important;
         border-color: {border_color} !important;
     }}
@@ -977,6 +981,7 @@ def apply_custom_theme() -> None:
     /* 4. 精確覆蓋頂部第一列主選單塊 (頂部橫向主選單) */
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
         background-color: {navbar_bg_color} !important;
+        background: {navbar_bg_color} !important;
         padding: 12px 16px !important;
         border-radius: 12px !important;
         margin-bottom: 20px !important;
@@ -986,6 +991,7 @@ def apply_custom_theme() -> None:
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"],
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
         background-color: transparent !important;
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
     }}
@@ -994,6 +1000,7 @@ def apply_custom_theme() -> None:
     button[kind="primary"],
     button[data-testid="stBaseButton-primary"] {{
         background-color: {button_color} !important;
+        background: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
@@ -1001,6 +1008,7 @@ def apply_custom_theme() -> None:
     button[kind="secondary"],
     button[data-testid="stBaseButton-secondary"] {{
         background-color: {sec_btn_bg} !important;
+        background: {sec_btn_bg} !important;
         color: {sec_btn_text} !important;
         border: 1px solid {border_color} !important;
     }}
@@ -1014,6 +1022,7 @@ def apply_custom_theme() -> None:
     button div,
     button span {{
         background-color: transparent !important;
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
     }}
