@@ -921,41 +921,41 @@ def apply_custom_theme() -> None:
     css = f"""
     <style>
     /* 1. 主體背景與預設文字顏色 */
-    .stApp {{
+    .stApp, [data-testid="stAppViewContainer"] {{
         background-color: {bg_color} !important;
         color: {card_text} !important;
     }}
     
-    /* 2. 所有帶框容器 (st.container(border=True), st.expander, st.form) 框內強制填滿純白/純黑背景 */
+    /* 2. 所有外框容器 (st.container(border=True), st.expander, st.form, 邊框區塊) 內部強制作全純白/純黑填滿 */
     div[data-testid="stVerticalBlockBorderWrapper"],
-    div[data-testid="stVerticalBlockBorderWrapper"] > div,
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"],
-    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="element-container"],
-    details[data-testid="stExpander"],
-    details[data-testid="stExpander"] > summary,
-    details[data-testid="stExpander"] div,
+    div[data-testid="stVerticalBlockBorderWrapper"] *,
     div[data-testid="stForm"],
-    div[data-testid="stForm"] > div {{
+    div[data-testid="stForm"] *,
+    details[data-testid="stExpander"],
+    details[data-testid="stExpander"] *,
+    [data-testid="stBorderWrapper"],
+    [data-testid="stBorderWrapper"] * {{
         background-color: {card_bg} !important;
-        border-color: {border_color} !important;
         color: {card_text} !important;
     }}
-    div[data-testid="stVerticalBlockBorderWrapper"] {{
+    
+    /* 設定邊框樣式 */
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stForm"],
+    details[data-testid="stExpander"],
+    [data-testid="stBorderWrapper"] {{
         border: 1px solid {border_color} !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
-        overflow: hidden !important;
     }}
     
-    summary[data-testid="stExpanderSummary"] {{
+    summary[data-testid="stExpanderSummary"],
+    summary[data-testid="stExpanderSummary"] * {{
         background-color: {card_bg} !important;
         color: {card_text} !important;
-        border-radius: 12px !important;
     }}
     
-    /* 3. 輸入框與選項元件背景色與文字色 */
+    /* 3. 輸入框與選項元件背景色 */
     div[data-baseweb="input"],
     div[data-baseweb="select"] > div,
     div[data-baseweb="textarea"] {{
@@ -968,29 +968,28 @@ def apply_custom_theme() -> None:
     }}
 
     /* 4. 精確覆蓋頂部第一列主選單塊的背景色 (navbar_bg_color) */
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type,
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type * {{
         background-color: {navbar_bg_color} !important;
+    }}
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
         padding: 12px 16px !important;
         border-radius: 12px !important;
         margin-bottom: 20px !important;
         border: 1px solid {border_color} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
     }}
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"] {{
-        background-color: transparent !important;
-    }}
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
-        background-color: transparent !important;
-    }}
     
-    /* 5. 按鈕顏色 */
-    button[kind="primary"] {{
+    /* 5. 按鈕顏色獨立防護 */
+    button[kind="primary"],
+    button[kind="primary"] * {{
         background-color: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
     }}
-    button[kind="secondary"] {{
+    button[kind="secondary"],
+    button[kind="secondary"] * {{
         background-color: {sec_btn_bg} !important;
         color: {sec_btn_text} !important;
         border: 1px solid {border_color} !important;
