@@ -1081,16 +1081,29 @@ def render_home_page() -> None:
     else:
         render_daily_checkin_page()
 
+def get_registered_users_map() -> dict[str, int]:
+    """Returns a map of owner_name -> plan_count for users who have created & saved at least 1 plan."""
+    plans = storage.load_all_plans()
+    user_counts = {}
+    for pdata in plans.values():
+        owner = pdata.get("owner_name")
+        if owner and owner.strip():
+            clean = owner.strip()
+            user_counts[clean] = user_counts.get(clean, 0) + 1
+    return user_counts
+
 def render_start_page():
     st.title("📚 我的讀書計畫")
     
-    # 1. 使用者名字輸入與持久化儲存區塊
+    registered_map = get_registered_users_map()
     curr_user = st.session_state.get("user_name", "")
+    
+    # 1. 使用者名字輸入與登記狀態檢查區塊
     with st.container(border=True):
-        st.markdown("#### 👤 個人身份與紀錄自動儲存")
+        st.markdown("#### 👤 個人身份與帳號擁有權說明")
         col_input, col_save = st.columns([3, 1])
         with col_input:
-            input_name = st.text_input("請輸入您的名字 / 帳號 (儲存後網頁將為您保留資料狀態)", value=curr_user, key="start_page_user_input", placeholder="例如：Alex、小明...")
+            input_name = st.text_input("請輸入您的名字 / 帳號", value=curr_user, key="start_page_user_input", placeholder="例如：Alex、小明...")
         with col_save:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
             if st.button("💾 儲存名字", key="btn_save_user_name", use_container_width=True):
@@ -1102,8 +1115,24 @@ def render_start_page():
                     del st.query_params["user"]
                 st.rerun()
 
+        # 即時重複姓名與使用權狀態通知 (Duplicate Name Notification)
+        check_name = input_name.strip()
+        if check_name:
+            if check_name in registered_map:
+                plan_cnt = registered_map[check_name]
+                if check_name == curr_user:
+                    st.success(f"✅ 帳號驗證成功：**{check_name}** 已擁有使用權（已有 {plan_cnt} 筆儲存計畫）。")
+                else:
+                    st.warning(f"⚠️ **姓名重複通知**：名字「**{check_name}**」已被登記使用（已有 {plan_cnt} 筆儲存計畫）。若這是您的帳號請確認登入，否則請更換其他名字。")
+            else:
+                st.info(f"💡 名字「**{check_name}**」目前尚未被登記使用。建立並儲存第一個計畫後，您將正式獲得「{check_name}」的使用權！")
+
     if st.session_state.get("user_name"):
-        st.success(f"👋 歡迎回來，**{st.session_state['user_name']}**！以下是您的專屬讀書計畫：")
+        user_name = st.session_state["user_name"].strip()
+        if user_name in registered_map:
+            st.success(f"👋 歡迎回來，**{user_name}**！以下是您的專屬讀書計畫：")
+        else:
+            st.info(f"👋 歡迎您，**{user_name}**！目前尚未建立計畫，點擊下方「➕ 建立新計畫」即可正式登記並擁有「{user_name}」的使用權。")
     else:
         st.info("💡 提示：請先在上方輸入您的名字/帳號並點擊「儲存名字」，系統會為您載入專屬計畫與自動保存資料！")
 
