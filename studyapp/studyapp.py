@@ -830,7 +830,7 @@ def render_setup_page() -> None:
             "plan_goal": st.session_state.get("plan_goal", ""),
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
-            "preferred_subject_count": preferred_subject_count,
+            "preferred_subject_count": st.session_state.get("preferred_subject_count", 0),
             "subjects": st.session_state["subjects"],
             "fixed_events": st.session_state["fixed_events"],
             "specific_events": st.session_state["specific_events"],
