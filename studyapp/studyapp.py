@@ -1128,38 +1128,31 @@ def render_start_page():
             
             # --- Tab 1: 登入已有帳號 ---
             with tab_login:
-                all_users_keys = sorted(list(set(registered_users_list + list(storage.load_all_users().keys()))))
-                if all_users_keys:
-                    st.markdown("請選擇帳號並輸入密碼（密碼限英文與數字）：")
-                    c1, c2, c3 = st.columns([2, 2, 1])
-                    with c1:
-                        login_selected = st.selectbox(
-                            "帳號名稱",
-                            options=["-- 請選擇帳號 --"] + all_users_keys,
-                            key="select_exist_user"
-                        )
-                    with c2:
-                        login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
-                    with c3:
-                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                        if st.button("🔑 確定登入", key="btn_login_select", use_container_width=True, type="primary"):
-                            if not login_selected or login_selected == "-- 請選擇帳號 --":
-                                st.error("請選擇有效的帳號！")
-                            elif not login_password:
-                                st.error("請輸入密碼！")
-                            elif not storage.is_alphanumeric(login_password):
-                                st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
+                st.markdown("請輸入您的帳號名稱與密碼（密碼限英文與數字）：")
+                c1, c2, c3 = st.columns([2, 2, 1])
+                with c1:
+                    login_username = st.text_input("帳號名稱", key="input_login_username", placeholder="請輸入您的帳號名稱...")
+                with c2:
+                    login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
+                with c3:
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("🔑 確定登入", key="btn_login_submit", use_container_width=True, type="primary"):
+                        clean_user = login_username.strip()
+                        if not clean_user:
+                            st.error("請輸入帳號名稱！")
+                        elif not login_password:
+                            st.error("請輸入密碼！")
+                        elif not storage.is_alphanumeric(login_password):
+                            st.error("❌ 密碼格式錯誤：密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)！")
+                        else:
+                            ok, msg = storage.verify_user_credentials(clean_user, login_password)
+                            if ok:
+                                st.session_state["user_name"] = clean_user
+                                st.query_params["user"] = clean_user
+                                st.success(f"✅ {msg}")
+                                st.rerun()
                             else:
-                                ok, msg = storage.verify_user_credentials(login_selected, login_password)
-                                if ok:
-                                    st.session_state["user_name"] = login_selected
-                                    st.query_params["user"] = login_selected
-                                    st.success(f"✅ {msg}")
-                                    st.rerun()
-                                else:
-                                    st.error(f"❌ 登入失敗：{msg}")
-                else:
-                    st.info("目前尚無任何已註冊帳號。請切換至「註冊新帳號」建立您的第一個帳號！")
+                                st.error(f"❌ 登入失敗：{msg}")
             
             # --- Tab 2: 註冊新帳號 ---
             with tab_register:
