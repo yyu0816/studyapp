@@ -607,14 +607,12 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
     week_map = {"星期一": 0, "星期二": 1, "星期三": 2, "星期四": 3, "星期五": 4, "星期六": 5, "星期日": 6,
                 "週一": 0, "週二": 1, "週三": 2, "週四": 3, "週五": 4, "週六": 5, "週日": 6}
 
-    # 計算有效天數與緩衝天數 (八二法則)
-    effective_days = math.floor(total_days * 0.8)
-    effective_end_date = start_date + timedelta(days=max(0, effective_days - 1))
+    # 2. 將每個科目的教材進度，平攤分佈在計畫期間的有效讀書日中 (避免前面爆量、後面全空)
+    mat_daily_map: dict[datetime.date, list[dict[str, Any]]] = {}
 
-    # 2. 為每個科目安排日期 (逆向推算)
-    subject_schedules = []
     for subject in subjects_data:
         subj_name = subject.get("name", "未命名科目")
+        subj_color = subject.get("color", "#4f84ff")
         materials = subject.get("materials", [])
         
         exam_date_str = subject.get("exam_date")
@@ -629,142 +627,55 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
         prefs_raw = subject.get("weekdays", [])
         prefs_idx = [week_map[p] for p in prefs_raw if p in week_map]
         
-        # Rule C: 如果只有一天偏好，自動增加一天 (相隔 3 天)
-        if len(prefs_idx) == 1:
-            added_idx = (prefs_idx[0] + 3) % 7
-            prefs_idx.append(added_idx)
+        # 該科目的有效可讀書日 (從排程起點至考試日/結束日)
+        deadline = min(exam_date, end_date)
+        valid_dates = []
+        curr = scheduling_start_date
+        while curr <= deadline:
+            if daily_sessions.get(curr, {}).get("sessions", 0) > 0:
+                if not prefs_idx or curr.weekday() in prefs_idx:
+                    valid_dates.append(curr)
+            curr += timedelta(days=1)
             
-        target_dates = []
-        days_since_last_scheduled = 0
-        
-        curr_d = exam_date - timedelta(days=1)
-        while curr_d >= start_date:
-            if curr_d > end_date:
-                curr_d -= timedelta(days=1)
-                continue
-                
-            days_to_exam = (exam_date - curr_d).days
-            should_schedule = False
-            
-            if days_to_exam <= 7:
-                # 考前一週：每2天排一次 (衝刺期不受緩衝日限制)
-                if days_since_last_scheduled >= 2 or len(target_dates) == 0:
-                    should_schedule = True
-            else:
-                # 長期備戰期：必須在 effective_end_date 之前才排程，保留後面的全域緩衝日
-                if curr_d <= effective_end_date:
-                    if prefs_idx:
-                        # 依據偏好
-                        if curr_d.weekday() in prefs_idx:
-                            should_schedule = True
-                    else:
-                        # 無偏好：每2天排一次
-                        if days_since_last_scheduled >= 2:
-                            should_schedule = True
-                        
-            if should_schedule:
-                target_dates.append(curr_d)
-                days_since_last_scheduled = 0
-            else:
-                days_since_last_scheduled += 1
-                
-            curr_d -= timedelta(days=1)
-            
-        target_dates.reverse() # 照時間順序
-        
-        # 處理教材進度
+        if not valid_dates:
+            valid_dates = [d for d in sorted(daily_sessions.keys()) if d <= deadline and daily_sessions[d]["sessions"] > 0]
+        if not valid_dates:
+            valid_dates = [scheduling_start_date]
+
         for mat in materials:
             mat_type = mat.get("type", "其他")
             mat_name = mat.get("name", "未命名教材")
             qty = int(mat.get("quantity", 0))
             unit = UNIT_MAP.get(mat_type, "項")
-            if qty > 0:
-                past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
-                remaining_qty = max(0, qty - past_qty)
-                
-                subject_schedules.append({
-                    "subject": subj_name,
-                    "color": subject.get("color", "#4f84ff"),
-                    "material": mat_name,
-                    "unit": unit,
-                    "target_dates": list(target_dates),
-                    "remaining_qty": remaining_qty,
-                    "assigned_count": 0
-                })
-                
-    # 3. 根據總空閒時間，計算每個教材真正該分配到的節數 (確保份量極大化平攤)
-    num_materials = len(subject_schedules)
-    if num_materials > 0:
-        base_session = total_sessions // num_materials
-        remainder = total_sessions % num_materials
-        for i, sp in enumerate(subject_schedules):
-            alloc = base_session + (1 if i < remainder else 0)
-            if sp["remaining_qty"] > 0:
-                alloc = min(alloc, sp["remaining_qty"])
-            sp["remaining_sessions"] = alloc
-            sp["assigned_count"] = 0
+            if qty <= 0:
+                continue
 
-    # 4. 分數優先級貪婪排程 (Score-based Slot Allocator)
-    curr_d = scheduling_start_date
-    last_scheduled_subject = None
-    
-    while curr_d <= end_date:
-        d_info = daily_sessions.get(curr_d)
-        if not d_info or d_info["sessions"] == 0:
-            curr_d += timedelta(days=1)
-            continue
-            
-        scheduled_today = []
-        for _ in range(d_info["sessions"]):
-            best_sp = None
-            best_score = -999999
-            
-            for sp in subject_schedules:
-                if sp["remaining_sessions"] <= 0:
-                    continue
-                    
-                # 基礎分數：剩餘節數越多越優先
-                score = sp["remaining_sessions"] * 10
-                
-                # 目標日加分：如果是演算法推算出來的理想讀書日
-                if curr_d in sp["target_dates"]:
-                    score += 1000
-                    
-                # 同日重複懲罰：強迫科目分散到不同天，避免一天讀 100 頁
-                count_today = scheduled_today.count(sp["subject"])
-                score -= 2000 * count_today
-                
-                # 連續懲罰：避免同一天連續讀同一科 (雖然有了同日懲罰，這作為微調)
-                if sp["subject"] == last_scheduled_subject:
-                    score -= 50
-                    
-                if score > best_score:
-                    best_score = score
-                    best_sp = sp
-                    
-            if best_sp:
-                d_info["scheduled"].append(best_sp)
-                scheduled_today.append(best_sp["subject"])
-                best_sp["remaining_sessions"] -= 1
-                best_sp["assigned_count"] += 1
-                last_scheduled_subject = best_sp["subject"]
+            past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
+            remaining_qty = max(0, qty - past_qty)
+            if remaining_qty <= 0:
+                continue
+
+            num_days = len(valid_dates)
+            if remaining_qty <= num_days:
+                # 頁數小於天數：均勻間隔安排在各天 (每天 1 單位)
+                step = num_days / remaining_qty
+                for i in range(remaining_qty):
+                    idx = min(int(i * step), num_days - 1)
+                    d = valid_dates[idx]
+                    mat_daily_map.setdefault(d, []).append({
+                        "subject": subj_name, "color": subj_color, "material": mat_name, "unit": unit, "qty": 1
+                    })
             else:
-                break # 所有科目都排完了
-                
-        curr_d += timedelta(days=1)
+                # 頁數大於天數：平攤分配到每一天 (例如 100 頁 / 30 天 = 每天 3~4 頁)
+                base = remaining_qty // num_days
+                rem = remaining_qty % num_days
+                for i, d in enumerate(valid_dates):
+                    q = base + (1 if i < rem else 0)
+                    mat_daily_map.setdefault(d, []).append({
+                        "subject": subj_name, "color": subj_color, "material": mat_name, "unit": unit, "qty": q
+                    })
 
-    # 5. 計算每個科目真正被分配到的陣列 (確保所有量都被完美分攤到獲取的天數上)
-    for sp in subject_schedules:
-        qty = sp["remaining_qty"]
-        allocated = sp["assigned_count"]
-        if allocated > 0:
-            base_prog = qty // allocated
-            rem_prog = qty % allocated
-            sp["progress_array"] = [base_prog + 1 if i < rem_prog else base_prog for i in range(allocated)]
-        else:
-            sp["progress_array"] = []
-
-    # 6. 產生最終排程
+    # 3. 產生最終每日每時段排程
     schedule = list(past_schedule_output)
     curr_d = scheduling_start_date
     
@@ -776,7 +687,7 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
             continue
             
         d_str = curr_d.strftime("%Y-%m-%d")
-        scheduled_items = d_info["scheduled"]
+        day_tasks = mat_daily_map.get(curr_d, [])
         s_count = d_info["sessions"]
         
         for session_idx in range(1, s_count + 1):
@@ -784,17 +695,8 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
             start_str = f"{slot[0]//60:02d}:{slot[0]%60:02d}"
             end_str = f"{slot[1]//60:02d}:{slot[1]%60:02d}"
             
-            if session_idx - 1 < len(scheduled_items):
-                sp = scheduled_items[session_idx - 1]
-                
-                if sp["progress_array"]:
-                    progress_val = sp["progress_array"].pop(0)
-                else:
-                    progress_val = 0
-                
-                progress_str = f"{progress_val} {sp['unit']}"
-                sp["remaining_qty"] -= progress_val
-
+            if session_idx - 1 < len(day_tasks):
+                task = day_tasks[session_idx - 1]
                 schedule.append({
                     "date": d_str,
                     "第幾天": f"Day {day_idx + 1}",
@@ -802,16 +704,16 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
                     "學習區塊": f"第 {session_idx} 節 (1小時)",
                     "start_time": start_str,
                     "end_time": end_str,
-                    "科目": sp["subject"],
-                    "color": sp["color"],
-                    "教材": sp["material"],
-                    "目標進度": progress_str
+                    "科目": task["subject"],
+                    "color": task["color"],
+                    "教材": task["material"],
+                    "目標進度": f"{task['qty']} {task['unit']}"
                 })
             else:
                 schedule.append({
                     "date": d_str,
                     "第幾天": f"Day {day_idx + 1}",
-                    "屬性": "緩衝/總複習日",
+                    "屬性": "複習/自由安排",
                     "學習區塊": f"第 {session_idx} 節 (1小時)",
                     "start_time": start_str,
                     "end_time": end_str,
