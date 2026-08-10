@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 import streamlit as st
+import streamlit.components.v1 as components
 import dashboard
 
 import importlib
@@ -619,7 +620,7 @@ def render_setup_page() -> None:
     if "plan_name" not in st.session_state: st.session_state["plan_name"] = ""
     if "plan_goal" not in st.session_state: st.session_state["plan_goal"] = ""
 
-    st.session_state["plan_name"] = st.text_input("讀書計畫名稱", value=st.session_state["plan_name"])
+    st.session_state["plan_name"] = st.text_input("讀書計畫名稱", value=st.session_state["plan_name"], autocomplete="new-password")
     st.session_state["plan_goal"] = st.text_area("計畫目標", value=st.session_state["plan_goal"], placeholder="進入班排前十、書卷獎、比上次進步五名...")
 
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
@@ -635,7 +636,7 @@ def render_setup_page() -> None:
             st.markdown(f"### 科目 {idx + 1}")
             sc1, sc2 = st.columns([3, 1])
             with sc1:
-                name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}")
+                name_value = st.text_input("科目名稱", value=subject.get("name", ""), key=f"subject_name_{idx}", autocomplete="new-password")
                 st.session_state["subjects"][idx]["name"] = name_value
             with sc2:
                 if f"subject_color_{idx}" not in st.session_state:
@@ -647,7 +648,7 @@ def render_setup_page() -> None:
                         st.session_state[f"subject_color_{i}"] = hex_val
                     
                 color_val = st.color_picker("科目代表色", key=f"subject_color_{idx}")
-                st.text_input("或輸入色號", value=color_val, key=f"subj_hex_in_{idx}", on_change=_update_subj_color, kwargs={"i": idx})
+                st.text_input("或輸入色號", value=color_val, key=f"subj_hex_in_{idx}", autocomplete="new-password", on_change=_update_subj_color, kwargs={"i": idx})
                 st.session_state["subjects"][idx]["color"] = st.session_state[f"subject_color_{idx}"]
 
             materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1}])
@@ -656,7 +657,7 @@ def render_setup_page() -> None:
                 selected_type = effective_type if effective_type in MATERIAL_TYPES else "其他"
                 cols = st.columns([2, 1.2, 1.2, 0.8])
                 with cols[0]:
-                    material_name = st.text_input("教材名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}")
+                    material_name = st.text_input("教材名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}", autocomplete="new-password")
                     st.session_state["subjects"][idx]["materials"][mid]["name"] = material_name
                 with cols[1]:
                     material_type = st.selectbox(
@@ -671,6 +672,7 @@ def render_setup_page() -> None:
                             "其他類型",
                             value=custom_type_value,
                             key=f"subject_{idx}_material_custom_{mid}",
+                            autocomplete="new-password",
                         )
                         effective_type = custom_type_value.strip() or "其他"
                     else:
@@ -744,7 +746,7 @@ def render_setup_page() -> None:
 
     for idx, event in enumerate(st.session_state["fixed_events"]):
         with st.container():
-            title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"event_title_{idx}")
+            title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"event_title_{idx}", autocomplete="new-password")
             weekdays_value = render_weekday_selector("星期", event.get("weekdays", []), f"event_{idx}")
             
             st_col, end_col = st.columns(2)
@@ -794,7 +796,7 @@ def render_setup_page() -> None:
     
     for idx, event in enumerate(st.session_state["specific_events"]):
         with st.container():
-            title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"specific_event_title_{idx}")
+            title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"specific_event_title_{idx}", autocomplete="new-password")
             
             d_col1, d_col2 = st.columns(2)
             with d_col1:
@@ -1163,9 +1165,9 @@ def apply_custom_theme() -> None:
         function disableAutofill() {
             try {
                 const root = window.parent ? window.parent.document : document;
-                const inputs = root.querySelectorAll('input:not([type="submit"]):not([type="button"]), textarea');
+                const inputs = root.querySelectorAll('input, textarea');
                 inputs.forEach(el => {
-                    el.setAttribute('autocomplete', 'off');
+                    el.setAttribute('autocomplete', 'new-password');
                     el.setAttribute('autocorrect', 'off');
                     el.setAttribute('autocapitalize', 'off');
                     el.setAttribute('spellcheck', 'false');
@@ -1182,7 +1184,7 @@ def apply_custom_theme() -> None:
     })();
     </script>
     """
-    st.markdown(js, unsafe_allow_html=True)
+    components.html(js, height=0, width=0)
 
 
 def render_home_page() -> None:
@@ -1311,9 +1313,9 @@ def render_start_page():
                     st.markdown("請輸入您的帳號名稱與密碼（輸入完畢按 **Enter 鍵** 或點擊按鈕即可送出）：")
                     c1, c2, c3 = st.columns([2, 2, 1])
                     with c1:
-                        login_username = st.text_input("帳號名稱", key="input_login_username", placeholder="請輸入您的帳號名稱...")
+                        login_username = st.text_input("帳號名稱", key="input_login_username", autocomplete="new-password", placeholder="請輸入您的帳號名稱...")
                     with c2:
-                        login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password")
+                        login_password = st.text_input("密碼 (限英文與數字)", type="password", key="input_login_password", autocomplete="new-password")
                     with c3:
                         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                         login_submitted = st.form_submit_button("🔑 確定登入", use_container_width=True, type="primary")
@@ -1362,7 +1364,7 @@ def render_start_page():
                         
                         f_email_col, f_send_col = st.columns([3, 1])
                         with f_email_col:
-                            f_email = st.text_input("註冊時綁定的 Gmail 帳號：", key="input_f_email", placeholder="例如：yourname@gmail.com")
+                            f_email = st.text_input("註冊時綁定的 Gmail 帳號：", key="input_f_email", autocomplete="new-password", placeholder="例如：yourname@gmail.com")
                         with f_send_col:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                             if st.button("📨 發送驗證信", key="btn_send_user_code", use_container_width=True):
@@ -1390,7 +1392,7 @@ def render_start_page():
                             st.info(f"📨 驗證信已寄出至 **{verify_info['email']}**，請在下方輸入 6 碼驗證碼：")
                             v1, v2 = st.columns([2, 1])
                             with v1:
-                                user_input_code = st.text_input("請輸入 6 碼驗證碼：", key="input_user_vcode", max_chars=6, placeholder="6位數字驗證碼")
+                                user_input_code = st.text_input("請輸入 6 碼驗證碼：", key="input_user_vcode", autocomplete="new-password", max_chars=6, placeholder="6位數字驗證碼")
                             with v2:
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                                 if st.button("✅ 驗證身分並顯示帳號", key="btn_check_user_vcode", type="primary", use_container_width=True):
@@ -1409,9 +1411,9 @@ def render_start_page():
                         
                         r_user_col, r_email_col, r_send_col = st.columns([2, 2, 1])
                         with r_user_col:
-                            r_user = st.text_input("帳號名稱：", key="input_r_user", placeholder="請輸入欲重設密碼的帳號...")
+                            r_user = st.text_input("帳號名稱：", key="input_r_user", autocomplete="new-password", placeholder="請輸入欲重設密碼的帳號...")
                         with r_email_col:
-                            r_email = st.text_input("該帳號綁定的 Gmail：", key="input_r_email", placeholder="請輸入綁定的 Gmail...")
+                            r_email = st.text_input("該帳號綁定的 Gmail：", key="input_r_email", autocomplete="new-password", placeholder="請輸入綁定的 Gmail...")
                         with r_send_col:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                             if st.button("📨 發送驗證信", key="btn_send_pass_code", use_container_width=True):
@@ -1442,11 +1444,11 @@ def render_start_page():
                             st.info(f"📨 驗證信已寄出至 **{pass_verify_info['email']}**，請輸入 6 碼驗證碼並設定新密碼：")
                             pv1, pv2, pv3 = st.columns([1, 1, 1])
                             with pv1:
-                                pass_input_code = st.text_input("6 碼驗證碼：", key="input_pass_vcode", max_chars=6, placeholder="6位數字")
+                                pass_input_code = st.text_input("6 碼驗證碼：", key="input_pass_vcode", autocomplete="new-password", max_chars=6, placeholder="6位數字")
                             with pv2:
-                                new_pwd = st.text_input("設定新密碼 (限英數)：", type="password", key="input_reset_pwd")
+                                new_pwd = st.text_input("設定新密碼 (限英數)：", type="password", key="input_reset_pwd", autocomplete="new-password")
                             with pv3:
-                                new_pwd2 = st.text_input("確認新密碼：", type="password", key="input_reset_pwd2")
+                                new_pwd2 = st.text_input("確認新密碼：", type="password", key="input_reset_pwd2", autocomplete="new-password")
 
                             if (new_pwd and not storage.is_alphanumeric(new_pwd)) or (new_pwd2 and not storage.is_alphanumeric(new_pwd2)):
                                 st.warning("⚠️ **密碼格式提醒**：僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)。")
@@ -1475,15 +1477,15 @@ def render_start_page():
                     st.markdown("請設定您的新帳號與密碼，並綁定 Gmail 帳號（可用於日後忘記帳號或密碼時的驗證）：")
                     cr1, cr2 = st.columns(2)
                     with cr1:
-                        new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex...")
+                        new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", autocomplete="new-password", placeholder="例如：Alex...")
                     with cr2:
-                        new_reg_email = st.text_input("綁定 Gmail 帳號", key="input_new_reg_email", placeholder="例如：yourname@gmail.com")
+                        new_reg_email = st.text_input("綁定 Gmail 帳號", key="input_new_reg_email", autocomplete="new-password", placeholder="例如：yourname@gmail.com")
 
                     cr3, cr4, cr5 = st.columns([2, 2, 1])
                     with cr3:
-                        new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
+                        new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass", autocomplete="new-password")
                     with cr4:
-                        new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
+                        new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2", autocomplete="new-password")
                     with cr5:
                         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                         reg_submitted = st.form_submit_button("✨ 註冊帳號", use_container_width=True, type="primary")

@@ -93,7 +93,7 @@ def _trigger_reschedule_if_needed():
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
     _title_key = "_add_dlg_title"
-    title = st.text_input("行程名稱", key=_title_key)
+    title = st.text_input("行程名稱", key=_title_key, autocomplete="new-password")
 
     # Auto-sync end_date when start_date changes
     _sd_key = "_add_dlg_start"
@@ -139,7 +139,7 @@ def add_event_dialog(day_str: str):
                 st.session_state["add_dlg_cp"] = preset_color
             picked_color = st.color_picker("顏色", key="add_dlg_cp", label_visibility="collapsed")
         with c2:
-            hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("add_dlg_hex", "add_dlg_cp"))
+            hex_val = st.text_input("HEX", value=picked_color, key="add_dlg_hex", autocomplete="new-password", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("add_dlg_hex", "add_dlg_cp"))
             
         if hex_val.startswith("#") and len(hex_val) == 7:
             color = hex_val
@@ -221,7 +221,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     _title_key = "_edit_dlg_title"
     if _title_key not in st.session_state:
         st.session_state[_title_key] = title_orig
-    title = st.text_input("行程名稱", key=_title_key)
+    title = st.text_input("行程名稱", key=_title_key, autocomplete="new-password")
 
     _sd_key = "_edit_dlg_start"
     _ed_key = "_edit_dlg_end"
@@ -287,7 +287,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                 st.session_state["edit_dlg_cp"] = color_orig if color_orig.startswith("#") else preset_color
             picked_color = st.color_picker("顏色", key="edit_dlg_cp", label_visibility="collapsed")
         with c2:
-            hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("edit_dlg_hex", "edit_dlg_cp"))
+            hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", autocomplete="new-password", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("edit_dlg_hex", "edit_dlg_cp"))
             
         if hex_val.startswith("#") and len(hex_val) == 7:
             color = hex_val
