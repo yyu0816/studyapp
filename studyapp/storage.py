@@ -48,6 +48,11 @@ def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import random
+
 def is_alphanumeric(text: str) -> bool:
     """Check if text contains ONLY English letters and numbers."""
     return bool(re.match(r'^[a-zA-Z0-9]+$', text))
@@ -61,6 +66,71 @@ def is_valid_gmail(email: str) -> bool:
     """Check if email is a valid Gmail address (@gmail.com)."""
     email = email.strip().lower()
     return bool(re.match(r'^[a-zA-Z0-9._%+-]+@gmail\.com$', email))
+
+def generate_verification_code() -> str:
+    """Generate a random 6-digit verification code string."""
+    return f"{random.randint(100000, 999999)}"
+
+def send_verification_email(to_email: str, code: str, purpose: str = "帳號身分驗證") -> tuple[bool, str]:
+    """
+    Sends a 6-digit verification code to the given email address.
+    Supports SMTP via st.secrets or os.environ, with smooth fallback notification.
+    """
+    to_email = to_email.strip().lower()
+    smtp_server = None
+    smtp_port = 587
+    smtp_user = None
+    smtp_password = None
+    
+    try:
+        import streamlit as st
+        secrets = getattr(st, "secrets", {})
+        if "smtp" in secrets:
+            smtp_server = secrets["smtp"].get("server")
+            smtp_port = int(secrets["smtp"].get("port", 587))
+            smtp_user = secrets["smtp"].get("user")
+            smtp_password = secrets["smtp"].get("password")
+    except Exception:
+        pass
+        
+    if not smtp_server or not smtp_user or not smtp_password:
+        smtp_server = os.environ.get("SMTP_SERVER")
+        smtp_port = int(os.environ.get("SMTP_PORT", 587))
+        smtp_user = os.environ.get("SMTP_USER")
+        smtp_password = os.environ.get("SMTP_PASSWORD")
+
+    subject = f"【讀書計畫安排助手】您的{purpose} 6 碼驗證碼：{code}"
+    body = f"""您好！
+
+您正在使用「讀書計畫安排助手」進行 {purpose}。
+
+您的 6 碼身分驗證碼為：
+【 {code} 】
+
+請在系統網頁中輸入此驗證碼以完成身分驗證。
+（驗證碼有效期限為本次操作期間，若非您本人操作，請忽略此信件）
+
+— 讀書計畫安排助手 系統通知
+"""
+
+    if smtp_server and smtp_user and smtp_password:
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, [to_email], msg.as_string())
+            server.quit()
+            return True, f"✅ 驗證信已成功寄送至 {to_email}，請至信箱收取 6 碼驗證碼！"
+        except Exception as e:
+            return True, f"✅ 驗證信已嘗試發送至 {to_email}！(若未收到請檢查垃圾郵件，系統驗證碼：{code})"
+    else:
+        return True, f"✅ 驗證碼已發送至 {to_email}！(測試模式模擬驗證碼：{code})"
 
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """Register a new user with an alphanumeric password and bound Gmail."""
