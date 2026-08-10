@@ -344,11 +344,6 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                         c = ev.get("display_color", ev.get("color", "#4f84ff"))
                         events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{em} {t}">{em} {t}</div>'
 
-                # Aggregated study tasks (same subject & material combined)
-                if item and item.get("tasks"):
-                    for task_text in item["tasks"]:
-                        events_html += f'<div style="font-size:11px;font-weight:500;color:#2c3e50;padding:2px 5px;border-radius:4px;margin-top:2px;background:#eef5ff;border-left:3px solid #4f84ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{task_text}">📖 {task_text}</div>'
-
             if is_active:
                 cell_inner = f'{num_html}{events_html}'
                 row += (
