@@ -72,33 +72,50 @@ def generate_verification_code() -> str:
 
 def send_verification_email(to_email: str, code: str, purpose: str = "帳號身分驗證") -> tuple[bool, str]:
     """
-    Sends a 6-digit verification code via Brevo SMTP relay.
-    Brevo free plan: 300 emails/day, no custom domain required.
+    Sends a 6-digit verification code to the given email address.
+    Supports either [smtp] (e.g. Gmail App Password) or [brevo] in st.secrets.
     """
     to_email = to_email.strip().lower()
-    smtp_user = None      # Brevo 登入信笞（您的 Brevo 帳號 email）
-    smtp_key  = None      # Brevo SMTP Key（不是登入密碼）
-    from_email = None     # 已在 Brevo 驗證的寄件人信笞
+    
+    # Brevo configuration
+    brevo_user = None
+    brevo_key  = None
+    brevo_from = None
+    
+    # Standard SMTP (e.g., Gmail) configuration
+    smtp_server   = "smtp.gmail.com"
+    smtp_port     = 587
+    smtp_user     = None
+    smtp_password = None
 
     try:
         import streamlit as st
         secrets = getattr(st, "secrets", {})
         if "brevo" in secrets:
-            smtp_user  = secrets["brevo"].get("smtp_user")
-            smtp_key   = secrets["brevo"].get("smtp_key")
-            from_email = secrets["brevo"].get("from_email", smtp_user)
+            brevo_user = secrets["brevo"].get("smtp_user") or secrets["brevo"].get("login")
+            brevo_key  = secrets["brevo"].get("smtp_key") or secrets["brevo"].get("password")
+            brevo_from = secrets["brevo"].get("from_email", brevo_user)
+        if "smtp" in secrets:
+            smtp_server   = secrets["smtp"].get("server", "smtp.gmail.com")
+            smtp_port     = int(secrets["smtp"].get("port", 587))
+            smtp_user     = secrets["smtp"].get("user")
+            smtp_password = secrets["smtp"].get("password")
     except Exception:
         pass
 
-    if not smtp_user or not smtp_key:
-        smtp_user  = os.environ.get("BREVO_SMTP_USER")
-        smtp_key   = os.environ.get("BREVO_SMTP_KEY")
-        from_email = os.environ.get("BREVO_FROM_EMAIL", smtp_user)
+    if not brevo_user:
+        brevo_user = os.environ.get("BREVO_SMTP_USER")
+        brevo_key  = os.environ.get("BREVO_SMTP_KEY")
+        brevo_from = os.environ.get("BREVO_FROM_EMAIL", brevo_user)
 
-    if not smtp_user or not smtp_key:
-        return False, "❌ 發信失敗：尚未配置 Brevo SMTP 憑證。請在 Streamlit Secrets 設定 [brevo] 的 smtp_user 與 smtp_key。"
+    if not smtp_user:
+        smtp_server   = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port     = int(os.environ.get("SMTP_PORT", 587))
+        smtp_user     = os.environ.get("SMTP_USER")
+        smtp_password = os.environ.get("SMTP_PASSWORD")
 
-    from_email = (from_email or smtp_user).strip()
+    if not (brevo_user and brevo_key) and not (smtp_user and smtp_password):
+        return False, "❌ 發信失敗：尚未配置郵件發信憑證。請在 Streamlit Secrets 設定 [smtp]（Gmail 16位應用程式密碼）或 [brevo]。"
 
     subject = f"【讀書計畫安排助手】您的{purpose} 6 碼驗證碼"
     body = f"""您好！
@@ -118,19 +135,44 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 
     try:
         msg = EmailMessage()
-        msg["From"]    = f"讀書計畫安排助手 <{from_email}>"
-        msg["To"]      = to_email
-        msg["Subject"] = subject
-        msg.set_content(body)          # auto-encodes as quoted-printable UTF-8
+        
+        # 1. If standard SMTP (Gmail) is configured:
+        if smtp_user and smtp_password:
+            clean_user = str(smtp_user).strip()
+            clean_pass = str(smtp_password).replace(" ", "").strip()
+            msg["From"]    = f"讀書計畫安排助手 <{clean_user}>"
+            msg["To"]      = to_email
+            msg["Subject"] = subject
+            msg.set_content(body)
 
-        with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=15) as server:
-            server.starttls()
-            server.login(smtp_user.strip(), smtp_key.strip())
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
+            else:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
+                server.starttls()
+                
+            server.login(clean_user, clean_pass)
             server.send_message(msg)
+            server.quit()
+            return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
 
-        return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
+        # 2. If Brevo SMTP is configured:
+        elif brevo_user and brevo_key:
+            sender_addr = (brevo_from or brevo_user).strip()
+            msg["From"]    = f"讀書計畫安排助手 <{sender_addr}>"
+            msg["To"]      = to_email
+            msg["Subject"] = subject
+            msg.set_content(body)
+
+            with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=15) as server:
+                server.starttls()
+                server.login(str(brevo_user).strip(), str(brevo_key).replace(" ", "").strip())
+                server.send_message(msg)
+
+            return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
+
     except Exception as e:
-        return False, f"❌ 郵件發送失敗（錯誤：{str(e)}）"
+        return False, f"❌ 郵件發送失敗（錯誤：{str(e)}），請確認發信信箱權限、應用程式密碼或網路連線。"
 
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """Register a new user with an alphanumeric password and bound Gmail."""
