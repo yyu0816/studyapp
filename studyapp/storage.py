@@ -51,6 +51,8 @@ def hash_password(password: str) -> str:
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email.utils import formataddr
 import random
 
 def is_alphanumeric(text: str) -> bool:
@@ -120,9 +122,9 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = f"讀書計畫安排助手 <{smtp_user}>"
+        msg['From'] = formataddr((str(Header('讀書計畫安排助手', 'utf-8')), smtp_user))
         msg['To'] = to_email
-        msg['Subject'] = subject
+        msg['Subject'] = Header(subject, 'utf-8')
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
         if smtp_port == 465:
