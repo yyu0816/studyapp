@@ -52,13 +52,28 @@ def is_alphanumeric(text: str) -> bool:
     """Check if text contains ONLY English letters and numbers."""
     return bool(re.match(r'^[a-zA-Z0-9]+$', text))
 
-def register_user(username: str, password: str) -> tuple[bool, str]:
-    """Register a new user with an alphanumeric password."""
+def is_valid_email(email: str) -> bool:
+    """Check if email is a valid email format."""
+    email = email.strip().lower()
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
+
+def is_valid_gmail(email: str) -> bool:
+    """Check if email is a valid Gmail address (@gmail.com)."""
+    email = email.strip().lower()
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@gmail\.com$', email))
+
+def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
+    """Register a new user with an alphanumeric password and bound Gmail."""
     username = username.strip()
+    email = email.strip().lower()
     if not username:
         return False, "使用者名稱不能為空"
     if not is_alphanumeric(password):
         return False, "密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)"
+    if not email:
+        return False, "請輸入綁定的 Gmail 帳號"
+    if not is_valid_email(email):
+        return False, "Gmail 格式不正確 (例如：example@gmail.com)"
         
     users = load_all_users()
     if username in users:
@@ -66,10 +81,50 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
         
     users[username] = {
         "username": username,
+        "email": email,
         "password_hash": hash_password(password)
     }
     save_all_users(users)
     return True, "註冊成功"
+
+def find_usernames_by_email(email: str) -> list[str]:
+    """Find all usernames associated with a bound Gmail address."""
+    email = email.strip().lower()
+    if not email:
+        return []
+    users = load_all_users()
+    matched = []
+    for uname, udata in users.items():
+        if udata.get("email", "").strip().lower() == email:
+            matched.append(uname)
+    return matched
+
+def reset_user_password_with_email(username: str, email: str, new_password: str) -> tuple[bool, str]:
+    """Verify Gmail binding and reset password for a user."""
+    username = username.strip()
+    email = email.strip().lower()
+    if not username:
+        return False, "請輸入帳號名稱"
+    if not email:
+        return False, "請輸入綁定的 Gmail"
+    if not is_alphanumeric(new_password):
+        return False, "新密碼僅限使用英文字母 (A-Z, a-z) 與數字 (0-9)"
+        
+    users = load_all_users()
+    if username not in users:
+        return False, f"找不到帳號「{username}」"
+        
+    user_info = users[username]
+    bound_email = user_info.get("email", "").strip().lower()
+    if not bound_email:
+        return False, f"帳號「{username}」未綁定 Gmail，無法以此方式驗證"
+    if bound_email != email:
+        return False, "輸入的 Gmail 與該帳號綁定的 Gmail 不一致！"
+        
+    user_info["password_hash"] = hash_password(new_password)
+    users[username] = user_info
+    save_all_users(users)
+    return True, "密碼重設成功！請使用新密碼登入。"
 
 def verify_user_credentials(username: str, password: str) -> tuple[bool, str]:
     """Verify username and password for existing users. STRICTLY FORBIDS auto-creating new users on login."""

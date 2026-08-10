@@ -1246,10 +1246,10 @@ def render_start_page():
                         del st.query_params["plan_id"]
                     st.rerun()
     else:
-        # 未登入：提供「🔑 登入已有帳號」與「✨ 註冊新帳號」雙分頁
+        # 未登入：提供「🔑 登入已有帳號」、「✨ 註冊新帳號」與「🆘 忘記帳號/密碼」三頁籤
         with st.container(border=True):
             st.markdown("#### 🔐 使用者登入 / 註冊系統")
-            tab_login, tab_register = st.tabs(["🔑 登入已有帳號", "✨ 註冊新帳號"])
+            tab_login, tab_register, tab_forgot = st.tabs(["🔑 登入已有帳號", "✨ 註冊新帳號", "🆘 忘記帳號 / 密碼"])
             
             # --- Tab 1: 登入已有帳號 ---
             with tab_login:
@@ -1288,15 +1288,19 @@ def render_start_page():
             # --- Tab 2: 註冊新帳號 ---
             with tab_register:
                 with st.form(key="form_register", border=False):
-                    st.markdown("請設定您的新帳號與密碼（輸入完畢按 **Enter 鍵** 或點擊按鈕即可送出）：")
-                    cr1, cr2, cr3, cr4 = st.columns([2, 2, 2, 1])
+                    st.markdown("請設定您的新帳號與密碼，並綁定 Gmail 帳號（可用於日後忘記帳號或密碼時的驗證）：")
+                    cr1, cr2 = st.columns(2)
                     with cr1:
                         new_reg_name = st.text_input("新帳號名字", key="input_new_reg_name", placeholder="例如：Alex...")
                     with cr2:
-                        new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
+                        new_reg_email = st.text_input("綁定 Gmail 帳號", key="input_new_reg_email", placeholder="例如：yourname@gmail.com")
+
+                    cr3, cr4, cr5 = st.columns([2, 2, 1])
                     with cr3:
-                        new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
+                        new_reg_pass = st.text_input("設定密碼 (限英文與數字)", type="password", key="input_new_reg_pass")
                     with cr4:
+                        new_reg_pass2 = st.text_input("確認密碼", type="password", key="input_new_reg_pass2")
+                    with cr5:
                         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                         reg_submitted = st.form_submit_button("✨ 註冊帳號", use_container_width=True, type="primary")
 
@@ -1305,8 +1309,13 @@ def render_start_page():
 
                 if reg_submitted:
                     clean_reg = new_reg_name.strip()
+                    clean_email = new_reg_email.strip().lower()
                     if not clean_reg:
                         st.error("帳號名字不能為空！")
+                    elif not clean_email:
+                        st.error("請輸入欲綁定的 Gmail 帳號！")
+                    elif not storage.is_valid_email(clean_email):
+                        st.error("Gmail 格式不正確，請輸入有效的 Email 地址 (例如：example@gmail.com)！")
                     elif not new_reg_pass:
                         st.error("請設定密碼！")
                     elif not storage.is_alphanumeric(new_reg_pass):
@@ -1314,14 +1323,73 @@ def render_start_page():
                     elif new_reg_pass != new_reg_pass2:
                         st.error("❌ 兩次輸入的密碼不一致！")
                     else:
-                        ok, msg = storage.register_user(clean_reg, new_reg_pass)
+                        ok, msg = storage.register_user(clean_reg, new_reg_pass, clean_email)
                         if ok:
                             st.session_state["user_name"] = clean_reg
                             st.query_params["user"] = clean_reg
-                            st.success(f"🎉 帳號「{clean_reg}」註冊成功！")
+                            st.success(f"🎉 帳號「{clean_reg}」註冊成功，並已成功綁定 Gmail ({clean_email})！")
                             st.rerun()
                         else:
                             st.error(f"⛔ 註冊失敗：{msg}")
+
+            # --- Tab 3: 忘記帳號 / 密碼 ---
+            with tab_forgot:
+                st.markdown("您可以透過當初註冊時綁定的 **Gmail 帳號** 找回帳號名稱或重設密碼：")
+                forgot_choice = st.radio("請選擇您需要的協助：", ["🔍 忘記使用者姓名 (查詢帳號名稱)", "🔑 忘記密碼 (驗證 Gmail 重設密碼)"], horizontal=True)
+                
+                if "忘記使用者姓名" in forgot_choice:
+                    with st.form(key="form_find_username", border=False):
+                        f_email = st.text_input("請輸入當初綁定的 Gmail 帳號：", placeholder="例如：yourname@gmail.com")
+                        find_submitted = st.form_submit_button("🔍 查詢帳號名稱", type="primary")
+                        
+                    if find_submitted:
+                        clean_f_email = f_email.strip().lower()
+                        if not clean_f_email:
+                            st.error("請輸入 Gmail 帳號！")
+                        elif not storage.is_valid_email(clean_f_email):
+                            st.error("Gmail 格式不正確！")
+                        else:
+                            matched_unames = storage.find_usernames_by_email(clean_f_email)
+                            if matched_unames:
+                                names_str = "、".join([f"**{u}**" for u in matched_unames])
+                                st.success(f"✅ 查詢成功！綁定此 Gmail 的使用者帳號為：{names_str}。您現在可以切換至「登入」頁籤進行登入。")
+                            else:
+                                st.error("❌ 查無綁定此 Gmail 的帳號，請確認輸入是否正確或前往註冊新帳號。")
+
+                else:
+                    with st.form(key="form_reset_password", border=False):
+                        r_user = st.text_input("帳號名稱：", placeholder="請輸入欲重設密碼的帳號名稱...")
+                        r_email = st.text_input("該帳號綁定的 Gmail：", placeholder="請輸入綁定的 Gmail...")
+                        r_col1, r_col2 = st.columns(2)
+                        with r_col1:
+                            r_new_pass = st.text_input("設定新密碼 (限英文與數字)", type="password", key="input_r_new_pass")
+                        with r_col2:
+                            r_new_pass2 = st.text_input("確認新密碼", type="password", key="input_r_new_pass2")
+                            
+                        reset_submitted = st.form_submit_button("🔑 驗證並重設密碼", type="primary")
+                        
+                    if (r_new_pass and not storage.is_alphanumeric(r_new_pass)) or (r_new_pass2 and not storage.is_alphanumeric(r_new_pass2)):
+                        st.warning("⚠️ **密碼格式提醒**：檢測到英文與數字以外的符號！密碼僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)。")
+                        
+                    if reset_submitted:
+                        clean_r_user = r_user.strip()
+                        clean_r_email = r_email.strip().lower()
+                        if not clean_r_user:
+                            st.error("請輸入帳號名稱！")
+                        elif not clean_r_email:
+                            st.error("請輸入綁定的 Gmail！")
+                        elif not r_new_pass:
+                            st.error("請輸入新密碼！")
+                        elif not storage.is_alphanumeric(r_new_pass):
+                            st.error("⛔ 密碼包含英文與數字以外的非法符號！")
+                        elif r_new_pass != r_new_pass2:
+                            st.error("❌ 兩次輸入的新密碼不一致！")
+                        else:
+                            ok, msg = storage.reset_user_password_with_email(clean_r_user, clean_r_email, r_new_pass)
+                            if ok:
+                                st.success(f"✅ {msg}")
+                            else:
+                                st.error(f"❌ 重設失敗：{msg}")
 
     st.markdown("---")
     
