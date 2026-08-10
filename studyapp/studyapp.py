@@ -1066,28 +1066,28 @@ def apply_custom_theme() -> None:
     /* 3. 輸入框與選項元件背景色 */
     div[data-baseweb="input"],
     div[data-baseweb="select"] > div,
-    div[data-baseweb="textarea"] {
+    div[data-baseweb="textarea"] {{
         background-color: {input_bg} !important;
         background: {input_bg} !important;
         color: {input_text} !important;
         border-color: {border_color} !important;
-    }
-    input, textarea {
+    }}
+    input, textarea {{
         color: {input_text} !important;
-    }
+    }}
 
     /* 防止瀏覽器自動填入時產生怪異黃/藍色背景及建議提示干擾 */
     input:-webkit-autofill,
     input:-webkit-autofill:hover, 
     input:-webkit-autofill:focus, 
-    input:-webkit-autofill:active {
+    input:-webkit-autofill:active {{
         -webkit-box-shadow: 0 0 0 1000px {input_bg} inset !important;
         -webkit-text-fill-color: {input_text} !important;
         transition: background-color 5000s ease-in-out 0s;
-    }
+    }}
 
     /* 4. 精確覆蓋頂部第一列主選單塊 (頂部橫向主選單) */
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
         background-color: {navbar_bg_color} !important;
         background: {navbar_bg_color} !important;
         padding: 12px 16px !important;
@@ -1095,45 +1095,45 @@ def apply_custom_theme() -> None:
         margin-bottom: 20px !important;
         border: 1px solid {border_color} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
-    }
+    }}
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"],
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
         background-color: transparent !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-    }
+    }}
 
     /* 5. 按鈕顏色獨立防護：確保按鈕有自己的實心與外框樣式，內部文字透明 */
     button[kind="primary"],
-    button[data-testid="stBaseButton-primary"] {
+    button[data-testid="stBaseButton-primary"] {{
         background-color: {button_color} !important;
         background: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
-    }
+    }}
     button[kind="secondary"],
-    button[data-testid="stBaseButton-secondary"] {
+    button[data-testid="stBaseButton-secondary"] {{
         background-color: {sec_btn_bg} !important;
         background: {sec_btn_bg} !important;
         color: {sec_btn_text} !important;
         border: 1px solid {border_color} !important;
-    }
+    }}
     button[kind="secondary"]:hover,
-    button[data-testid="stBaseButton-secondary"]:hover {
+    button[data-testid="stBaseButton-secondary"]:hover {{
         border-color: {button_color} !important;
         color: {button_color} !important;
-    }
+    }}
     button *,
     button p,
     button div,
-    button span {
+    button span {{
         background-color: transparent !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-    }
+    }}
     
     /* 6. 星期與標籤 (Multiselect Tags & Pills) 套用按鈕自訂主題色 */
     div[data-baseweb="tag"],
@@ -1141,18 +1141,18 @@ def apply_custom_theme() -> None:
     div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
     div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
     div[data-baseweb="tag"] [data-role="remove"],
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {{
         background-color: {button_color} !important;
         background: {button_color} !important;
         color: #ffffff !important;
         border-color: {button_color} !important;
-    }
+    }}
     div[data-baseweb="tag"] *,
     span[data-baseweb="tag"] *,
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {{
         color: #ffffff !important;
         fill: #ffffff !important;
-    }
+    }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
