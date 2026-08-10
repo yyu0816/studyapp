@@ -48,9 +48,7 @@ def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-import smtplib
-from email.message import EmailMessage
-from email.utils import formataddr
+import resend
 import random
 
 def is_alphanumeric(text: str) -> bool:
@@ -73,38 +71,27 @@ def generate_verification_code() -> str:
 
 def send_verification_email(to_email: str, code: str, purpose: str = "帳號身分驗證") -> tuple[bool, str]:
     """
-    Sends a 6-digit verification code to the given email address via SMTP.
-    Uses modern Python EmailMessage with automatic RFC 2047 UTF-8 encoding.
+    Sends a 6-digit verification code to the given email address via Resend API.
     """
     to_email = to_email.strip().lower()
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-    smtp_user = None
-    smtp_password = None
-    
+    api_key = None
+    from_email = "onboarding@resend.dev"  # default test sender
+
     try:
         import streamlit as st
         secrets = getattr(st, "secrets", {})
-        if "smtp" in secrets:
-            smtp_server = secrets["smtp"].get("server", "smtp.gmail.com")
-            smtp_port = int(secrets["smtp"].get("port", 587))
-            smtp_user = secrets["smtp"].get("user")
-            smtp_password = secrets["smtp"].get("password")
+        if "resend" in secrets:
+            api_key = secrets["resend"].get("api_key")
+            from_email = secrets["resend"].get("from_email", from_email)
     except Exception:
         pass
-        
-    if not smtp_user or not smtp_password:
-        smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.environ.get("SMTP_PORT", 587))
-        smtp_user = os.environ.get("SMTP_USER")
-        smtp_password = os.environ.get("SMTP_PASSWORD")
 
-    if not smtp_user or not smtp_password:
-        return False, "❌ 發信失敗：系統伺服器尚未配置發信 Gmail 與應用程式密碼 (SMTP)。請在 Streamlit Secrets 設定 [smtp] 資訊以啟用真實郵件發送功能。"
+    if not api_key:
+        api_key = os.environ.get("RESEND_API_KEY")
+        from_email = os.environ.get("RESEND_FROM_EMAIL", from_email)
 
-    # Clean credentials: strip spaces from app password if present
-    clean_user = str(smtp_user).strip()
-    clean_pass = str(smtp_password).replace(" ", "").strip()
+    if not api_key:
+        return False, "❌ 發信失敗：系統尚未配置 Resend API Key。請在 Streamlit Secrets 設定 [resend] 的 api_key。"
 
     subject = f"【讀書計畫安排助手】您的{purpose} 6 碼驗證碼"
     body = f"""您好！
@@ -123,24 +110,20 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 """
 
     try:
-        msg = EmailMessage()
-        msg['From'] = formataddr(('讀書計畫安排助手', clean_user))
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.set_content(body)
-
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
+        resend.api_key = api_key.strip()
+        params = {
+            "from": f"讀書計畫安排助手 <{from_email}>",
+            "to": [to_email],
+            "subject": subject,
+            "text": body,
+        }
+        response = resend.Emails.send(params)
+        if response and response.get("id"):
+            return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
         else:
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
-            server.starttls()
-            
-        server.login(clean_user, clean_pass)
-        server.send_message(msg)
-        server.quit()
-        return True, f"✅ 驗證信已成功發送至您的 Gmail ({to_email})，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
+            return False, f"❌ 郵件發送失敗（回應異常：{response}）"
     except Exception as e:
-        return False, f"❌ 郵件發送失敗（錯誤：{str(e)}），請確認發信信箱權限、應用程式密碼或網路連線。"
+        return False, f"❌ 郵件發送失敗（錯誤：{str(e)}）"
 
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """Register a new user with an alphanumeric password and bound Gmail."""
