@@ -121,22 +121,21 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 """
 
     try:
-        msg = MIMEMultipart()
-        msg['From'] = formataddr((str(Header('讀書計畫安排助手', 'utf-8')), smtp_user))
+        msg = MIMEText(body, 'plain', 'utf-8')
+        msg['From'] = formataddr(('讀書計畫安排助手', smtp_user), charset='utf-8')
         msg['To'] = to_email
         msg['Subject'] = Header(subject, 'utf-8')
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
         if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=12)
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
         else:
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=12)
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
             server.starttls()
             
         server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, [to_email], msg.as_string())
+        server.send_message(msg)
         server.quit()
-        return True, f"✅ 驗證信已成功發送至您的 Gmail ({to_email})，請至收件匣（含垃圾郵件匣）收取 6 碼驗證碼！"
+        return True, f"✅ 驗證信已成功發送至您的 Gmail ({to_email})，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
     except Exception as e:
         return False, f"❌ 郵件發送失敗（錯誤：{str(e)}），請確認發信信箱權限、應用程式密碼或網路連線。"
 
