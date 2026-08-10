@@ -1066,18 +1066,28 @@ def apply_custom_theme() -> None:
     /* 3. 輸入框與選項元件背景色 */
     div[data-baseweb="input"],
     div[data-baseweb="select"] > div,
-    div[data-baseweb="textarea"] {{
+    div[data-baseweb="textarea"] {
         background-color: {input_bg} !important;
         background: {input_bg} !important;
         color: {input_text} !important;
         border-color: {border_color} !important;
-    }}
-    input, textarea {{
+    }
+    input, textarea {
         color: {input_text} !important;
-    }}
+    }
+
+    /* 防止瀏覽器自動填入時產生怪異黃/藍色背景及建議提示干擾 */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 1000px {input_bg} inset !important;
+        -webkit-text-fill-color: {input_text} !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
 
     /* 4. 精確覆蓋頂部第一列主選單塊 (頂部橫向主選單) */
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {{
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type {
         background-color: {navbar_bg_color} !important;
         background: {navbar_bg_color} !important;
         padding: 12px 16px !important;
@@ -1085,45 +1095,45 @@ def apply_custom_theme() -> None:
         margin-bottom: 20px !important;
         border: 1px solid {border_color} !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
-    }}
+    }
     div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="column"],
-    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {{
+    div[data-testid="stAppViewContainer"] section.main div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="element-container"] {
         background-color: transparent !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-    }}
+    }
 
     /* 5. 按鈕顏色獨立防護：確保按鈕有自己的實心與外框樣式，內部文字透明 */
     button[kind="primary"],
-    button[data-testid="stBaseButton-primary"] {{
+    button[data-testid="stBaseButton-primary"] {
         background-color: {button_color} !important;
         background: {button_color} !important;
         border-color: {button_color} !important;
         color: #ffffff !important;
         font-weight: 600 !important;
-    }}
+    }
     button[kind="secondary"],
-    button[data-testid="stBaseButton-secondary"] {{
+    button[data-testid="stBaseButton-secondary"] {
         background-color: {sec_btn_bg} !important;
         background: {sec_btn_bg} !important;
         color: {sec_btn_text} !important;
         border: 1px solid {border_color} !important;
-    }}
+    }
     button[kind="secondary"]:hover,
-    button[data-testid="stBaseButton-secondary"]:hover {{
+    button[data-testid="stBaseButton-secondary"]:hover {
         border-color: {button_color} !important;
         color: {button_color} !important;
-    }}
+    }
     button *,
     button p,
     button div,
-    button span {{
+    button span {
         background-color: transparent !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-    }}
+    }
     
     /* 6. 星期與標籤 (Multiselect Tags & Pills) 套用按鈕自訂主題色 */
     div[data-baseweb="tag"],
@@ -1131,21 +1141,48 @@ def apply_custom_theme() -> None:
     div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
     div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
     div[data-baseweb="tag"] [data-role="remove"],
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {{
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {
         background-color: {button_color} !important;
         background: {button_color} !important;
         color: #ffffff !important;
         border-color: {button_color} !important;
-    }}
+    }
     div[data-baseweb="tag"] *,
     span[data-baseweb="tag"] *,
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {{
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {
         color: #ffffff !important;
         fill: #ffffff !important;
-    }}
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+    
+    js = r"""
+    <script>
+    (function() {
+        function disableAutofill() {
+            try {
+                const root = window.parent ? window.parent.document : document;
+                const inputs = root.querySelectorAll('input:not([type="submit"]):not([type="button"]), textarea');
+                inputs.forEach(el => {
+                    el.setAttribute('autocomplete', 'off');
+                    el.setAttribute('autocorrect', 'off');
+                    el.setAttribute('autocapitalize', 'off');
+                    el.setAttribute('spellcheck', 'false');
+                    el.setAttribute('data-lpignore', 'true');
+                    el.setAttribute('data-form-type', 'other');
+                });
+            } catch(e) {}
+        }
+        disableAutofill();
+        if (window.parent && window.parent.document) {
+            const obs = new MutationObserver(disableAutofill);
+            obs.observe(window.parent.document.body, { childList: true, subtree: true });
+        }
+    })();
+    </script>
+    """
+    st.markdown(js, unsafe_allow_html=True)
 
 
 def render_home_page() -> None:
@@ -1234,6 +1271,7 @@ def get_registered_users_map() -> dict[str, int]:
     return user_counts
 
 def render_start_page():
+    apply_custom_theme()
     st.title("📚 我的讀書計畫")
     
     registered_map = get_registered_users_map()
@@ -1303,8 +1341,20 @@ def render_start_page():
 
                 # 忘記帳號 / 密碼（透過 Gmail 接收 6 碼驗證信）
                 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                with st.expander("❓ 忘記使用者名稱或密碼？點此發送 6 碼驗證信到 Gmail 找回", expanded=False):
-                    forgot_action = st.radio("請選擇協助項目：", ["🔍 忘記使用者名稱 (驗證信找回帳號)", "🔑 忘記密碼 (驗證信重設密碼)"], horizontal=True)
+                is_forgot_open = bool(
+                    st.session_state.get("forgot_expanded") or 
+                    st.session_state.get("f_user_verify") or 
+                    st.session_state.get("f_pass_verify") or
+                    st.session_state.get("input_f_email") or
+                    st.session_state.get("input_r_user")
+                )
+                with st.expander("❓ 忘記使用者名稱或密碼？點此發送 6 碼驗證信到 Gmail 找回", expanded=is_forgot_open):
+                    forgot_action = st.radio(
+                        "請選擇協助項目：", 
+                        ["🔍 忘記使用者名稱 (驗證信找回帳號)", "🔑 忘記密碼 (驗證信重設密碼)"], 
+                        horizontal=True,
+                        key="forgot_action_radio"
+                    )
 
                     if "忘記使用者名稱" in forgot_action:
                         st.markdown("##### 🔍 找回使用者名稱")
@@ -1316,6 +1366,7 @@ def render_start_page():
                         with f_send_col:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                             if st.button("📨 發送驗證信", key="btn_send_user_code", use_container_width=True):
+                                st.session_state["forgot_expanded"] = True
                                 clean_f_email = f_email.strip().lower()
                                 if not clean_f_email:
                                     st.error("請先輸入 Gmail 帳號！")
@@ -1343,6 +1394,7 @@ def render_start_page():
                             with v2:
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                                 if st.button("✅ 驗證身分並顯示帳號", key="btn_check_user_vcode", type="primary", use_container_width=True):
+                                    st.session_state["forgot_expanded"] = True
                                     if user_input_code.strip() == verify_info["code"]:
                                         matched_unames = find_usernames_by_email(verify_info["email"])
                                         names_str = "、".join([f"**{u}**" for u in matched_unames])
@@ -1363,6 +1415,7 @@ def render_start_page():
                         with r_send_col:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                             if st.button("📨 發送驗證信", key="btn_send_pass_code", use_container_width=True):
+                                st.session_state["forgot_expanded"] = True
                                 clean_r_user = r_user.strip()
                                 clean_r_email = r_email.strip().lower()
                                 if not clean_r_user:
@@ -1399,6 +1452,7 @@ def render_start_page():
                                 st.warning("⚠️ **密碼格式提醒**：僅能包含英文字母 (A-Z, a-z) 與數字 (0-9)。")
 
                             if st.button("🔑 驗證身分並重設密碼", key="btn_confirm_reset_pwd", type="primary", use_container_width=True):
+                                st.session_state["forgot_expanded"] = True
                                 if pass_input_code.strip() != pass_verify_info["code"]:
                                     st.error("❌ 驗證碼不正確，請重新確認郵件！")
                                 elif not new_pwd:

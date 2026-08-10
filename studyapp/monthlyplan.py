@@ -59,14 +59,32 @@ def _format_date_list(date_strs: list[str]) -> str:
     return ", ".join(formatted_ranges)
 
 def _trigger_reschedule_if_needed():
-    plan_data = st.session_state.get("plan")
-    existing_schedule = st.session_state.get("app_state", {}).get("monthly_plan")
-    if plan_data and existing_schedule:
-        plan_data["daily_override_events"] = st.session_state.get("daily_override_events", {})
+    plan_data = st.session_state.get("plan") or st.session_state.get("app_state", {}).get("plan")
+    if not plan_data:
+        current_id = st.session_state.get("current_plan_id")
+        if current_id:
+            import storage
+            saved = storage.load_plan(current_id)
+            if saved:
+                plan_data = saved.get("plan") or saved.get("app_state", {}).get("plan")
+
+    if plan_data:
+        # Sync latest daily_override_events into plan_data
+        override_events = st.session_state.get("daily_override_events", {})
+        plan_data["daily_override_events"] = override_events
+        st.session_state["plan"] = plan_data
+        st.session_state.setdefault("app_state", {})["plan"] = plan_data
+
         import logic
         from studyapp import build_monthly_plan
         import storage
-        new_schedule = logic.generate_daily_schedule(plan_data, existing_schedule=existing_schedule, reschedule_from_date=date.today())
+
+        existing_schedule = st.session_state.get("app_state", {}).get("monthly_plan")
+        new_schedule = logic.generate_daily_schedule(
+            plan_data,
+            existing_schedule=existing_schedule,
+            reschedule_from_date=date.today()
+        )
         st.session_state.setdefault("app_state", {})["monthly_plan"] = new_schedule
         st.session_state["monthly_plan"] = build_monthly_plan(plan_data, new_schedule)
         storage.save_current_state()
@@ -74,12 +92,13 @@ def _trigger_reschedule_if_needed():
 
 @st.dialog("新增行程")
 def add_event_dialog(day_str: str):
-    title = st.text_input("行程名稱")
+    _title_key = "_add_dlg_title"
+    title = st.text_input("行程名稱", key=_title_key)
 
     # Auto-sync end_date when start_date changes
     _sd_key = "_add_dlg_start"
     _ed_key = "_add_dlg_end"
-    init_day = _parse_date(day_str)
+    init_day = _parse_date(day_str) if day_str else date.today()
     if _sd_key not in st.session_state:
         st.session_state[_sd_key] = init_day
         st.session_state[_ed_key] = init_day
@@ -95,19 +114,19 @@ def add_event_dialog(day_str: str):
     with col_d2:
         end_date = st.date_input("結束日期", key=_ed_key)
 
-    is_all_day = st.checkbox("整天", value=True)
+    is_all_day = st.checkbox("整天", value=True, key="_add_dlg_all_day")
     start_time, end_time = "00:00", "23:59"
     if not is_all_day:
         col1, col2 = st.columns(2)
         with col1:
-            sv = st.time_input("開始時間")
+            sv = st.time_input("開始時間", key="_add_dlg_st")
             if sv: start_time = sv.strftime("%H:%M")
         with col2:
-            ev = st.time_input("結束時間")
+            ev = st.time_input("結束時間", key="_add_dlg_et")
             if ev: end_time = ev.strftime("%H:%M")
 
     emoji = render_emoji_picker("表情符號", "📌", "add_event_dlg")
-    color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
+    color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], key="_add_dlg_color_sel")
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
@@ -129,32 +148,42 @@ def add_event_dialog(day_str: str):
     else:
         color = preset_color
 
-    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=False)
+    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=False, key="_add_dlg_concurrent")
 
-    if st.button("儲存", use_container_width=True):
-        if not title:
-            st.error("請輸入行程名稱")
-            return
-        if start_date > end_date:
-            st.error("開始日期不能晚於結束日期")
-            return
-        # clean up temp keys
-        st.session_state.pop(_sd_key, None)
-        st.session_state.pop(_ed_key, None)
-        st.session_state.pop("add_dlg_cp", None)
+    col_save, col_cancel = st.columns(2)
+    with col_save:
+        if st.button("儲存行程", use_container_width=True, type="primary", key="btn_save_add_event"):
+            if not title:
+                st.error("請輸入行程名稱")
+                return
+            if start_date > end_date:
+                st.error("開始日期不能晚於結束日期")
+                return
+            # clean up temp keys
+            st.session_state.pop(_title_key, None)
+            st.session_state.pop(_sd_key, None)
+            st.session_state.pop(_ed_key, None)
+            st.session_state.pop("_add_dlg_all_day", None)
+            st.session_state.pop("_add_dlg_concurrent", None)
+            st.session_state.pop("add_dlg_cp", None)
+            st.session_state.pop("show_add_event_dialog", None)
 
-        st.session_state.setdefault("daily_override_events", {})
-        cur = start_date
-        while cur <= end_date:
-            cs = cur.strftime("%Y-%m-%d")
-            st.session_state["daily_override_events"].setdefault(cs, []).append({
-                "title": title, "start": start_time, "end": end_time,
-                "emoji": emoji, "color": color, "display_color": color,
-                "is_all_day": is_all_day, "show_on_calendar": True,
-                "concurrent_with_study": concurrent_with_study,
-            })
-            cur += timedelta(days=1)
-        _trigger_reschedule_if_needed()
+            st.session_state.setdefault("daily_override_events", {})
+            cur = start_date
+            while cur <= end_date:
+                cs = cur.strftime("%Y-%m-%d")
+                st.session_state["daily_override_events"].setdefault(cs, []).append({
+                    "title": title, "start": start_time, "end": end_time,
+                    "emoji": emoji, "color": color, "display_color": color,
+                    "is_all_day": is_all_day, "show_on_calendar": True,
+                    "concurrent_with_study": concurrent_with_study,
+                })
+                cur += timedelta(days=1)
+            _trigger_reschedule_if_needed()
+    with col_cancel:
+        if st.button("取消", use_container_width=True, type="secondary", key="btn_cancel_add_event"):
+            st.session_state.pop("show_add_event_dialog", None)
+            st.rerun()
 
 @st.dialog("編輯行程")
 def edit_event_dialog(date_str: str, ev_idx: int):
@@ -162,6 +191,9 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     ev_list_for_date = override.get(date_str, [])
     if ev_idx >= len(ev_list_for_date):
         st.error("找不到行程")
+        if st.button("關閉", use_container_width=True):
+            st.session_state.pop("show_edit_event_dialog", None)
+            st.rerun()
         return
         
     ev = ev_list_for_date[ev_idx]
@@ -186,7 +218,10 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                 matching_dates.append(d_str)
                 break # only count the date once
 
-    title = st.text_input("行程名稱", value=title_orig)
+    _title_key = "_edit_dlg_title"
+    if _title_key not in st.session_state:
+        st.session_state[_title_key] = title_orig
+    title = st.text_input("行程名稱", key=_title_key)
 
     _sd_key = "_edit_dlg_start"
     _ed_key = "_edit_dlg_end"
@@ -199,8 +234,9 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             st.session_state[_ed_key] = _parse_date(date_str)
 
     def _on_start_change():
-        if st.session_state[_ed_key] < st.session_state[_sd_key]:
-            st.session_state[_ed_key] = st.session_state[_sd_key]
+        new_start = st.session_state[_sd_key]
+        if st.session_state[_ed_key] < new_start:
+            st.session_state[_ed_key] = new_start
 
     col_d1, col_d2 = st.columns(2)
     with col_d1:
@@ -208,32 +244,47 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     with col_d2:
         end_date = st.date_input("結束日期", key=_ed_key)
 
-    is_all_day = st.checkbox("整天", value=is_all_day_orig)
-    start_time, end_time = start_time_orig, end_time_orig
+    _all_day_key = "_edit_dlg_all_day"
+    if _all_day_key not in st.session_state:
+        st.session_state[_all_day_key] = is_all_day_orig
+    is_all_day = st.checkbox("整天", key=_all_day_key)
+    
+    start_time, end_time = "00:00", "23:59"
     if not is_all_day:
         col1, col2 = st.columns(2)
         with col1:
-            sv = st.time_input("開始時間", value=datetime.strptime(start_time, "%H:%M").time())
+            try:
+                st_obj = datetime.strptime(start_time_orig, "%H:%M").time()
+            except:
+                st_obj = datetime.strptime("00:00", "%H:%M").time()
+            sv = st.time_input("開始時間", value=st_obj, key="_edit_dlg_st")
             if sv: start_time = sv.strftime("%H:%M")
         with col2:
-            evt = st.time_input("結束時間", value=datetime.strptime(end_time, "%H:%M").time())
-            if evt: end_time = evt.strftime("%H:%M")
+            try:
+                et_obj = datetime.strptime(end_time_orig, "%H:%M").time()
+            except:
+                et_obj = datetime.strptime("23:59", "%H:%M").time()
+            ev_t = st.time_input("結束時間", value=et_obj, key="_edit_dlg_et")
+            if ev_t: end_time = ev_t.strftime("%H:%M")
 
     emoji = render_emoji_picker("表情符號", emoji_orig, "edit_event_dlg")
-    cur_color = color_orig
-    is_custom = not any(o["value"] == cur_color for o in COLOR_OPTIONS if isinstance(o, dict))
-    color_idx = next((i for i, o in enumerate(COLOR_OPTIONS) if isinstance(o, dict) and o["value"] == cur_color), 0)
-    color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"], index=color_idx)
+    
+    match_color_idx = 0
+    for idx, opt in enumerate(COLOR_OPTIONS):
+        if opt["value"] == color_orig:
+            match_color_idx = idx
+            break
+    color_option = st.selectbox("顏色", COLOR_OPTIONS, index=match_color_idx, format_func=lambda x: x["name"], key="_edit_dlg_color_sel")
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
         st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{preset_color};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-    use_custom_color = st.checkbox("使用自訂顏色", value=bool(is_custom), key="edit_custom_color")
+    use_custom_color = st.checkbox("使用自訂顏色", key="edit_custom_color_cb")
     if use_custom_color:
         st.caption("※ 若選擇器無反應，可直接輸入 HEX 色號 (如 #ff0000)")
         c1, c2 = st.columns([1, 2])
         with c1:
             if "edit_dlg_cp" not in st.session_state:
-                st.session_state["edit_dlg_cp"] = cur_color
+                st.session_state["edit_dlg_cp"] = color_orig if color_orig.startswith("#") else preset_color
             picked_color = st.color_picker("顏色", key="edit_dlg_cp", label_visibility="collapsed")
         with c2:
             hex_val = st.text_input("HEX", value=picked_color, key="edit_dlg_hex", label_visibility="collapsed", on_change=_sync_hex_to_cp, args=("edit_dlg_hex", "edit_dlg_cp"))
@@ -245,11 +296,14 @@ def edit_event_dialog(date_str: str, ev_idx: int):
     else:
         color = preset_color
 
-    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", value=concurrent_orig, key="edit_concurrent")
+    _concurrent_key = "_edit_dlg_concurrent"
+    if _concurrent_key not in st.session_state:
+        st.session_state[_concurrent_key] = concurrent_orig
+    concurrent_with_study = st.checkbox("是否可和讀書計畫並行？", key=_concurrent_key)
 
     col_save, col_del = st.columns(2)
     with col_save:
-        if st.button("儲存", use_container_width=True, type="primary"):
+        if st.button("儲存修改", use_container_width=True, type="primary", key="btn_save_edit_event"):
             if not title:
                 st.error("請輸入行程名稱")
                 return
@@ -275,22 +329,30 @@ def edit_event_dialog(date_str: str, ev_idx: int):
                     "concurrent_with_study": concurrent_with_study,
                 })
                 cur += timedelta(days=1)
+            st.session_state.pop(_title_key, None)
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
+            st.session_state.pop(_all_day_key, None)
+            st.session_state.pop(_concurrent_key, None)
             st.session_state.pop("edit_dlg_cp", None)
+            st.session_state.pop("show_edit_event_dialog", None)
             _trigger_reschedule_if_needed()
     with col_del:
-        if st.button("刪除", use_container_width=True, type="secondary"):
+        if st.button("刪除此行程", use_container_width=True, type="secondary", key="btn_del_edit_event"):
             for d_str in matching_dates:
-                for idx, event in enumerate(st.session_state["daily_override_events"][d_str]):
+                for idx, event in enumerate(list(st.session_state["daily_override_events"].get(d_str, []))):
                     if (event.get("title", "") == title_orig and 
                         event.get("start", "") == start_time_orig and
                         event.get("end", "") == end_time_orig):
                         st.session_state["daily_override_events"][d_str].pop(idx)
                         break
+            st.session_state.pop(_title_key, None)
             st.session_state.pop(_sd_key, None)
             st.session_state.pop(_ed_key, None)
+            st.session_state.pop(_all_day_key, None)
+            st.session_state.pop(_concurrent_key, None)
             st.session_state.pop("edit_dlg_cp", None)
+            st.session_state.pop("show_edit_event_dialog", None)
             _trigger_reschedule_if_needed()
 
 def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: date, end_date: date) -> str:
@@ -382,6 +444,13 @@ def render_monthly_plan_page() -> None:
 
     grouped = _group_monthly_plan_by_month(monthly_plan)
 
+    if st.session_state.get("show_add_event_dialog"):
+        add_event_dialog(st.session_state.get("add_event_dialog_day", ""))
+
+    if st.session_state.get("show_edit_event_dialog"):
+        e_date, e_idx = st.session_state["show_edit_event_dialog"]
+        edit_event_dialog(e_date, e_idx)
+
     qp = st.query_params
     edit_val = qp.get("edit_event", None)
     
@@ -389,7 +458,8 @@ def render_monthly_plan_page() -> None:
         st.query_params.clear()
         parts = edit_val.split("|")
         if len(parts) == 2:
-            edit_event_dialog(parts[0], int(parts[1]))
+            st.session_state["show_edit_event_dialog"] = (parts[0], int(parts[1]))
+            st.rerun()
 
     for (year, month), _items in sorted(grouped.items()):
         st.markdown(f"### {year}年{month}月")
@@ -421,7 +491,9 @@ def render_monthly_plan_page() -> None:
             if st.button("＋ 新增行程", key=f"add_btn_{year}_{month}", use_container_width=True, type="primary"):
                 # Default to first day of current month within plan range
                 default_day = max(start_date, date(year, month, 1))
-                add_event_dialog(default_day.strftime("%Y-%m-%d"))
+                st.session_state["show_add_event_dialog"] = True
+                st.session_state["add_event_dialog_day"] = default_day.strftime("%Y-%m-%d")
+                st.rerun()
             
             # Collect ALL user-added events for this month from override
             # (not limited to _items dates — events can span outside plan range)
@@ -505,7 +577,8 @@ def render_monthly_plan_page() -> None:
                         st.markdown(f'<div style="width:4px; height:24px; background:{ev_color}; border-radius:2px; margin-top:8px;"></div>', unsafe_allow_html=True)
                     with col_btn:
                         if st.button(f"**{date_str_formatted}** {ev_emoji} {ev_title}", key=f"edit_btn_{year}_{month}_{first_date}_{first_idx}", type="tertiary", use_container_width=True):
-                            edit_event_dialog(first_date, first_idx)
+                            st.session_state["show_edit_event_dialog"] = (first_date, first_idx)
+                            st.rerun()
             else:
                 st.write("本月無新增行程")
                     
