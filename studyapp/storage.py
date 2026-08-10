@@ -49,9 +49,7 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
+from email.message import EmailMessage
 from email.utils import formataddr
 import random
 
@@ -76,7 +74,7 @@ def generate_verification_code() -> str:
 def send_verification_email(to_email: str, code: str, purpose: str = "帳號身分驗證") -> tuple[bool, str]:
     """
     Sends a 6-digit verification code to the given email address via SMTP.
-    Strict Security: The verification code is NEVER revealed in return messages.
+    Uses modern Python EmailMessage with automatic RFC 2047 UTF-8 encoding.
     """
     to_email = to_email.strip().lower()
     smtp_server = "smtp.gmail.com"
@@ -104,6 +102,10 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
     if not smtp_user or not smtp_password:
         return False, "❌ 發信失敗：系統伺服器尚未配置發信 Gmail 與應用程式密碼 (SMTP)。請在 Streamlit Secrets 設定 [smtp] 資訊以啟用真實郵件發送功能。"
 
+    # Clean credentials: strip spaces from app password if present
+    clean_user = str(smtp_user).strip()
+    clean_pass = str(smtp_password).replace(" ", "").strip()
+
     subject = f"【讀書計畫安排助手】您的{purpose} 6 碼驗證碼"
     body = f"""您好！
 
@@ -121,10 +123,11 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 """
 
     try:
-        msg = MIMEText(body, 'plain', 'utf-8')
-        msg['From'] = formataddr(('讀書計畫安排助手', smtp_user), charset='utf-8')
+        msg = EmailMessage()
+        msg['From'] = formataddr(('讀書計畫安排助手', clean_user))
         msg['To'] = to_email
-        msg['Subject'] = Header(subject, 'utf-8')
+        msg['Subject'] = subject
+        msg.set_content(body)
 
         if smtp_port == 465:
             server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
@@ -132,7 +135,7 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
             server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
             server.starttls()
             
-        server.login(smtp_user, smtp_password)
+        server.login(clean_user, clean_pass)
         server.send_message(msg)
         server.quit()
         return True, f"✅ 驗證信已成功發送至您的 Gmail ({to_email})，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
