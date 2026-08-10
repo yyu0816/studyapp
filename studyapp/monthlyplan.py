@@ -413,38 +413,7 @@ def render_monthly_plan_page() -> None:
                     st.session_state["cal_view_date"] = view_d.strftime("%Y-%m-%d")
                     st.rerun()
 
-            # Single day detailed breakdown card
-            sel_day_str = st.session_state.get("cal_view_date")
-            if sel_day_str and (sel_day_str.startswith(f"{year}-{month:02d}-") or True):
-                with st.container(border=True):
-                    st.markdown(f"##### 📌 **{sel_day_str} 當日進度與排程**")
-                    day_plan_item = plan_by_date.get(sel_day_str, {})
-                    day_tasks = day_plan_item.get("tasks", [])
-                    
-                    st.markdown("**📖 今日讀書目標：**")
-                    if day_tasks:
-                        for dt in day_tasks:
-                            st.markdown(f"- **{dt}**")
-                    else:
-                        st.caption("今日無指定讀書進度 / 為自由複習日。")
-                        
-                    st.markdown("**🗓️ 今日固定與自訂行程：**")
-                    day_evs = []
-                    if day_plan_item.get("fixed_events"):
-                        day_evs.extend(day_plan_item["fixed_events"])
-                    if sel_day_str in st.session_state.get("daily_override_events", {}):
-                        day_evs.extend(st.session_state["daily_override_events"][sel_day_str])
-                        
-                    if day_evs:
-                        for ev in day_evs:
-                            em = ev.get("emoji", "📌")
-                            t = ev.get("title", "未命名行程")
-                            s = ev.get("start", "")
-                            e = ev.get("end", "")
-                            time_str = f" ({s}~{e})" if s and e else ""
-                            st.markdown(f"- {em} {t}{time_str}")
-                    else:
-                        st.caption("今日無額外行程安排。")
+            # 日期選擇觸發後將在頂部詳細視圖展開呈現
 
         with col_overview:
             st.markdown("#### 📅 行程總覽")
