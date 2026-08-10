@@ -1326,10 +1326,13 @@ def render_start_page():
                                     if not matched_unames:
                                         st.error("❌ 查無綁定此 Gmail 的帳號，請確認輸入是否正確。")
                                     else:
-                                        v_code = storage.generate_verification_code()
-                                        st.session_state["f_user_verify"] = {"email": clean_f_email, "code": v_code}
-                                        ok, msg = storage.send_verification_email(clean_f_email, v_code, "查詢帳號名稱")
-                                        st.success(msg)
+                                        v_code = generate_verification_code()
+                                        ok, msg = send_verification_email(clean_f_email, v_code, "查詢帳號名稱")
+                                        if ok:
+                                            st.session_state["f_user_verify"] = {"email": clean_f_email, "code": v_code}
+                                            st.success(msg)
+                                        else:
+                                            st.error(msg)
 
                         verify_info = st.session_state.get("f_user_verify")
                         if verify_info:
@@ -1341,7 +1344,7 @@ def render_start_page():
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                                 if st.button("✅ 驗證身分並顯示帳號", key="btn_check_user_vcode", type="primary", use_container_width=True):
                                     if user_input_code.strip() == verify_info["code"]:
-                                        matched_unames = storage.find_usernames_by_email(verify_info["email"])
+                                        matched_unames = find_usernames_by_email(verify_info["email"])
                                         names_str = "、".join([f"**{u}**" for u in matched_unames])
                                         st.success(f"🎉 **身分驗證成功！** 綁定此 Gmail 的帳號為：{names_str}。您可直接在上方輸入帳號與密碼進行登入！")
                                         st.session_state.pop("f_user_verify", None)
@@ -1373,10 +1376,13 @@ def render_start_page():
                                     elif all_users[clean_r_user].get("email", "").strip().lower() != clean_r_email:
                                         st.error("❌ 輸入的 Gmail 與該帳號綁定的信箱不一致！")
                                     else:
-                                        v_code = storage.generate_verification_code()
-                                        st.session_state["f_pass_verify"] = {"username": clean_r_user, "email": clean_r_email, "code": v_code}
-                                        ok, msg = storage.send_verification_email(clean_r_email, v_code, "重設密碼")
-                                        st.success(msg)
+                                        v_code = generate_verification_code()
+                                        ok, msg = send_verification_email(clean_r_email, v_code, "重設密碼")
+                                        if ok:
+                                            st.session_state["f_pass_verify"] = {"username": clean_r_user, "email": clean_r_email, "code": v_code}
+                                            st.success(msg)
+                                        else:
+                                            st.error(msg)
 
                         pass_verify_info = st.session_state.get("f_pass_verify")
                         if pass_verify_info:
