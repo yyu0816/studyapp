@@ -48,7 +48,8 @@ def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-import resend
+import smtplib
+from email.message import EmailMessage
 import random
 
 def is_alphanumeric(text: str) -> bool:
@@ -71,27 +72,33 @@ def generate_verification_code() -> str:
 
 def send_verification_email(to_email: str, code: str, purpose: str = "帳號身分驗證") -> tuple[bool, str]:
     """
-    Sends a 6-digit verification code to the given email address via Resend API.
+    Sends a 6-digit verification code via Brevo SMTP relay.
+    Brevo free plan: 300 emails/day, no custom domain required.
     """
     to_email = to_email.strip().lower()
-    api_key = None
-    from_email = "onboarding@resend.dev"  # default test sender
+    smtp_user = None      # Brevo 登入信笞（您的 Brevo 帳號 email）
+    smtp_key  = None      # Brevo SMTP Key（不是登入密碼）
+    from_email = None     # 已在 Brevo 驗證的寄件人信笞
 
     try:
         import streamlit as st
         secrets = getattr(st, "secrets", {})
-        if "resend" in secrets:
-            api_key = secrets["resend"].get("api_key")
-            from_email = secrets["resend"].get("from_email", from_email)
+        if "brevo" in secrets:
+            smtp_user  = secrets["brevo"].get("smtp_user")
+            smtp_key   = secrets["brevo"].get("smtp_key")
+            from_email = secrets["brevo"].get("from_email", smtp_user)
     except Exception:
         pass
 
-    if not api_key:
-        api_key = os.environ.get("RESEND_API_KEY")
-        from_email = os.environ.get("RESEND_FROM_EMAIL", from_email)
+    if not smtp_user or not smtp_key:
+        smtp_user  = os.environ.get("BREVO_SMTP_USER")
+        smtp_key   = os.environ.get("BREVO_SMTP_KEY")
+        from_email = os.environ.get("BREVO_FROM_EMAIL", smtp_user)
 
-    if not api_key:
-        return False, "❌ 發信失敗：系統尚未配置 Resend API Key。請在 Streamlit Secrets 設定 [resend] 的 api_key。"
+    if not smtp_user or not smtp_key:
+        return False, "❌ 發信失敗：尚未配置 Brevo SMTP 憑證。請在 Streamlit Secrets 設定 [brevo] 的 smtp_user 與 smtp_key。"
+
+    from_email = (from_email or smtp_user).strip()
 
     subject = f"【讀書計畫安排助手】您的{purpose} 6 碼驗證碼"
     body = f"""您好！
@@ -110,18 +117,18 @@ def send_verification_email(to_email: str, code: str, purpose: str = "帳號身�
 """
 
     try:
-        resend.api_key = api_key.strip()
-        params = {
-            "from": f"讀書計畫安排助手 <{from_email}>",
-            "to": [to_email],
-            "subject": subject,
-            "text": body,
-        }
-        response = resend.Emails.send(params)
-        if response and response.get("id"):
-            return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
-        else:
-            return False, f"❌ 郵件發送失敗（回應異常：{response}）"
+        msg = EmailMessage()
+        msg["From"]    = f"讀書計畫安排助手 <{from_email}>"
+        msg["To"]      = to_email
+        msg["Subject"] = subject
+        msg.set_content(body)          # auto-encodes as quoted-printable UTF-8
+
+        with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=15) as server:
+            server.starttls()
+            server.login(smtp_user.strip(), smtp_key.strip())
+            server.send_message(msg)
+
+        return True, f"✅ 驗證信已成功發送至 {to_email}，請至信箱（含垃圾郵件匣）收取 6 碼驗證碼！"
     except Exception as e:
         return False, f"❌ 郵件發送失敗（錯誤：{str(e)}）"
 
