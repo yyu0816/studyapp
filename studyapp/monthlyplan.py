@@ -64,8 +64,12 @@ def _trigger_reschedule_if_needed():
     if plan_data and existing_schedule:
         plan_data["daily_override_events"] = st.session_state.get("daily_override_events", {})
         import logic
+        from studyapp import build_monthly_plan
+        import storage
         new_schedule = logic.generate_daily_schedule(plan_data, existing_schedule=existing_schedule, reschedule_from_date=date.today())
         st.session_state.setdefault("app_state", {})["monthly_plan"] = new_schedule
+        st.session_state["monthly_plan"] = build_monthly_plan(plan_data, new_schedule)
+        storage.save_current_state()
     st.rerun()
 
 @st.dialog("新增行程")
