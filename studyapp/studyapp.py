@@ -5,7 +5,23 @@ from typing import Any
 import streamlit as st
 import dashboard
 
+import importlib
 import storage
+try:
+    importlib.reload(storage)
+except Exception:
+    pass
+
+from storage import (
+    generate_verification_code,
+    send_verification_email,
+    find_usernames_by_email,
+    reset_user_password_with_email,
+    verify_user_credentials,
+    register_user,
+    is_alphanumeric,
+    is_valid_email
+)
 
 try:
     import click
