@@ -541,5 +541,81 @@ def render_monthly_plan_page() -> None:
                             st.markdown(f"<div style='font-size:14px; margin-left:10px; margin-bottom:4px;'>• 共 {val_str} {unit}</div>", unsafe_allow_html=True)
                 else:
                     st.write("本月無學習進度")
+
+            # 每日詳細視圖 (位於月進度框框下方)
+            cal_view_date = st.session_state.get("cal_view_date")
+            if cal_view_date and cal_view_date.startswith(f"{year}-{month:02d}-"):
+                st.markdown(f"#### 📌 {cal_view_date} 詳細進度")
+                with st.container(border=True):
+                    schedule_data = st.session_state.get("app_state", {}).get("monthly_plan") or []
+                    daily_schedule = [s for s in schedule_data if s.get("date") == cal_view_date]
+                    
+                    st.markdown("**📖 當日讀書進度：**")
+                    if daily_schedule:
+                        grouped_tasks: dict[tuple[str, str, str, str], float] = {}
+                        for item in daily_schedule:
+                            subj = item.get("科目", "")
+                            if subj == "總複習 (自由安排)" or not subj:
+                                continue
+                            mat = item.get("教材", "")
+                            target = item.get("目標進度", "")
+                            color = item.get("color", "#4f84ff")
+                            parts = target.split(" ")
+                            qty = 0.0
+                            unit = "頁"
+                            if len(parts) >= 2:
+                                try:
+                                    qty = float(parts[0])
+                                    unit = parts[1]
+                                except ValueError:
+                                    pass
+                            elif len(parts) == 1 and parts[0]:
+                                try:
+                                    qty = float(parts[0])
+                                except ValueError:
+                                    pass
+                            key = (subj, mat, unit, color)
+                            grouped_tasks[key] = grouped_tasks.get(key, 0.0) + qty
+
+                        if grouped_tasks:
+                            for (subj, mat, unit, color), total_qty in grouped_tasks.items():
+                                qty_str = f"{int(total_qty)}" if total_qty.is_integer() else f"{total_qty:.1f}"
+                                mat_str = f" ({mat})" if mat and mat != "-" else ""
+                                st.markdown(f"- **{subj}**{mat_str}：{qty_str} {unit}")
+                        else:
+                            st.caption("今日為自由複習日 / 無指定讀書進度。")
+                    else:
+                        st.caption("今日無指定讀書進度。")
+                    
+                    # 顯示當日行程 (固定行程與特定行程)
+                    events_today = []
+                    override_events = st.session_state.get("daily_override_events", {}).get(cal_view_date, [])
+                    events_today.extend(override_events)
+                    
+                    plan_fixed = st.session_state.get("plan", {}).get("fixed_events", [])
+                    try:
+                        view_dt = datetime.strptime(cal_view_date, "%Y-%m-%d").date()
+                        weekday_map = {0: "週一", 1: "週二", 2: "週三", 3: "週四", 4: "週五", 5: "週六", 6: "週日"}
+                        w_str = weekday_map[view_dt.weekday()]
+                        for fe in plan_fixed:
+                            if w_str in fe.get("weekdays", []) and fe.get("show_on_calendar", True):
+                                events_today.append(fe)
+                    except Exception:
+                        pass
+
+                    if events_today:
+                        st.markdown("**🗓️ 當日行程：**")
+                        for ev in events_today:
+                            em = ev.get("emoji", "📌")
+                            t = ev.get("title", "未命名行程")
+                            s = ev.get("start", "")
+                            e = ev.get("end", "")
+                            time_str = f" ({s}~{e})" if s and e else ""
+                            st.markdown(f"- {em} **{t}**{time_str}")
+
+                    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+                    if st.button("✕ 關閉每日詳細視圖", key=f"close_daily_view_{year}_{month}", use_container_width=True):
+                        st.session_state["cal_view_date"] = None
+                        st.rerun()
         
         st.markdown("---")
