@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import streamlit as st
-from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS
+from dailycheck import COLOR_OPTIONS, EMOJI_OPTIONS, render_emoji_picker
 from logic import calculate_daily_available_sessions
 import logic
 
@@ -102,7 +102,7 @@ def add_event_dialog(day_str: str):
             ev = st.time_input("結束時間")
             if ev: end_time = ev.strftime("%H:%M")
 
-    emoji = st.selectbox("表情符號", EMOJI_OPTIONS)
+    emoji = render_emoji_picker("表情符號", "📌", "add_event_dlg")
     color_option = st.selectbox("顏色", COLOR_OPTIONS, format_func=lambda x: x["name"])
     preset_color = color_option["value"] if isinstance(color_option, dict) else color_option
     if isinstance(color_option, dict):
@@ -215,8 +215,7 @@ def edit_event_dialog(date_str: str, ev_idx: int):
             evt = st.time_input("結束時間", value=datetime.strptime(end_time, "%H:%M").time())
             if evt: end_time = evt.strftime("%H:%M")
 
-    emoji_idx = EMOJI_OPTIONS.index(ev.get("emoji", EMOJI_OPTIONS[0])) if ev.get("emoji") in EMOJI_OPTIONS else 0
-    emoji = st.selectbox("表情符號", EMOJI_OPTIONS, index=emoji_idx)
+    emoji = render_emoji_picker("表情符號", emoji_orig, "edit_event_dlg")
     cur_color = color_orig
     is_custom = not any(o["value"] == cur_color for o in COLOR_OPTIONS if isinstance(o, dict))
     color_idx = next((i for i, o in enumerate(COLOR_OPTIONS) if isinstance(o, dict) and o["value"] == cur_color), 0)
@@ -325,10 +324,7 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                 num_weight = "normal"
                 bg = "#fafafa"
 
-            if is_active:
-                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
-            else:
-                num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
+            num_html = f'<div style="font-weight:{num_weight}; color:{num_color}; font-size:14px; margin-bottom:4px;">{day.day}</div>'
 
             events_html = ""
             if is_active:
@@ -340,8 +336,14 @@ def _build_calendar_html(year: int, month: int, plan_by_date: dict, start_date: 
                 for ev in events:
                     if ev.get("show_on_calendar", True):
                         t = ev.get("title", "")
+                        em = ev.get("emoji", "📌")
                         c = ev.get("display_color", ev.get("color", "#4f84ff"))
-                        events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{t}</div>'
+                        events_html += f'<div style="font-size:11px;font-weight:bold;color:#fff;padding:2px 6px;border-radius:5px;margin-top:3px;background:{c};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{em} {t}">{em} {t}</div>'
+
+                # Aggregated study tasks (same subject & material combined)
+                if item and item.get("tasks"):
+                    for task_text in item["tasks"]:
+                        events_html += f'<div style="font-size:11px;font-weight:500;color:#2c3e50;padding:2px 5px;border-radius:4px;margin-top:2px;background:#eef5ff;border-left:3px solid #4f84ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{task_text}">📖 {task_text}</div>'
 
             if is_active:
                 cell_inner = f'{num_html}{events_html}'
@@ -402,7 +404,7 @@ def render_monthly_plan_page() -> None:
             
             st.markdown("---")
             st.markdown("#### 🔍 查看單日詳細進度")
-            st.write("*(由於 HTML 表格無法直接點擊，請在此選擇日期)*")
+            st.write("*(請在此選擇日期以檢視當日的讀書量分配與行程)*")
             c_date, c_btn = st.columns([2, 1])
             with c_date:
                 view_d = st.date_input("選擇日期", value=max(start_date, date(year, month, 1)), key=f"view_d_{year}_{month}", label_visibility="collapsed")
@@ -410,6 +412,39 @@ def render_monthly_plan_page() -> None:
                 if st.button("顯示當日進度", key=f"btn_view_{year}_{month}", use_container_width=True):
                     st.session_state["cal_view_date"] = view_d.strftime("%Y-%m-%d")
                     st.rerun()
+
+            # Single day detailed breakdown card
+            sel_day_str = st.session_state.get("cal_view_date")
+            if sel_day_str and (sel_day_str.startswith(f"{year}-{month:02d}-") or True):
+                with st.container(border=True):
+                    st.markdown(f"##### 📌 **{sel_day_str} 當日進度與排程**")
+                    day_plan_item = plan_by_date.get(sel_day_str, {})
+                    day_tasks = day_plan_item.get("tasks", [])
+                    
+                    st.markdown("**📖 今日讀書目標：**")
+                    if day_tasks:
+                        for dt in day_tasks:
+                            st.markdown(f"- **{dt}**")
+                    else:
+                        st.caption("今日無指定讀書進度 / 為自由複習日。")
+                        
+                    st.markdown("**🗓️ 今日固定與自訂行程：**")
+                    day_evs = []
+                    if day_plan_item.get("fixed_events"):
+                        day_evs.extend(day_plan_item["fixed_events"])
+                    if sel_day_str in st.session_state.get("daily_override_events", {}):
+                        day_evs.extend(st.session_state["daily_override_events"][sel_day_str])
+                        
+                    if day_evs:
+                        for ev in day_evs:
+                            em = ev.get("emoji", "📌")
+                            t = ev.get("title", "未命名行程")
+                            s = ev.get("start", "")
+                            e = ev.get("end", "")
+                            time_str = f" ({s}~{e})" if s and e else ""
+                            st.markdown(f"- {em} {t}{time_str}")
+                    else:
+                        st.caption("今日無額外行程安排。")
 
         with col_overview:
             st.markdown("#### 📅 行程總覽")

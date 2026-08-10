@@ -373,7 +373,7 @@ def collect_plan_and_daily_data(form_data: Any) -> tuple[dict[str, Any], dict[st
     return plan_data, daily_data
 
 
-def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
+def build_monthly_plan(plan_data: dict[str, Any], schedule_result: list[dict[str, Any]] = None) -> list[dict[str, Any]]:
     start_date = datetime.strptime(plan_data.get("start_date", date.today().strftime("%Y-%m-%d")), "%Y-%m-%d").date()
     end_date = plan_data.get("end_date")
     if end_date:
@@ -384,8 +384,6 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
     else:
         end_date_value = start_date + timedelta(days=max(1, int(plan_data.get("timeframe_days", 1) or 1) - 1))
 
-    preferred_count = int(plan_data.get("preferred_subject_count", 0) or 0)
-    subjects = plan_data.get("subjects", []) or []
     fixed_events = plan_data.get("fixed_events", []) or []
 
     weekday_map = {
@@ -398,19 +396,58 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
         6: "週日",
     }
 
+    # Group schedule result by date and aggregate same subject & material
+    schedule_by_date: dict[str, list[dict[str, Any]]] = {}
+    if schedule_result:
+        for s in schedule_result:
+            d_str = s.get("date")
+            if d_str:
+                schedule_by_date.setdefault(d_str, []).append(s)
+
     monthly_plan: list[dict[str, Any]] = []
     current_date = start_date
     while current_date <= end_date_value:
-        selected_subjects = [item["name"] for item in subjects[: max(1, min(preferred_count or 1, len(subjects)))]]
-        tasks = []
-        for subject in subjects[: max(1, min(preferred_count or 1, len(subjects)))]:
-            for material in subject.get("materials", []) or []:
-                quantity = material.get("quantity", material.get("pages", 0))
-                if quantity:
-                    task_name = material.get("name") or material.get("type") or "教材"
-                    unit = get_material_unit(material.get("type", ""))
-                    tasks.append(f"{subject['name']}：{task_name} {quantity} {unit}")
+        d_str = current_date.strftime("%Y-%m-%d")
         weekday_label = weekday_map[current_date.weekday()]
+
+        tasks = []
+        selected_subjects = []
+        if d_str in schedule_by_date:
+            day_sessions = schedule_by_date[d_str]
+            # Group by (subject, material, unit) to combine duplicate subject/material lines
+            grouped: dict[tuple[str, str, str], float] = {}
+            for item in day_sessions:
+                subj = item.get("科目", "")
+                if subj == "總複習 (自由安排)" or not subj:
+                    continue
+                if subj not in selected_subjects:
+                    selected_subjects.append(subj)
+                mat = item.get("教材", "")
+                tgt = item.get("目標進度", "")
+                parts = tgt.split(" ")
+                qty = 0.0
+                unit = "頁"
+                if len(parts) >= 2:
+                    try:
+                        qty = float(parts[0])
+                        unit = parts[1]
+                    except ValueError:
+                        pass
+                elif len(parts) == 1 and parts[0]:
+                    try:
+                        qty = float(parts[0])
+                    except ValueError:
+                        pass
+                key = (subj, mat, unit)
+                grouped[key] = grouped.get(key, 0.0) + qty
+
+            for (subj, mat, unit), total_qty in grouped.items():
+                qty_str = f"{int(total_qty)}" if total_qty.is_integer() else f"{total_qty:.1f}"
+                if mat and mat != "-":
+                    tasks.append(f"{subj}：{mat} {qty_str} {unit}")
+                else:
+                    tasks.append(f"{subj}：{qty_str} {unit}")
+
         daily_events = [
             event
             for event in fixed_events
@@ -418,12 +455,12 @@ def build_monthly_plan(plan_data: dict[str, Any]) -> list[dict[str, Any]]:
         ]
         monthly_plan.append(
             {
-                "date": current_date.strftime("%Y-%m-%d"),
+                "date": d_str,
                 "day_name": weekday_label,
                 "subjects": selected_subjects,
                 "tasks": tasks,
                 "fixed_events": daily_events,
-                "target_progress": "完成今日指定頁數",
+                "target_progress": "完成今日指定進度",
             }
         )
         current_date += timedelta(days=1)
@@ -455,6 +492,54 @@ def _initialize_session_state() -> None:
         st.session_state["main_page"] = "計劃頁面"
     if "selected_day" not in st.session_state:
         st.session_state["selected_day"] = None
+
+
+def render_emoji_picker(label: str, current_emoji: str, key_prefix: str) -> str:
+    """提供一格一格的網格型表情符號選擇器，讓使用者一目了然，不用滑動長滾輪選單。"""
+    state_key = f"{key_prefix}_selected_emoji"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = current_emoji if current_emoji in EMOJI_OPTIONS else EMOJI_OPTIONS[0]
+
+    curr = st.session_state[state_key]
+    st.markdown(f"**{label}**")
+    with st.popover(f"{curr} 選擇表情符號 (點擊開啟表情格)", use_container_width=True):
+        st.caption("點擊下方表情格直接選取：")
+        cols = st.columns(8)
+        for i, emoji_char in enumerate(EMOJI_OPTIONS):
+            is_active = (emoji_char == curr)
+            btn_type = "primary" if is_active else "secondary"
+            if cols[i % 8].button(
+                emoji_char,
+                key=f"{key_prefix}_emj_{i}",
+                type=btn_type,
+                use_container_width=True
+            ):
+                st.session_state[state_key] = emoji_char
+                st.rerun()
+
+    return st.session_state.get(state_key, current_emoji)
+
+
+def render_weekday_selector(label: str, selected_weekdays: list[str], key_prefix: str) -> list[str]:
+    """星期按鈕選擇器，選取時直接套用自訂主題按鈕色彩 (button_color)。"""
+    state_key = f"{key_prefix}_weekdays_state"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = list(selected_weekdays)
+
+    current_selected = st.session_state[state_key]
+    st.markdown(f"**{label}**")
+    cols = st.columns(7)
+    for i, day_name in enumerate(WEEKDAY_OPTIONS):
+        is_sel = day_name in current_selected
+        btn_type = "primary" if is_sel else "secondary"
+        if cols[i].button(day_name, key=f"{key_prefix}_day_btn_{i}", type=btn_type, use_container_width=True):
+            if is_sel:
+                current_selected.remove(day_name)
+            else:
+                current_selected.append(day_name)
+            st.session_state[state_key] = list(current_selected)
+            st.rerun()
+    return st.session_state[state_key]
 
 
 def get_material_unit(material_type: str) -> str:
@@ -608,7 +693,7 @@ def render_setup_page() -> None:
                 st.session_state["subjects"][idx]["exam_date"] = exam_date_val.strftime("%Y-%m-%d")
                 
             with ec2:
-                weekdays_value = st.multiselect("希望安排在的星期", WEEKDAY_OPTIONS, default=subject.get("weekdays", []), key=f"subject_{idx}_weekdays")
+                weekdays_value = render_weekday_selector("希望安排在的星期", subject.get("weekdays", []), f"subject_{idx}")
                 st.session_state["subjects"][idx]["weekdays"] = weekdays_value
             if len(st.session_state["subjects"]) > 1:
                 st.button("刪除科目", key=f"delete_subject_{idx}", on_click=_del_subject, args=(idx,))
@@ -644,7 +729,7 @@ def render_setup_page() -> None:
     for idx, event in enumerate(st.session_state["fixed_events"]):
         with st.container():
             title_value = st.text_input("行程標題", value=event.get("title", ""), key=f"event_title_{idx}")
-            weekdays_value = st.multiselect("星期", WEEKDAY_OPTIONS, default=event.get("weekdays", []), key=f"event_weekdays_{idx}")
+            weekdays_value = render_weekday_selector("星期", event.get("weekdays", []), f"event_{idx}")
             
             st_col, end_col = st.columns(2)
             with st_col:
@@ -660,11 +745,10 @@ def render_setup_page() -> None:
             )
             if isinstance(color_option, dict):
                 st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{color_option['value']};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
-            emoji_option = st.selectbox(
+            emoji_option = render_emoji_picker(
                 "表情符號",
-                options=EMOJI_OPTIONS,
-                index=EMOJI_OPTIONS.index(event.get("emoji", EMOJI_OPTIONS[0])) if event.get("emoji") in EMOJI_OPTIONS else 0,
-                key=f"event_emoji_{idx}",
+                event.get("emoji", EMOJI_OPTIONS[0]),
+                f"event_{idx}"
             )
             show_on_calendar = st.checkbox("顯示在月曆", value=bool(event.get("show_on_calendar", True)), key=f"event_show_{idx}")
             concurrent_with_study = st.checkbox("是否能和讀書計畫並行？", value=bool(event.get("concurrent_with_study", False)), key=f"event_concurrent_{idx}")
@@ -726,11 +810,10 @@ def render_setup_page() -> None:
             if isinstance(color_option, dict):
                 st.markdown(f"<div style='display:inline-block;width:20px;height:20px;border-radius:4px;background:{color_option['value']};vertical-align:middle;margin-right:6px;'></div> {color_option['name']}", unsafe_allow_html=True)
             
-            emoji_option = st.selectbox(
+            emoji_option = render_emoji_picker(
                 "表情符號",
-                options=EMOJI_OPTIONS,
-                index=EMOJI_OPTIONS.index(event.get("emoji", "🏖️")) if event.get("emoji") in EMOJI_OPTIONS else 0,
-                key=f"specific_event_emoji_{idx}",
+                event.get("emoji", "🏖️"),
+                f"specific_event_{idx}"
             )
             
             show_on_calendar = st.checkbox("顯示在月曆", value=bool(event.get("show_on_calendar", True)), key=f"specific_event_show_{idx}")
@@ -789,8 +872,7 @@ def render_setup_page() -> None:
         st.info("💡 **系統偵測到您已有正在進行的計畫**。如果您中途新增了行程，建議勾選下方選項，系統會將您「還沒讀完的進度」重新均勻分配到「今天到計畫結束」的剩餘空閒時間中，並保留過去的打卡紀錄！")
         is_partial_reschedule = st.checkbox("保留過去紀錄，僅從今日起重新排定剩餘進度", value=True)
         
-    btn_text = "更新讀書計畫" if has_existing_plan else "生成完整讀書計畫"
-    if st.button(btn_text):
+    if st.button("生成讀書計畫", type="primary"):
         if end_date < start_date:
             st.error("結束日期不能早於開始日期。")
             return
@@ -858,7 +940,7 @@ def render_setup_page() -> None:
             
         st.session_state.setdefault("app_state", {})["monthly_plan"] = schedule_result
         
-        st.session_state["monthly_plan"] = build_monthly_plan(plan_data)
+        st.session_state["monthly_plan"] = build_monthly_plan(plan_data, schedule_result)
         st.session_state["main_page"] = "月計畫"
         
         # Save to storage
@@ -894,7 +976,7 @@ def is_dark_color(hex_color: str) -> bool:
 
 
 def apply_custom_theme() -> None:
-    theme = st.session_state.get("custom_theme") or {}
+    theme = st.session_state.get("custom_theme", {})
     bg_color = theme.get("bg_color", "#ffffff")
     button_color = theme.get("button_color", "#4f84ff")
     navbar_bg_color = theme.get("navbar_bg_color", "#f8f9fa")
@@ -1025,6 +1107,25 @@ def apply_custom_theme() -> None:
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+    }}
+    
+    /* 6. 星期與標籤 (Multiselect Tags & Pills) 套用按鈕自訂主題色 */
+    div[data-baseweb="tag"],
+    span[data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
+    div[data-baseweb="tag"] [data-role="remove"],
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {{
+        background-color: {button_color} !important;
+        background: {button_color} !important;
+        color: #ffffff !important;
+        border-color: {button_color} !important;
+    }}
+    div[data-baseweb="tag"] *,
+    span[data-baseweb="tag"] *,
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {{
+        color: #ffffff !important;
+        fill: #ffffff !important;
     }}
     </style>
     """

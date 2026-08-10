@@ -30,6 +30,32 @@ COLOR_OPTIONS = [
 ]
 
 
+def render_emoji_picker(label: str, current_emoji: str, key_prefix: str) -> str:
+    """提供一格一格的網格型表情符號選擇器，讓使用者一目了然，不用滑動長滾輪選單。"""
+    state_key = f"{key_prefix}_selected_emoji"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = current_emoji if current_emoji in EMOJI_OPTIONS else EMOJI_OPTIONS[0]
+
+    curr = st.session_state[state_key]
+    st.markdown(f"**{label}**")
+    with st.popover(f"{curr} 選擇表情符號 (點擊開啟表情格)", use_container_width=True):
+        st.caption("點擊下方表情格直接選取：")
+        cols = st.columns(8)
+        for i, emoji_char in enumerate(EMOJI_OPTIONS):
+            is_active = (emoji_char == curr)
+            btn_type = "primary" if is_active else "secondary"
+            if cols[i % 8].button(
+                emoji_char,
+                key=f"{key_prefix}_emj_{i}",
+                type=btn_type,
+                use_container_width=True
+            ):
+                st.session_state[state_key] = emoji_char
+                st.rerun()
+
+    return st.session_state.get(state_key, current_emoji)
+
+
 # The get_contrast_color logic has been moved to timeline_utils.py
 
 
@@ -230,9 +256,7 @@ def render_daily_checkin_page() -> None:
                         
                         st.info(f"⏱ 預覽：{e_sh}:{e_sm} → {e_eh}:{e_em}")
                         
-                        new_emoji_e = st.selectbox("表符", EMOJI_OPTIONS,
-                            index=EMOJI_OPTIONS.index(emoji) if emoji in EMOJI_OPTIONS else 0,
-                            key=f"edit_emoji_{i}")
+                        new_emoji_e = render_emoji_picker("表情符號", emoji, f"edit_emoji_{i}")
                         
                         new_concurrent = st.checkbox("是否能和讀書計畫並行？", 
                             value=bool(event.get("concurrent_with_study", False)), 
