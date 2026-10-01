@@ -448,17 +448,39 @@ def render_daily_checkin_page() -> None:
 
         st.markdown("#### ⚖️ 進度安排反饋")
         with st.container(border=True):
-            today_feedback = st.session_state["daily_feedback"].setdefault(today_str, {"amount": 3, "pacing": 3})
-            amount_feedback = st.radio(
-                "分量回饋 (1: 分量太少；5: 分量太多)",
-                [1, 2, 3, 4, 5], index=today_feedback["amount"] - 1, horizontal=True, key="daily_amount"
-            )
-            pacing_feedback = st.radio(
-                "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
-                [1, 2, 3, 4, 5], index=today_feedback["pacing"] - 1, horizontal=True, key="daily_pacing_score"
-            )
-            today_feedback["amount"] = amount_feedback
-            today_feedback["pacing"] = pacing_feedback
+            today_feedback = st.session_state["daily_feedback"].setdefault(today_str, {"amount": 3, "pacing": 3, "submitted": False})
+            is_feedback_submitted = today_feedback.get("submitted", False)
+
+            if not is_feedback_submitted:
+                amount_feedback = st.radio(
+                    "分量回饋 (1: 分量太少；5: 分量太多)",
+                    [1, 2, 3, 4, 5], index=today_feedback.get("amount", 3) - 1, horizontal=True, key="daily_amount"
+                )
+                pacing_feedback = st.radio(
+                    "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
+                    [1, 2, 3, 4, 5], index=today_feedback.get("pacing", 3) - 1, horizontal=True, key="daily_pacing_score"
+                )
+                today_feedback["amount"] = amount_feedback
+                today_feedback["pacing"] = pacing_feedback
+
+                if st.button("確認送出進度反饋", key="btn_submit_pacing_feedback", type="primary"):
+                    today_feedback["submitted"] = True
+                    st.rerun()
+            else:
+                amount_feedback = today_feedback.get("amount", 3)
+                pacing_feedback = today_feedback.get("pacing", 3)
+                st.radio(
+                    "分量回饋 (1: 分量太少；5: 分量太多)",
+                    [1, 2, 3, 4, 5], index=amount_feedback - 1, horizontal=True, key="daily_amount_locked", disabled=True
+                )
+                st.radio(
+                    "節奏回饋 (1: 節奏太慢、休息太多；5: 節奏太快、休息太少)",
+                    [1, 2, 3, 4, 5], index=pacing_feedback - 1, horizontal=True, key="daily_pacing_score_locked", disabled=True
+                )
+                st.success("已送出進度安排反饋！")
+                if st.button("✏️ 修改進度反饋", key="btn_edit_pacing_feedback"):
+                    today_feedback["submitted"] = False
+                    st.rerun()
 
             if "show_time_loss" not in st.session_state:
                 st.session_state["show_time_loss"] = False
