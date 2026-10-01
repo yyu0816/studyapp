@@ -708,7 +708,7 @@ def render_setup_page() -> None:
 
                 # 提醒使用者：頁數若填寫不完整 (僅填其中一格) 則顯示警示
                 if (has_sp and not has_ep) or (not has_sp and has_ep):
-                    st.warning(f"⚠️ 「{material_name.strip() or '教材項目'}」頁數填寫不完整：請同時填寫「起始頁」與「結束頁」（如 p.10 ~ 100），或將兩格皆留空視為單次不可拆分項目。")
+                    st.warning(f"⚠️ 「{material_name.strip() or '教材項目'}」頁數填寫不完整：請同時填寫「起始頁」與「結束頁」（如 p.10 ~ 100），或將兩格皆留空。")
 
                 if sp_num is not None and ep_num is not None and ep_num >= sp_num:
                     tot_pages = ep_num - sp_num + 1

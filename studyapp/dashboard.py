@@ -189,7 +189,7 @@ def render_subject_material_progress_section():
 
                 if is_atomic:
                     total_pages = 1
-                    range_label = "不可拆分項目"
+                    range_label = ""
                 elif sp is not None and ep is not None and ep >= sp:
                     total_pages = ep - sp + 1
                     range_label = f"p. {sp} ~ {ep}"
@@ -205,7 +205,7 @@ def render_subject_material_progress_section():
                 else:
                     qty = int(mat.get("quantity", mat.get("total_pages", 0)) or 0)
                     total_pages = qty if qty > 0 else 1
-                    range_label = f"共 {total_pages} 頁" if qty > 0 else "不可拆分項目"
+                    range_label = f"共 {total_pages} 頁" if qty > 0 else ""
                     
                 completed_count = 0
                 max_completed_p = 0
@@ -242,12 +242,13 @@ def render_subject_material_progress_section():
                     comp_pages = completed_count
                     pct = 100 if completed_count > 0 else 0
                     
+                label_suffix = f" ({range_label})" if range_label else ""
                 col_item, col_badge = st.columns([3, 1])
                 with col_item:
                     if pct >= 100:
-                        st.markdown(f"<s>✅ **{mat_name}** ({range_label})</s>", unsafe_allow_html=True)
+                        st.markdown(f"<s>✅ **{mat_name}**{label_suffix}</s>", unsafe_allow_html=True)
                     elif pct > 0:
-                        st.markdown(f"🔄 **{mat_name}** ({range_label})", unsafe_allow_html=True)
+                        st.markdown(f"🔄 **{mat_name}**{label_suffix}", unsafe_allow_html=True)
                         if sp is not None and max_completed_p >= sp:
                             detail_str = f"已完成 p. {sp} ~ {max_completed_p} (共 {comp_pages}/{total_pages} 頁, {pct}%)"
                         else:
@@ -255,7 +256,7 @@ def render_subject_material_progress_section():
                         st.caption(detail_str)
                         st.progress(pct / 100.0)
                     else:
-                        st.markdown(f"📌 **{mat_name}** ({range_label})", unsafe_allow_html=True)
+                        st.markdown(f"📌 **{mat_name}**{label_suffix}", unsafe_allow_html=True)
                         st.caption("尚未開始")
                         
                 with col_badge:
