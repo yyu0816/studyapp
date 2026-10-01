@@ -201,13 +201,10 @@ def render_settings_page() -> None:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        st.subheader("📚 每週講義與教材管理")
+        st.subheader("📚 科目與教材進度管理")
         with st.container(border=True):
-            st.markdown("##### 🎓 大學生每週動態講義補充工具")
-            st.caption("教授上課前才發布最新 PDF / 簡報 / 題庫？點擊下方按鈕隨時補充或修改頁數，系統會自動平滑重新分配進度！")
-            if st.button("📚 補充 / 更新每週講義與教材進度", type="primary", key="btn_settings_supp_mat"):
-                st.session_state["show_material_supplement_dialog"] = True
-                st.rerun()
+            st.markdown("##### 🎓 彈性進度與頁數管理")
+            st.info("💡 已將科目與教材項目設定整合至 **「計畫頁面」**。您可以隨時在 **「計畫頁面」** 新增科目、更新頁數範圍（如 p.10~100）或新增學習項目，系統將會自動將未完成的進度平滑分配至後續讀書日！")
 
         st.markdown("<br>", unsafe_allow_html=True)
 

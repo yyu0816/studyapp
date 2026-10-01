@@ -110,19 +110,40 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
                 if not isinstance(material, dict):
                     continue
                 name = str(material.get("name", "") or "").strip()
-                material_type = str(material.get("type", "課本") or "課本").strip() or "課本"
-                quantity = material.get("quantity", material.get("pages", 0))
+                sp_raw = material.get("start_page")
+                ep_raw = material.get("end_page")
+                
                 try:
-                    quantity_value = int(quantity)
-                except (TypeError, ValueError):
-                    quantity_value = 0
+                    sp_num = int(sp_raw) if sp_raw is not None and str(sp_raw).strip() != "" else None
+                except (ValueError, TypeError):
+                    sp_num = None
+
+                try:
+                    ep_num = int(ep_raw) if ep_raw is not None and str(ep_raw).strip() != "" else None
+                except (ValueError, TypeError):
+                    ep_num = None
+
+                if sp_num is not None and ep_num is not None and ep_num >= sp_num:
+                    tot_pages = ep_num - sp_num + 1
+                elif ep_num is not None and ep_num > 0:
+                    sp_num = 1
+                    tot_pages = ep_num
+                elif sp_num is not None and sp_num > 0:
+                    tot_pages = sp_num
+                else:
+                    qty = material.get("quantity", material.get("pages", 0))
+                    try:
+                        tot_pages = int(qty) if int(qty) > 0 else 0
+                    except:
+                        tot_pages = 0
+
                 material_entry = {
                     "name": name,
-                    "type": material_type,
-                    "quantity": quantity_value if quantity_value > 0 else 0,
+                    "start_page": sp_num,
+                    "end_page": ep_num,
+                    "quantity": tot_pages,
+                    "total_pages": tot_pages,
                 }
-                if "pages" in material:
-                    material_entry["pages"] = material.get("pages")
                 materials.append(material_entry)
             if subject.get("name") or materials:
                 subjects.append({
@@ -130,6 +151,7 @@ def parse_subject_entries(form_data: Any) -> list[dict[str, Any]]:
                     "color": str(subject.get("color", "#4f84ff") or "#4f84ff"),
                     "materials": materials,
                     "weekdays": list(subject.get("weekdays", []) or []),
+                    "exam_date": subject.get("exam_date"),
                 })
         return subjects
 
@@ -564,13 +586,13 @@ def get_material_unit(material_type: str) -> str:
 
 
 def _add_subject():
-    st.session_state["subjects"].append({"name": "", "color": "#4f84ff", "materials": [{"name": "", "type": "課本", "quantity": 1}], "weekdays": []})
+    st.session_state["subjects"].append({"name": "", "color": "#4f84ff", "materials": [{"name": "", "start_page": None, "end_page": None, "quantity": 0}], "weekdays": []})
 
 def _del_subject(idx):
     st.session_state["subjects"].pop(idx)
 
 def _add_material(idx):
-    st.session_state["subjects"][idx]["materials"].append({"name": "", "type": "課本", "quantity": 1})
+    st.session_state["subjects"][idx]["materials"].append({"name": "", "start_page": None, "end_page": None, "quantity": 0})
 
 def _del_material(idx, mid):
     del st.session_state["subjects"][idx]["materials"][mid]
@@ -613,130 +635,8 @@ def render_time_picker(label: str, default_time_str: str, key_prefix: str) -> st
     return f"{hour}:{minute}"
 
 
-@st.dialog("📚 補充 / 更新每週講義與教材進度")
-def render_material_supplement_dialog():
-    plan_data = st.session_state.get("plan") or st.session_state.get("app_state", {}).get("plan")
-    if not plan_data:
-        current_id = st.session_state.get("current_plan_id")
-        if current_id:
-            saved = storage.load_plan(current_id)
-            if saved:
-                plan_data = saved.get("plan") or saved.get("app_state", {}).get("plan")
-    
-    if not plan_data or not plan_data.get("subjects"):
-        st.warning("目前尚無有效讀書計畫或科目資料。請先至初始設定新增科目與計畫！")
-        if st.button("關閉", use_container_width=True, key="_supp_dlg_close_empty"):
-            st.session_state.pop("show_material_supplement_dialog", None)
-            st.rerun()
-        return
-
-    subjects = plan_data.get("subjects", [])
-    subj_names = [s.get("name", f"科目 {i+1}") for i, s in enumerate(subjects)]
-
-    st.markdown("💡 **大學生 / 每週講義動態發布友善工具**")
-    st.caption("教授上課前才發布 PDF、投影片或作業？選取科目後即可隨時新增最新每週講義，系統會自動重新計算排程並平滑分配至後續讀書日！")
-
-    sel_subj_idx = st.selectbox("請選擇要補充或更新講義的科目：", range(len(subj_names)), format_func=lambda i: subj_names[i], key="_supp_dlg_subj_sel")
-    selected_subject = subjects[sel_subj_idx]
-
-    materials = selected_subject.get("materials", [])
-
-    st.markdown(f"##### 📖 **{selected_subject.get('name')}** 當前講義與教材現狀")
-    if materials:
-        m_items = []
-        for m in materials:
-            name = m.get("name", "未命名教材")
-            m_type = m.get("type", "講義/簡報")
-            qty = m.get("quantity", m.get("pages", 0))
-            is_tbd = m.get("is_tbd", False) or qty == 0
-            unit = MATERIAL_UNIT_MAP.get(m_type, "頁/單位")
-            badge = "💡 待每週發布/待補充" if is_tbd else f"✅ {qty} {unit}"
-            m_items.append(f"・ **{name}** ({m_type}) — `{badge}`")
-        st.markdown("\n".join(m_items))
-    else:
-        st.info("此科目目前尚無教材紀錄。")
-
-    st.markdown("---")
-
-    tab_add, tab_edit = st.tabs(["✨ ＋ 補充上課新發布講義/簡報", "✏️ 填入/修改現有教材頁數"])
-
-    with tab_add:
-        st.markdown("###### 新增每週最新發布講義、PDF 投影片或習題")
-        new_name = st.text_input("講義/簡報名稱：", placeholder="例如：Week 5 講義 (Ch4 陣列)、HW3 作業題庫...", key="_supp_add_name", autocomplete="new-password")
-        c1, c2 = st.columns(2)
-        with c1:
-            mat_type_options = ["講義/簡報", "課本", "教材", "練習題", "模擬考", "教學影片", "筆記", "其他"]
-            new_type = st.selectbox("類型：", mat_type_options, key="_supp_add_type")
-        with c2:
-            new_qty = st.number_input("頁數 / 數量：", min_value=1, value=30, step=1, key="_supp_add_qty")
-        
-        if st.button("🚀 補充講義並自動重新分配排程", type="primary", use_container_width=True, key="_supp_btn_add_confirm"):
-            if not new_name.strip():
-                st.error("請輸入講義名稱！")
-            else:
-                new_item = {
-                    "name": new_name.strip(),
-                    "type": new_type,
-                    "quantity": int(new_qty),
-                    "is_tbd": False
-                }
-                materials.append(new_item)
-                selected_subject["materials"] = materials
-                subjects[sel_subj_idx] = selected_subject
-                plan_data["subjects"] = subjects
-
-                st.session_state["plan"] = plan_data
-                st.session_state.setdefault("app_state", {})["plan"] = plan_data
-
-                import monthlyplan
-                monthlyplan._trigger_reschedule_if_needed()
-
-                st.session_state.pop("show_material_supplement_dialog", None)
-                st.toast(f"🎉 已成功補充「{new_name.strip()} ({int(new_qty)} 頁)」，最新讀書進度已自動重新分配！")
-                st.rerun()
-
-    with tab_edit:
-        if not materials:
-            st.write("目前無既有教材可修改。")
-        else:
-            st.markdown("###### 修改已知教材的頁數或名稱")
-            mat_names = [m.get("name", f"教材 {i+1}") for i, m in enumerate(materials)]
-            sel_m_idx = st.selectbox("請選擇教材：", range(len(mat_names)), format_func=lambda i: mat_names[i], key="_supp_edit_mat_sel")
-            target_mat = materials[sel_m_idx]
-
-            edit_name = st.text_input("教材名稱：", value=target_mat.get("name", ""), key="_supp_edit_name", autocomplete="new-password")
-            edit_qty = st.number_input("最新頁數/數量：", min_value=1, value=max(1, int(target_mat.get("quantity", target_mat.get("pages", 1)))), step=1, key="_supp_edit_qty")
-
-            if st.button("💾 儲存修訂並重新分配進度", type="primary", use_container_width=True, key="_supp_btn_edit_confirm"):
-                if not edit_name.strip():
-                    st.error("教材名稱不能為空！")
-                else:
-                    target_mat["name"] = edit_name.strip()
-                    target_mat["quantity"] = int(edit_qty)
-                    target_mat["is_tbd"] = False
-                    materials[sel_m_idx] = target_mat
-                    selected_subject["materials"] = materials
-                    subjects[sel_subj_idx] = selected_subject
-                    plan_data["subjects"] = subjects
-
-                    st.session_state["plan"] = plan_data
-                    st.session_state.setdefault("app_state", {})["plan"] = plan_data
-
-                    import monthlyplan
-                    monthlyplan._trigger_reschedule_if_needed()
-
-                    st.session_state.pop("show_material_supplement_dialog", None)
-                    st.toast(f"🎉 已成功更新「{edit_name.strip()}」頁數為 {int(edit_qty)} 頁！")
-                    st.rerun()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("關閉視窗", use_container_width=True, key="_supp_dlg_close"):
-        st.session_state.pop("show_material_supplement_dialog", None)
-        st.rerun()
-
-
 def render_setup_page() -> None:
-    st.subheader("1. 初始設定")
+    st.subheader("1. 初始設定與科目管理")
     _initialize_session_state()
 
     if "plan_name" not in st.session_state: st.session_state["plan_name"] = ""
@@ -750,16 +650,8 @@ def render_setup_page() -> None:
     if end_date < start_date:
         st.error("結束日期不能早於開始日期。")
 
-    st.subheader("科目與教材")
-    with st.expander("🎓 大學生 / 每週講義動態發布友善機制（點此展開說明）", expanded=True):
-        st.info(
-            "💡 **教授上課前才發布最新 PDF / 講義？**\n\n"
-            "別擔心！您不需要在一開始就知道全學期的完整頁數：\n"
-            "1. 您可以先新增科目，並填寫已知教材或勾選「待每週發布 (0頁)」。\n"
-            "2. 計畫建立後，每當教授發布最新講義或簡報，在 **儀表板**、**月計畫** 或 **設定** 隨時點擊 **「📚 補充/更新每週講義」**。\n"
-            "3. 系統將會自動把最新講義平滑分配至本週與接下來的讀書日中，完全不需重新建立計畫！"
-        )
-    st.caption("每個科目可新增多個教材／材料，輸入完一項後再按新增科目或新增教材。")
+    st.subheader("科目與教材項目")
+    st.caption("每個科目可新增多個教材／材料項目（如：MIS課本 p.10~100、Ch4簡報）。可隨時在計畫頁面新增或更新頁數，系統將自動平滑分配未完成的進度。")
 
     for idx, subject in enumerate(st.session_state["subjects"]):
         with st.container():
@@ -781,56 +673,50 @@ def render_setup_page() -> None:
                 st.text_input("或輸入色號", value=color_val, key=f"subj_hex_in_{idx}", autocomplete="new-password", on_change=_update_subj_color, kwargs={"i": idx})
                 st.session_state["subjects"][idx]["color"] = st.session_state[f"subject_color_{idx}"]
 
-            materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "type": "課本", "quantity": 1, "is_tbd": False}])
+            materials = st.session_state["subjects"][idx].setdefault("materials", [{"name": "", "start_page": None, "end_page": None, "quantity": 0}])
             for mid, material in enumerate(materials):
-                effective_type = material.get("type", "課本")
-                selected_type = effective_type if effective_type in MATERIAL_TYPES else "其他"
-                cols = st.columns([2, 1.2, 1.2, 0.8])
+                cols = st.columns([2.5, 1.2, 1.2, 0.8])
                 with cols[0]:
-                    material_name = st.text_input("教材名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}", autocomplete="new-password")
-                    st.session_state["subjects"][idx]["materials"][mid]["name"] = material_name
+                    material_name = st.text_input("教材 / 項目名稱", value=material.get("name", ""), key=f"subject_{idx}_material_name_{mid}", placeholder="例如：MIS 課本、Ch4 投影片...", autocomplete="new-password")
                 with cols[1]:
-                    material_type = st.selectbox(
-                        "類型",
-                        MATERIAL_TYPES,
-                        index=MATERIAL_TYPES.index(selected_type),
-                        key=f"subject_{idx}_material_type_{mid}",
-                    )
-                    custom_type_value = material.get("custom_type", "") if material_type == "其他" else ""
-                    if material_type == "其他":
-                        custom_type_value = st.text_input(
-                            "其他類型",
-                            value=custom_type_value,
-                            key=f"subject_{idx}_material_custom_{mid}",
-                            autocomplete="new-password",
-                        )
-                        effective_type = custom_type_value.strip() or "其他"
-                    else:
-                        effective_type = material_type
-                    st.session_state["subjects"][idx]["materials"][mid]["type"] = effective_type
-                    if effective_type == "其他":
-                        st.session_state["subjects"][idx]["materials"][mid]["custom_type"] = custom_type_value
-                    else:
-                        st.session_state["subjects"][idx]["materials"][mid].pop("custom_type", None)
+                    sp_val = material.get("start_page")
+                    sp_str = str(sp_val) if sp_val is not None else ""
+                    sp_in = st.text_input("起始頁 (選填)", value=sp_str, key=f"subject_{idx}_material_sp_{mid}", placeholder="如 10", autocomplete="new-password")
                 with cols[2]:
-                    unit_text = get_material_unit(effective_type)
-                    chk_tbd = st.checkbox("待每週發布", value=material.get("is_tbd", False), key=f"subject_{idx}_material_tbd_{mid}")
-                    st.session_state["subjects"][idx]["materials"][mid]["is_tbd"] = chk_tbd
-                    if chk_tbd:
-                        quantity_value = 0
-                        st.caption("💡 待每週上課發布後補充進度")
-                    else:
-                        quantity_value = st.number_input(
-                            f"數量 ({unit_text})",
-                            min_value=0,
-                            step=1,
-                            value=int(material.get("quantity", material.get("pages", 1)) or 0),
-                            key=f"subject_{idx}_material_quantity_{mid}",
-                        )
-                    st.session_state["subjects"][idx]["materials"][mid]["quantity"] = int(quantity_value)
+                    ep_val = material.get("end_page")
+                    ep_str = str(ep_val) if ep_val is not None else ""
+                    ep_in = st.text_input("結束頁 (選填)", value=ep_str, key=f"subject_{idx}_material_ep_{mid}", placeholder="如 100", autocomplete="new-password")
                 with cols[3]:
-                    st.button("刪除教材", key=f"delete_material_{idx}_{mid}", on_click=_del_material, args=(idx, mid))
-            st.button("新增教材／材料", key=f"add_material_{idx}", on_click=_add_material, args=(idx,))
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    st.button("刪除", key=f"delete_material_{idx}_{mid}", on_click=_del_material, args=(idx, mid))
+
+                try:
+                    sp_num = int(sp_in.strip()) if sp_in.strip() else None
+                except:
+                    sp_num = None
+
+                try:
+                    ep_num = int(ep_in.strip()) if ep_in.strip() else None
+                except:
+                    ep_num = None
+
+                if sp_num is not None and ep_num is not None and ep_num >= sp_num:
+                    tot_pages = ep_num - sp_num + 1
+                elif ep_num is not None and ep_num > 0:
+                    sp_num = 1
+                    tot_pages = ep_num
+                elif sp_num is not None and sp_num > 0:
+                    tot_pages = sp_num
+                else:
+                    tot_pages = 0
+
+                st.session_state["subjects"][idx]["materials"][mid]["name"] = material_name
+                st.session_state["subjects"][idx]["materials"][mid]["start_page"] = sp_num
+                st.session_state["subjects"][idx]["materials"][mid]["end_page"] = ep_num
+                st.session_state["subjects"][idx]["materials"][mid]["quantity"] = tot_pages
+                st.session_state["subjects"][idx]["materials"][mid]["total_pages"] = tot_pages
+
+            st.button("新增教材 / 項目", key=f"add_material_{idx}", on_click=_add_material, args=(idx,))
             
             ec1, ec2 = st.columns(2)
             with ec1:

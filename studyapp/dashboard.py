@@ -152,10 +152,117 @@ def get_html_progress_bar(title: str, percentage: int, color_start: str, color_e
     </div>
 </div>"""
 
+import re
+
+def render_subject_material_progress_section():
+    """Render subject material completion status section."""
+    st.markdown("##### 📖 **各科目學習項目與進度清單**")
+    plan = st.session_state.get("plan", {})
+    subjects = plan.get("subjects", []) or st.session_state.get("subjects", [])
+    
+    if not subjects:
+        st.info("尚無科目與教材設定。請先至「計畫頁面」設定科目與學習項目！")
+        return
+        
+    daily_task_checks = st.session_state.get("daily_task_checks", {})
+    
+    with st.container(border=True):
+        for s_idx, subj in enumerate(subjects):
+            subj_name = subj.get("name", "未命名科目")
+            subj_color = subj.get("color", "#4f84ff")
+            materials = subj.get("materials", [])
+            
+            st.markdown(f"###### <span style='color:{subj_color}; font-size:16px;'>■</span> **{subj_name}**", unsafe_allow_html=True)
+            
+            if not materials:
+                st.caption("尚無新增教材項目")
+                continue
+                
+            for m_idx, mat in enumerate(materials):
+                mat_name = mat.get("name", "未命名項目")
+                if not mat_name.strip():
+                    mat_name = f"項目 {m_idx + 1}"
+                
+                sp = mat.get("start_page")
+                ep = mat.get("end_page")
+                qty = mat.get("quantity", mat.get("total_pages", 0)) or 0
+                
+                if sp is not None and ep is not None and ep >= sp:
+                    total_pages = ep - sp + 1
+                    range_label = f"p. {sp} ~ {ep}"
+                elif ep is not None and ep > 0:
+                    total_pages = ep
+                    sp = 1
+                    range_label = f"p. 1 ~ {ep}"
+                elif sp is not None and sp > 0:
+                    total_pages = sp
+                    ep = sp
+                    sp = 1
+                    range_label = f"p. 1 ~ {sp}"
+                else:
+                    total_pages = int(qty)
+                    range_label = f"共 {total_pages} 頁" if total_pages > 0 else "未指定頁數"
+                    
+                completed_count = 0
+                max_completed_p = 0
+                
+                prefix = f"{subj_name} - {mat_name}"
+                for d_str, checks in daily_task_checks.items():
+                    if not isinstance(checks, dict): continue
+                    for task_str, is_checked in checks.items():
+                        if is_checked and (task_str.startswith(f"{prefix}：") or task_str.startswith(f"{prefix} ") or task_str == prefix):
+                            m_range = re.search(r'p\.\s*(\d+)\s*~\s*(\d+)', task_str)
+                            m_pages = re.search(r'(\d+)\s*頁', task_str)
+                            m_num = re.search(r'(\d+)', task_str.split("：")[-1] if "：" in task_str else task_str)
+                            
+                            if m_range:
+                                r_start = int(m_range.group(1))
+                                r_end = int(m_range.group(2))
+                                completed_count += (r_end - r_start + 1)
+                                if r_end > max_completed_p:
+                                    max_completed_p = r_end
+                            elif m_pages:
+                                completed_count += int(m_pages.group(1))
+                            elif m_num:
+                                completed_count += int(m_num.group(1))
+                            else:
+                                completed_count += 1
+                                
+                if total_pages > 0:
+                    comp_pages = min(total_pages, completed_count)
+                    pct = int(round((comp_pages / total_pages) * 100))
+                else:
+                    comp_pages = completed_count
+                    pct = 100 if completed_count > 0 else 0
+                    
+                col_item, col_badge = st.columns([3, 1])
+                with col_item:
+                    if pct >= 100:
+                        st.markdown(f"<s>✅ **{mat_name}** ({range_label})</s>", unsafe_allow_html=True)
+                    elif pct > 0:
+                        st.markdown(f"🔄 **{mat_name}** ({range_label})", unsafe_allow_html=True)
+                        if sp is not None and max_completed_p >= sp:
+                            detail_str = f"已完成 p. {sp} ~ {max_completed_p} (共 {comp_pages}/{total_pages} 頁, {pct}%)"
+                        else:
+                            detail_str = f"已完成 {comp_pages}/{total_pages} 頁 ({pct}%)"
+                        st.caption(detail_str)
+                        st.progress(pct / 100.0)
+                    else:
+                        st.markdown(f"📌 **{mat_name}** ({range_label})", unsafe_allow_html=True)
+                        st.caption("尚未開始")
+                        
+                with col_badge:
+                    if pct >= 100:
+                        st.markdown("<span style='background-color:#d4edda; color:#155724; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>✅ 已完成 (100%)</span>", unsafe_allow_html=True)
+                    elif pct > 0:
+                        st.markdown(f"<span style='background-color:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>⌛ 進行中 ({pct}%)</span>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='background-color:#e2e3e5; color:#383d41; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>未開始 (0%)</span>", unsafe_allow_html=True)
+                        
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
 def render_dashboard():
     """Main render function for the dashboard page."""
-    
-    # st.markdown("## 📊 儀表板 (Dashboard)") # Removed per user request
     
     st.markdown("""
     <span id="dashboard-marker"></span>
@@ -180,17 +287,8 @@ def render_dashboard():
     subject_totals, df_daily = get_subject_study_analysis()
     mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
     completion_rate, checkin_days = get_overall_progress()
-    
-    with st.container(border=True):
-        c_info, c_btn = st.columns([3, 1])
-        with c_info:
-            st.markdown("##### 🎓 **大學生每週講義與教材補充**")
-            st.caption("教授上課前才發布最新 PDF 簡報或作業？點擊右側按鈕隨時補充，系統將自動平滑分配至後續讀書日！")
-        with c_btn:
-            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("📚 補充每週講義", type="primary", use_container_width=True, key="dash_btn_supp_material"):
-                st.session_state["show_material_supplement_dialog"] = True
-                st.rerun()
+
+    render_subject_material_progress_section()
 
     # Main Layout: Left 1/3, Right 2/3
     col_left, col_right = st.columns([1, 2], gap="large")
