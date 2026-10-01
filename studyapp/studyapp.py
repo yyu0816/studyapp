@@ -690,31 +690,39 @@ def render_setup_page() -> None:
                     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                     st.button("刪除", key=f"delete_material_{idx}_{mid}", on_click=_del_material, args=(idx, mid))
 
+                sp_raw = sp_in.strip()
+                ep_raw = ep_in.strip()
+
                 try:
-                    sp_num = int(sp_in.strip()) if sp_in.strip() else None
+                    sp_num = int(sp_raw) if sp_raw else None
                 except:
                     sp_num = None
 
                 try:
-                    ep_num = int(ep_in.strip()) if ep_in.strip() else None
+                    ep_num = int(ep_raw) if ep_raw else None
                 except:
                     ep_num = None
 
+                has_sp = (sp_num is not None) or bool(sp_raw)
+                has_ep = (ep_num is not None) or bool(ep_raw)
+
+                # 提醒使用者：頁數若填寫不完整 (僅填其中一格) 則顯示警示
+                if (has_sp and not has_ep) or (not has_sp and has_ep):
+                    st.warning(f"⚠️ 「{material_name.strip() or '教材項目'}」頁數填寫不完整：請同時填寫「起始頁」與「結束頁」（如 p.10 ~ 100），或將兩格皆留空視為單次不可拆分項目。")
+
                 if sp_num is not None and ep_num is not None and ep_num >= sp_num:
                     tot_pages = ep_num - sp_num + 1
-                elif ep_num is not None and ep_num > 0:
-                    sp_num = 1
-                    tot_pages = ep_num
-                elif sp_num is not None and sp_num > 0:
-                    tot_pages = sp_num
+                    is_atomic = False
                 else:
                     tot_pages = 0
+                    is_atomic = True
 
                 st.session_state["subjects"][idx]["materials"][mid]["name"] = material_name
-                st.session_state["subjects"][idx]["materials"][mid]["start_page"] = sp_num
-                st.session_state["subjects"][idx]["materials"][mid]["end_page"] = ep_num
-                st.session_state["subjects"][idx]["materials"][mid]["quantity"] = tot_pages
-                st.session_state["subjects"][idx]["materials"][mid]["total_pages"] = tot_pages
+                st.session_state["subjects"][idx]["materials"][mid]["start_page"] = sp_num if not is_atomic else None
+                st.session_state["subjects"][idx]["materials"][mid]["end_page"] = ep_num if not is_atomic else None
+                st.session_state["subjects"][idx]["materials"][mid]["is_atomic"] = is_atomic
+                st.session_state["subjects"][idx]["materials"][mid]["quantity"] = tot_pages if not is_atomic else 1
+                st.session_state["subjects"][idx]["materials"][mid]["total_pages"] = tot_pages if not is_atomic else 1
 
             st.button("新增教材 / 項目", key=f"add_material_{idx}", on_click=_add_material, args=(idx,))
             

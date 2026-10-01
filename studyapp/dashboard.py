@@ -185,9 +185,12 @@ def render_subject_material_progress_section():
                 
                 sp = mat.get("start_page")
                 ep = mat.get("end_page")
-                qty = mat.get("quantity", mat.get("total_pages", 0)) or 0
-                
-                if sp is not None and ep is not None and ep >= sp:
+                is_atomic = mat.get("is_atomic", False) or (sp is None and ep is None)
+
+                if is_atomic:
+                    total_pages = 1
+                    range_label = "不可拆分項目"
+                elif sp is not None and ep is not None and ep >= sp:
                     total_pages = ep - sp + 1
                     range_label = f"p. {sp} ~ {ep}"
                 elif ep is not None and ep > 0:
@@ -200,8 +203,9 @@ def render_subject_material_progress_section():
                     sp = 1
                     range_label = f"p. 1 ~ {sp}"
                 else:
-                    total_pages = int(qty)
-                    range_label = f"共 {total_pages} 頁" if total_pages > 0 else "未指定頁數"
+                    qty = int(mat.get("quantity", mat.get("total_pages", 0)) or 0)
+                    total_pages = qty if qty > 0 else 1
+                    range_label = f"共 {total_pages} 頁" if qty > 0 else "不可拆分項目"
                     
                 completed_count = 0
                 max_completed_p = 0
@@ -228,7 +232,10 @@ def render_subject_material_progress_section():
                             else:
                                 completed_count += 1
                                 
-                if total_pages > 0:
+                if is_atomic:
+                    pct = 100 if completed_count >= 1 else 0
+                    comp_pages = 1 if pct == 100 else 0
+                elif total_pages > 0:
                     comp_pages = min(total_pages, completed_count)
                     pct = int(round((comp_pages / total_pages) * 100))
                 else:

@@ -646,53 +646,70 @@ def generate_daily_schedule(plan: dict, existing_schedule: List[Dict[str, Any]] 
             mat_name = mat.get("name", "未命名教材")
             sp = mat.get("start_page")
             ep = mat.get("end_page")
-            qty = int(mat.get("quantity", mat.get("total_pages", 0)) or 0)
-            if qty <= 0:
-                continue
+            is_atomic = mat.get("is_atomic", False) or (sp is None and ep is None)
 
-            past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
-            remaining_qty = max(0, qty - past_qty)
-            if remaining_qty <= 0:
-                continue
-
-            # Compute page ranges for remaining pages
-            curr_p = (sp + past_qty) if sp is not None else None
-
-            num_days = len(valid_dates)
-            allocations = []
-            if remaining_qty <= num_days:
-                # 頁數小於天數：均勻間隔安排在各天 (每天 1 頁)
-                step = num_days / remaining_qty
-                for i in range(remaining_qty):
-                    idx = min(int(i * step), num_days - 1)
-                    allocations.append((valid_dates[idx], 1))
+            if is_atomic:
+                past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
+                if past_qty >= 1:
+                    continue  # 已在過去排定過或已完成
+                # 不可拆分項目：一次性安排在第一個有效讀書日
+                allocations = [(valid_dates[0], 1)]
+                for d, q in allocations:
+                    mat_daily_map.setdefault(d, []).append({
+                        "subject": subj_name,
+                        "color": subj_color,
+                        "material": mat_name,
+                        "target_str": "全項完成",
+                        "qty": 1
+                    })
             else:
-                # 頁數大於天數：平攤分配到每一天
-                base = remaining_qty // num_days
-                rem = remaining_qty % num_days
-                for i, d in enumerate(valid_dates):
-                    q = base + (1 if i < rem else 0)
-                    allocations.append((d, q))
+                qty = int(mat.get("quantity", mat.get("total_pages", 0)) or 0)
+                if qty <= 0:
+                    continue
 
-            for d, q in allocations:
-                if curr_p is not None:
-                    p_start = curr_p
-                    p_end = curr_p + q - 1
-                    curr_p += q
-                    if p_start == p_end:
-                        target_str = f"p. {p_start} (1 頁)"
-                    else:
-                        target_str = f"p. {p_start} ~ {p_end} ({q} 頁)"
+                past_qty = past_scheduled_qty.get((subj_name, mat_name), 0)
+                remaining_qty = max(0, qty - past_qty)
+                if remaining_qty <= 0:
+                    continue
+
+                # Compute page ranges for remaining pages
+                curr_p = (sp + past_qty) if sp is not None else None
+
+                num_days = len(valid_dates)
+                allocations = []
+                if remaining_qty <= num_days:
+                    # 頁數小於天數：均勻間隔安排在各天 (每天 1 頁)
+                    step = num_days / remaining_qty
+                    for i in range(remaining_qty):
+                        idx = min(int(i * step), num_days - 1)
+                        allocations.append((valid_dates[idx], 1))
                 else:
-                    target_str = f"{q} 頁"
+                    # 頁數大於天數：平攤分配到每一天
+                    base = remaining_qty // num_days
+                    rem = remaining_qty % num_days
+                    for i, d in enumerate(valid_dates):
+                        q = base + (1 if i < rem else 0)
+                        allocations.append((d, q))
 
-                mat_daily_map.setdefault(d, []).append({
-                    "subject": subj_name,
-                    "color": subj_color,
-                    "material": mat_name,
-                    "target_str": target_str,
-                    "qty": q
-                })
+                for d, q in allocations:
+                    if curr_p is not None:
+                        p_start = curr_p
+                        p_end = curr_p + q - 1
+                        curr_p += q
+                        if p_start == p_end:
+                            target_str = f"p. {p_start} (1 頁)"
+                        else:
+                            target_str = f"p. {p_start} ~ {p_end} ({q} 頁)"
+                    else:
+                        target_str = f"{q} 頁"
+
+                    mat_daily_map.setdefault(d, []).append({
+                        "subject": subj_name,
+                        "color": subj_color,
+                        "material": mat_name,
+                        "target_str": target_str,
+                        "qty": q
+                    })
 
     # 3. 產生最終每日每時段排程
     schedule = list(past_schedule_output)
