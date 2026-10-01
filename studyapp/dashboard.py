@@ -181,6 +181,17 @@ def render_dashboard():
     mood_history, month_str = get_mock_mood_history(st.session_state.dashboard_month_offset)
     completion_rate, checkin_days = get_overall_progress()
     
+    with st.container(border=True):
+        c_info, c_btn = st.columns([3, 1])
+        with c_info:
+            st.markdown("##### 🎓 **大學生每週講義與教材補充**")
+            st.caption("教授上課前才發布最新 PDF 簡報或作業？點擊右側按鈕隨時補充，系統將自動平滑分配至後續讀書日！")
+        with c_btn:
+            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("📚 補充每週講義", type="primary", use_container_width=True, key="dash_btn_supp_material"):
+                st.session_state["show_material_supplement_dialog"] = True
+                st.rerun()
+
     # Main Layout: Left 1/3, Right 2/3
     col_left, col_right = st.columns([1, 2], gap="large")
     

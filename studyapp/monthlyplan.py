@@ -487,13 +487,19 @@ def render_monthly_plan_page() -> None:
         with col_overview:
             st.markdown("#### 📅 行程總覽")
             
-            # 新增行程按鈕
-            if st.button("＋ 新增行程", key=f"add_btn_{year}_{month}", use_container_width=True, type="primary"):
-                # Default to first day of current month within plan range
-                default_day = max(start_date, date(year, month, 1))
-                st.session_state["show_add_event_dialog"] = True
-                st.session_state["add_event_dialog_day"] = default_day.strftime("%Y-%m-%d")
-                st.rerun()
+            # 新增行程與補充講義按鈕
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("＋ 新增行程", key=f"add_btn_{year}_{month}", use_container_width=True, type="primary"):
+                    # Default to first day of current month within plan range
+                    default_day = max(start_date, date(year, month, 1))
+                    st.session_state["show_add_event_dialog"] = True
+                    st.session_state["add_event_dialog_day"] = default_day.strftime("%Y-%m-%d")
+                    st.rerun()
+            with col_b2:
+                if st.button("📚 補充每週講義", key=f"supp_btn_{year}_{month}", use_container_width=True):
+                    st.session_state["show_material_supplement_dialog"] = True
+                    st.rerun()
             
             # Collect ALL user-added events for this month from override
             # (not limited to _items dates — events can span outside plan range)

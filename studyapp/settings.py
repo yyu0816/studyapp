@@ -201,6 +201,16 @@ def render_settings_page() -> None:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
+        st.subheader("📚 每週講義與教材管理")
+        with st.container(border=True):
+            st.markdown("##### 🎓 大學生每週動態講義補充工具")
+            st.caption("教授上課前才發布最新 PDF / 簡報 / 題庫？點擊下方按鈕隨時補充或修改頁數，系統會自動平滑重新分配進度！")
+            if st.button("📚 補充 / 更新每週講義與教材進度", type="primary", key="btn_settings_supp_mat"):
+                st.session_state["show_material_supplement_dialog"] = True
+                st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         st.subheader("📦 資料備份與清理")
         with st.container(border=True):
             plan_data = storage.load_plan(plan_id) or {}
