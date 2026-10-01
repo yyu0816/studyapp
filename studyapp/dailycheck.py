@@ -482,13 +482,8 @@ def render_daily_checkin_page() -> None:
                     today_feedback["submitted"] = False
                     st.rerun()
 
-            if "show_time_loss" not in st.session_state:
-                st.session_state["show_time_loss"] = False
-
-            if st.button("新增意外損失時間", key="btn_show_time_loss"):
-                st.session_state["show_time_loss"] = True
-
-            if st.session_state["show_time_loss"]:
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("➕ 新增意外損失時間"):
                 st.markdown("**新增一筆意外損失**")
                 st.markdown("開始時間")
                 loss_start_h = st.selectbox("開始時", [f"{h:02d}" for h in range(24)], key="loss_s_h")
@@ -498,9 +493,9 @@ def render_daily_checkin_page() -> None:
                 loss_end_m = st.selectbox("結束分", [f"{m:02d}" for m in range(60)], key="loss_e_m")
                     
                 st.info(f"⏱ 預覽：{loss_start_h}:{loss_start_m} → {loss_end_h}:{loss_end_m}")
-                loss_reason = st.text_input("原因（選填）", key="loss_reason")
+                loss_reason = st.text_input("原因（選填）", key="loss_reason", autocomplete="new-password")
 
-                if st.button("新增這筆"):
+                if st.button("確認新增這筆損失", key="btn_add_time_loss"):
                     start_mins = _time_to_minutes(loss_start_h, loss_start_m)
                     end_mins   = _time_to_minutes(loss_end_h,   loss_end_m)
                     diff_mins  = end_mins - start_mins
@@ -516,22 +511,22 @@ def render_daily_checkin_page() -> None:
                         del st.session_state["loss_reason"]
                     st.rerun()
 
-                time_loss_records = st.session_state["time_loss_records"].get(today_str, [])
-                if time_loss_records:
-                    st.markdown("**已記錄的意外損失：**")
-                    total_mins = 0
-                    for rec in time_loss_records:
-                        mins = rec.get("minutes", 0)
-                        total_mins += mins
-                        reason_str = f"　原因：{rec['reason']}" if rec.get("reason") else ""
-                        st.markdown(f"- {rec['start']} → {rec['end']}　**{mins} 分鐘**{reason_str}")
-                    total_h = total_mins // 60
-                    total_m = total_mins % 60
-                    st.info(f"⏱ 今日合計損失：**{total_h} 小時 {total_m} 分鐘**")
-                else:
-                    total_mins = 0
+            time_loss_records = st.session_state.get("time_loss_records", {}).get(today_str, [])
+            if time_loss_records:
+                st.markdown("**已記錄的意外損失：**")
+                total_mins = 0
+                for rec in time_loss_records:
+                    mins = rec.get("minutes", 0)
+                    total_mins += mins
+                    reason_str = f"　原因：{rec['reason']}" if rec.get("reason") else ""
+                    st.markdown(f"- {rec['start']} → {rec['end']}　**{mins} 分鐘**{reason_str}")
+                total_h = total_mins // 60
+                total_m = total_mins % 60
+                st.info(f"⏱ 今日合計損失：**{total_h} 小時 {total_m} 分鐘**")
+            else:
+                total_mins = 0
 
-                time_loss = round(total_mins / 60, 2)
+            time_loss = round(total_mins / 60, 2)
 
         # ── 紀錄區 ───────────────────────────────────────────────────────────
         st.markdown("#### 🗒️ 紀錄區")
