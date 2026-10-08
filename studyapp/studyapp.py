@@ -525,8 +525,6 @@ def _initialize_session_state() -> None:
         st.session_state["plan_name"] = ""
     if "plan_goal" not in st.session_state:
         st.session_state["plan_goal"] = ""
-    if "preferred_subject_count" not in st.session_state:
-        st.session_state["preferred_subject_count"] = 0
     if "main_page" not in st.session_state:
         st.session_state["main_page"] = "計劃頁面"
     if "selected_day" not in st.session_state:
@@ -585,8 +583,23 @@ def get_material_unit(material_type: str) -> str:
     return MATERIAL_UNIT_MAP.get(material_type, "項")
 
 
+def _sync_exam_date_to_end_date():
+    new_end = st.session_state.get("setup_end_date")
+    if new_end:
+        for idx, subj in enumerate(st.session_state.get("subjects", [])):
+            subj["exam_date"] = new_end.strftime("%Y-%m-%d")
+            st.session_state[f"subject_{idx}_exam_date"] = new_end
+
 def _add_subject():
-    st.session_state["subjects"].append({"name": "", "color": "#4f84ff", "materials": [{"name": "", "start_page": None, "end_page": None, "quantity": 0}], "weekdays": []})
+    end_d = st.session_state.get("setup_end_date", date.today() + timedelta(days=29))
+    end_d_str = end_d.strftime("%Y-%m-%d") if isinstance(end_d, date) else str(end_d)
+    st.session_state["subjects"].append({
+        "name": "",
+        "color": "#4f84ff",
+        "materials": [{"name": "", "start_page": None, "end_page": None, "quantity": 0}],
+        "weekdays": [],
+        "exam_date": end_d_str
+    })
 
 def _del_subject(idx):
     st.session_state["subjects"].pop(idx)
@@ -646,7 +659,7 @@ def render_setup_page() -> None:
     st.session_state["plan_goal"] = st.text_area("計畫目標", value=st.session_state["plan_goal"], placeholder="進入班排前十、書卷獎、比上次進步五名...")
 
     start_date = st.date_input("開始日期", value=date.today(), key="setup_start_date")
-    end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date")
+    end_date = st.date_input("結束日期", value=start_date + timedelta(days=29), key="setup_end_date", on_change=_sync_exam_date_to_end_date)
     if end_date < start_date:
         st.error("結束日期不能早於開始日期。")
 
@@ -736,8 +749,11 @@ def render_setup_page() -> None:
                         default_exam = end_date
                 if not default_exam:
                     default_exam = end_date
-                
-                exam_date_val = st.date_input("考試日期 (排程基準日)", value=default_exam, key=f"subject_{idx}_exam_date")
+
+                if f"subject_{idx}_exam_date" not in st.session_state:
+                    st.session_state[f"subject_{idx}_exam_date"] = default_exam
+
+                exam_date_val = st.date_input("考試日期 (排程基準日)", key=f"subject_{idx}_exam_date")
                 st.session_state["subjects"][idx]["exam_date"] = exam_date_val.strftime("%Y-%m-%d")
                 
             with ec2:
@@ -748,28 +764,6 @@ def render_setup_page() -> None:
         st.divider()
 
     st.button("新增科目", on_click=_add_subject)
-
-    st.subheader("學習偏好")
-    count_options = ["無偏好"] + [str(i) for i in range(1, 11)]
-    raw_pref = st.session_state.get("preferred_subject_count", "無偏好")
-    if raw_pref == 0 or raw_pref == "0" or not raw_pref:
-        pref_str = "無偏好"
-    else:
-        pref_str = str(raw_pref)
-    if pref_str not in count_options:
-        pref_str = "無偏好"
-
-    pref_idx = count_options.index(pref_str)
-
-    preferred_subject_count_value = st.selectbox(
-        "每天偏好的總科目數量",
-        count_options,
-        index=pref_idx,
-        key="select_preferred_subj_count",
-    )
-    st.session_state["preferred_subject_count"] = 0 if preferred_subject_count_value == "無偏好" else int(preferred_subject_count_value)
-
-    st.caption("你可以設定每天最希望安排的科目數量，若沒有特別偏好可選無偏好。")
 
     st.subheader("固定行程")
     st.caption("可像 Google Calendar 一樣新增固定行程，並選擇要不要顯示在月曆上。")
@@ -960,7 +954,6 @@ def render_setup_page() -> None:
             "plan_goal": st.session_state.get("plan_goal", ""),
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
-            "preferred_subject_count": st.session_state.get("preferred_subject_count", 0),
             "subjects": st.session_state["subjects"],
             "fixed_events": st.session_state["fixed_events"],
             "specific_events": st.session_state["specific_events"],
